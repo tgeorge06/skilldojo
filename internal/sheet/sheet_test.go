@@ -171,6 +171,30 @@ func TestStoreGrade(t *testing.T) {
 	}
 }
 
+func TestExpiredSheetNotGradeable(t *testing.T) {
+	st := NewStore()
+	sh := &Sheet{ID: "old", CreatedAt: time.Now().Add(-2 * sheetTTL), Questions: []Question{{Prompt: "1 + 1", Op: OpAddSub, answer: whole(2)}}}
+	if err := st.Put(sh); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.Grade("old", []string{"2"}); err == nil {
+		t.Error("expired sheet should not be gradeable")
+	}
+}
+
+func TestStoreCapacity(t *testing.T) {
+	st := NewStore()
+	for i := 0; i < maxActiveSheets; i++ {
+		sh := &Sheet{ID: strconv.Itoa(i), CreatedAt: time.Now()}
+		if err := st.Put(sh); err != nil {
+			t.Fatalf("put %d: %v", i, err)
+		}
+	}
+	if err := st.Put(&Sheet{ID: "overflow", CreatedAt: time.Now()}); err == nil {
+		t.Error("store over capacity should reject new sheets")
+	}
+}
+
 func TestGradeAcceptsEquivalentFractions(t *testing.T) {
 	st := NewStore()
 	sh := &Sheet{ID: "t1", CreatedAt: time.Now(), Questions: []Question{{Prompt: "1/4 + 1/4", Op: OpFrac, answer: frac(1, 2)}}}

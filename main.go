@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"html/template"
+	"io"
 	"io/fs"
 	"log"
 	"net/http"
@@ -85,7 +86,10 @@ func (s *server) handleNewSheet(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	s.store.Put(sh)
+	if err := s.store.Put(sh); err != nil {
+		writeError(w, http.StatusTooManyRequests, err)
+		return
+	}
 	writeJSON(w, newSheetResponse{ID: sh.ID, Questions: sh.Questions})
 }
 
@@ -132,8 +136,8 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, v any) error {
 		writeError(w, http.StatusBadRequest, fmt.Errorf("bad request body: %w", err))
 		return err
 	}
-	if dec.More() {
-		err := fmt.Errorf("bad request body: trailing data")
+	if err := dec.Decode(&struct{}{}); err != io.EOF {
+		err = fmt.Errorf("bad request body: trailing data")
 		writeError(w, http.StatusBadRequest, err)
 		return err
 	}

@@ -101,23 +101,40 @@ func Generate(ops []string, belt string, count int) (*Sheet, error) {
 	return &Sheet{ID: id, Questions: qs, Belt: belt, CreatedAt: time.Now()}, nil
 }
 
-// Put stores a sheet, evicting sheets older than an hour.
-func (s *Store) Put(sh *Sheet) {
+// maxActiveSheets bounds memory use if a client hammers /api/sheet.
+const maxActiveSheets = 1000
+
+// sheetTTL is how long an unsubmitted sheet stays gradeable.
+const sheetTTL = time.Hour
+
+// ErrTooManySheets is returned when the store is at capacity.
+var ErrTooManySheets = fmt.Errorf("too many active sheets — try again in a minute")
+
+// Put stores a sheet, evicting sheets older than sheetTTL.
+func (s *Store) Put(sh *Sheet) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	cutoff := time.Now().Add(-time.Hour)
+	cutoff := time.Now().Add(-sheetTTL)
 	for id, old := range s.sheets {
 		if old.CreatedAt.Before(cutoff) {
 			delete(s.sheets, id)
 		}
 	}
+	if len(s.sheets) >= maxActiveSheets {
+		return ErrTooManySheets
+	}
 	s.sheets[sh.ID] = sh
+	return nil
 }
 
 // Grade scores answers against the stored sheet and removes it.
 func (s *Store) Grade(id string, answers []string) ([]Result, error) {
 	s.mu.Lock()
 	sh, ok := s.sheets[id]
+	if ok && sh.CreatedAt.Before(time.Now().Add(-sheetTTL)) {
+		delete(s.sheets, id)
+		ok = false
+	}
 	if ok && len(answers) == len(sh.Questions) {
 		delete(s.sheets, id) // consume only on a well-formed submission
 	}
