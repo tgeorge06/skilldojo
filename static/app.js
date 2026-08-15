@@ -10,7 +10,7 @@ function dojo() {
     sheetId: "",
     questions: [],
     answers: [],
-    grade: { results: [], score: 0, total: 0, percent: 0 },
+    report: { results: [], score: 0, total: 0, percent: 0 },
 
     opChoices: [
       { id: "addsub", label: "Add & Subtract", emoji: "➕", hint: "big numbers!" },
@@ -36,7 +36,7 @@ function dojo() {
       return this.answers.filter((a) => a && a.trim() !== "").length;
     },
     gradeMessage() {
-      const p = this.grade.percent;
+      const p = this.report.percent;
       if (p === 100) return "PERFECT! A true SkillDojo master!";
       if (p >= 90) return "Amazing work — almost perfect!";
       if (p >= 80) return "Great job! Keep training!";
@@ -84,10 +84,10 @@ function dojo() {
       this.busy = true;
       this.error = "";
       try {
-        this.grade = await this.post("/api/grade", { id: this.sheetId, answers: this.answers });
+        this.report = await this.post("/api/grade", { id: this.sheetId, answers: this.answers });
         this.view = "results";
         window.scrollTo(0, 0);
-        if (this.grade.percent === 100) confettiBurst();
+        if (this.report.percent === 100) confettiBurst();
       } catch (e) {
         this.error = e.message;
       } finally {

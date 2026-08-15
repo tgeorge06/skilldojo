@@ -16,7 +16,7 @@
     <span class="text-4xl">🥋</span>
     <div>
       <h1 class="text-2xl font-bold tracking-tight">SkillDojo</h1>
-      <p class="text-sm text-slate-500 dark:text-slate-400">Math Dojo — train your skills, earn your belt</p>
+      <p class="text-sm text-slate-500 dark:text-slate-400">Math Dojo — pick your grade, train your skills</p>
     </div>
   </header>
 
@@ -112,18 +112,18 @@
   <!-- Results -->
   <section x-show="view === 'results'" x-cloak class="space-y-6">
     <div class="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-8 text-center shadow-sm">
-      <div class="text-6xl mb-2" x-text="grade.percent === 100 ? '🏆' : grade.percent >= 80 ? '🎉' : grade.percent >= 60 ? '💪' : '🥋'"></div>
-      <div class="text-5xl font-black tabular-nums" :class="grade.percent >= 80 ? 'text-emerald-600 dark:text-emerald-400' : grade.percent >= 60 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'">
-        <span x-text="grade.percent"></span>%
+      <div class="text-6xl mb-2" x-text="report.percent === 100 ? '🏆' : report.percent >= 80 ? '🎉' : report.percent >= 60 ? '💪' : '🥋'"></div>
+      <div class="text-5xl font-black tabular-nums" :class="report.percent >= 80 ? 'text-emerald-600 dark:text-emerald-400' : report.percent >= 60 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'">
+        <span x-text="report.percent"></span>%
       </div>
       <p class="mt-2 text-lg font-semibold text-slate-600 dark:text-slate-300">
-        <span x-text="grade.score"></span> out of <span x-text="grade.total"></span> correct
+        <span x-text="report.score"></span> out of <span x-text="report.total"></span> correct
       </p>
       <p class="mt-1 text-sm text-slate-500 dark:text-slate-400" x-text="gradeMessage()"></p>
     </div>
 
     <div class="space-y-2">
-      <template x-for="(r, i) in grade.results" :key="i">
+      <template x-for="(r, i) in report.results" :key="i">
         <div class="flex items-center gap-4 rounded-xl border px-5 py-3 shadow-sm"
              :class="r.right
                ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-200 dark:border-emerald-900'
