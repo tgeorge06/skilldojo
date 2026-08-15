@@ -118,8 +118,8 @@ func (s *Store) Put(sh *Sheet) {
 func (s *Store) Grade(id string, answers []string) ([]Result, error) {
 	s.mu.Lock()
 	sh, ok := s.sheets[id]
-	if ok {
-		delete(s.sheets, id)
+	if ok && len(answers) == len(sh.Questions) {
+		delete(s.sheets, id) // consume only on a well-formed submission
 	}
 	s.mu.Unlock()
 	if !ok {

@@ -50,6 +50,8 @@ func main() {
 		Addr:              *addr,
 		Handler:           mux,
 		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      15 * time.Second,
 	}
 	log.Printf("SkillDojo listening on http://%s", *addr)
 	log.Fatal(srv.ListenAndServe())
@@ -128,6 +130,11 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, v any) error {
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(v); err != nil {
 		writeError(w, http.StatusBadRequest, fmt.Errorf("bad request body: %w", err))
+		return err
+	}
+	if dec.More() {
+		err := fmt.Errorf("bad request body: trailing data")
+		writeError(w, http.StatusBadRequest, err)
 		return err
 	}
 	return nil

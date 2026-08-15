@@ -164,6 +164,11 @@ func TestStoreGrade(t *testing.T) {
 	if _, err := st.Grade(sh2.ID, []string{"1"}); err == nil {
 		t.Error("wrong answer count should fail")
 	}
+	// A malformed submission must not consume the sheet.
+	good := make([]string, len(sh2.Questions))
+	if _, err := st.Grade(sh2.ID, good); err != nil {
+		t.Errorf("sheet should survive a malformed grade attempt: %v", err)
+	}
 }
 
 func TestGradeAcceptsEquivalentFractions(t *testing.T) {
