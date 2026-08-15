@@ -87,10 +87,15 @@ func Generate(ops []string, belt string, count int) (*Sheet, error) {
 		return nil, fmt.Errorf("count must be 10, 20, or 30")
 	}
 
+	// Shuffle a copy so the remainder questions of an uneven split don't
+	// always favor the first-listed operations.
+	shuffled := make([]string, len(ops))
+	copy(shuffled, ops)
+	mrand.Shuffle(len(shuffled), func(i, j int) { shuffled[i], shuffled[j] = shuffled[j], shuffled[i] })
+
 	qs := make([]Question, 0, count)
 	for i := 0; i < count; i++ {
-		op := ops[i%len(ops)]
-		qs = append(qs, genQuestion(op, belt))
+		qs = append(qs, genQuestion(shuffled[i%len(shuffled)], belt))
 	}
 	mrand.Shuffle(len(qs), func(i, j int) { qs[i], qs[j] = qs[j], qs[i] })
 
@@ -108,7 +113,7 @@ const maxActiveSheets = 1000
 const sheetTTL = time.Hour
 
 // ErrTooManySheets is returned when the store is at capacity.
-var ErrTooManySheets = fmt.Errorf("too many active sheets — try again in a minute")
+var ErrTooManySheets = fmt.Errorf("too many active sheets — try again later")
 
 // Put stores a sheet, evicting sheets older than sheetTTL.
 func (s *Store) Put(sh *Sheet) error {
