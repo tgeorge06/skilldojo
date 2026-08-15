@@ -44,42 +44,42 @@ func TestFractionString(t *testing.T) {
 }
 
 func TestGenerateValidation(t *testing.T) {
-	if _, err := Generate(nil, BeltWhite, 10); err == nil {
+	if _, err := Generate(nil, 1, 10); err == nil {
 		t.Error("empty ops should fail")
 	}
-	if _, err := Generate([]string{"bogus"}, BeltWhite, 10); err == nil {
+	if _, err := Generate([]string{"bogus"}, 1, 10); err == nil {
 		t.Error("bad op should fail")
 	}
-	if _, err := Generate([]string{OpMul, OpMul}, BeltWhite, 10); err == nil {
+	if _, err := Generate([]string{OpMul, OpMul}, 1, 10); err == nil {
 		t.Error("duplicate ops should fail")
 	}
-	if _, err := Generate([]string{OpMul}, "rainbow", 10); err == nil {
-		t.Error("bad belt should fail")
+	if _, err := Generate([]string{OpMul}, 9, 10); err == nil {
+		t.Error("bad grade should fail")
 	}
-	if _, err := Generate([]string{OpMul}, BeltWhite, 7); err == nil {
+	if _, err := Generate([]string{OpMul}, 1, 7); err == nil {
 		t.Error("bad count should fail")
 	}
 }
 
-// Every generated question, at every belt, must have a well-formed prompt and a
+// Every generated question, at every grade, must have a well-formed prompt and a
 // non-negative answer; division/multiplication answers must be whole.
 func TestGeneratedQuestionsSound(t *testing.T) {
 	ops := []string{OpAddSub, OpMul, OpDiv, OpFrac}
-	for _, belt := range []string{BeltWhite, BeltYellow, BeltBlack} {
+	for grade := MinGrade; grade <= MaxGrade; grade++ {
 		for i := 0; i < 200; i++ {
-			sh, err := Generate(ops, belt, 20)
+			sh, err := Generate(ops, grade, 20)
 			if err != nil {
-				t.Fatalf("Generate(%s): %v", belt, err)
+				t.Fatalf("Generate(grade %d): %v", grade, err)
 			}
 			if len(sh.Questions) != 20 {
 				t.Fatalf("got %d questions, want 20", len(sh.Questions))
 			}
 			for _, q := range sh.Questions {
 				if q.Prompt == "" {
-					t.Fatalf("empty prompt (%s)", belt)
+					t.Fatalf("empty prompt (grade %d)", grade)
 				}
 				if q.answer.num < 0 || q.answer.den <= 0 {
-					t.Fatalf("bad answer %v for %q (%s)", q.answer, q.Prompt, belt)
+					t.Fatalf("bad answer %v for %q (grade %d)", q.answer, q.Prompt, grade)
 				}
 				if (q.Op == OpMul || q.Op == OpDiv || q.Op == OpAddSub) && q.answer.den != 1 {
 					t.Fatalf("non-whole answer %v for %q", q.answer, q.Prompt)
@@ -89,10 +89,31 @@ func TestGeneratedQuestionsSound(t *testing.T) {
 	}
 }
 
+// Grade 1 add/subtract must stay entirely within 20: operands, and the answer.
+func TestGradeOneAddSubWithinTwenty(t *testing.T) {
+	for i := 0; i < 500; i++ {
+		sh, err := Generate([]string{OpAddSub}, 1, 10)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, q := range sh.Questions {
+			parts := strings.Fields(q.Prompt)
+			a, _ := strconv.Atoi(parts[0])
+			b, _ := strconv.Atoi(parts[2])
+			if a < 1 || a > 20 || b < 1 || b > 20 {
+				t.Fatalf("grade-1 operand out of range in %q", q.Prompt)
+			}
+			if q.answer.num < 0 || q.answer.num > 20 {
+				t.Fatalf("grade-1 answer %v out of range for %q", q.answer, q.Prompt)
+			}
+		}
+	}
+}
+
 // Verify prompts actually evaluate to the stored answer.
 func TestPromptMatchesAnswer(t *testing.T) {
 	for i := 0; i < 500; i++ {
-		sh, err := Generate([]string{OpAddSub, OpMul, OpDiv}, BeltBlack, 10)
+		sh, err := Generate([]string{OpAddSub, OpMul, OpDiv}, 5, 10)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -128,7 +149,7 @@ func TestPromptMatchesAnswer(t *testing.T) {
 
 func TestStoreGrade(t *testing.T) {
 	st := NewStore()
-	sh, err := Generate([]string{OpMul}, BeltWhite, 10)
+	sh, err := Generate([]string{OpMul}, 1, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -159,7 +180,7 @@ func TestStoreGrade(t *testing.T) {
 		t.Error("unknown sheet should fail")
 	}
 
-	sh2, _ := Generate([]string{OpMul}, BeltWhite, 10)
+	sh2, _ := Generate([]string{OpMul}, 1, 10)
 	st.Put(sh2)
 	if _, err := st.Grade(sh2.ID, []string{"1"}); err == nil {
 		t.Error("wrong answer count should fail")

@@ -5,18 +5,18 @@ import (
 	mrand "math/rand/v2"
 )
 
-// genQuestion builds one question for op at belt difficulty.
+// genQuestion builds one question for op at the given grade level (1–5).
 // All answers are non-negative; division always divides evenly.
-func genQuestion(op, belt string) Question {
+func genQuestion(op string, grade int) Question {
 	switch op {
 	case OpAddSub:
-		return genAddSub(belt)
+		return genAddSub(grade)
 	case OpMul:
-		return genMul(belt)
+		return genMul(grade)
 	case OpDiv:
-		return genDiv(belt)
+		return genDiv(grade)
 	case OpFrac:
-		return genFrac(belt)
+		return genFrac(grade)
 	}
 	panic("unreachable: op validated by Generate")
 }
@@ -24,15 +24,29 @@ func genQuestion(op, belt string) Question {
 // randRange returns a uniform int in [lo, hi].
 func randRange(lo, hi int) int { return lo + mrand.IntN(hi-lo+1) }
 
-func genAddSub(belt string) Question {
+func genAddSub(grade int) Question {
+	// Grade 1 is special: everything stays within 20 (a+b ≤ 20, a−b ≥ 0).
+	if grade <= 1 {
+		if mrand.IntN(2) == 0 {
+			a := randRange(1, 19)
+			b := randRange(1, 20-a)
+			return Question{Prompt: fmt.Sprintf("%d + %d", a, b), Op: OpAddSub, answer: whole(a + b)}
+		}
+		a := randRange(2, 20)
+		b := randRange(1, a-1)
+		return Question{Prompt: fmt.Sprintf("%d − %d", a, b), Op: OpAddSub, answer: whole(a - b)}
+	}
+
 	var lo, hi int
-	switch belt {
-	case BeltWhite:
-		lo, hi = 10, 99 // 2-digit
-	case BeltYellow:
+	switch grade {
+	case 2:
+		lo, hi = 10, 99 // within 100
+	case 3:
 		lo, hi = 100, 999 // 3-digit
-	default:
+	case 4:
 		lo, hi = 100, 9999 // up to 4-digit
+	default:
+		lo, hi = 1000, 99999 // grade 5: up to 5-digit
 	}
 	a, b := randRange(lo, hi), randRange(lo, hi)
 	if mrand.IntN(2) == 0 {
@@ -44,44 +58,57 @@ func genAddSub(belt string) Question {
 	return Question{Prompt: fmt.Sprintf("%d − %d", a, b), Op: OpAddSub, answer: whole(a - b)}
 }
 
-func genMul(belt string) Question {
+func genMul(grade int) Question {
 	var a, b int
-	switch belt {
-	case BeltWhite:
-		// easy tables: 1–5 and 10
+	switch grade {
+	case 1:
+		// gentle intro: 1, 2, 5, 10 tables up to ×5
+		easy := []int{1, 2, 5, 10}
+		a, b = easy[mrand.IntN(len(easy))], randRange(1, 5)
+	case 2:
 		easy := []int{1, 2, 3, 4, 5, 10}
 		a, b = easy[mrand.IntN(len(easy))], randRange(1, 10)
-	case BeltYellow:
+	case 3:
 		a, b = randRange(2, 12), randRange(2, 12)
-	default:
+	case 4:
 		a, b = randRange(6, 12), randRange(6, 12) // the hard corner of the table
+	default:
+		a, b = randRange(13, 99), randRange(3, 9) // grade 5: 2-digit × 1-digit
 	}
 	return Question{Prompt: fmt.Sprintf("%d × %d", a, b), Op: OpMul, answer: whole(a * b)}
 }
 
-func genDiv(belt string) Question {
+func genDiv(grade int) Question {
 	// Built backwards from quotient × divisor so it always divides evenly.
 	var divisor, quotient int
-	switch belt {
-	case BeltWhite:
+	switch grade {
+	case 1:
+		divisor, quotient = 2, randRange(1, 10) // halving only
+	case 2:
 		divisor, quotient = randRange(2, 5), randRange(1, 10)
-	case BeltYellow:
+	case 3:
 		divisor, quotient = randRange(2, 12), randRange(2, 12)
-	default:
+	case 4:
 		divisor, quotient = randRange(3, 12), randRange(5, 25)
+	default:
+		divisor, quotient = randRange(3, 12), randRange(10, 99) // grade 5
 	}
 	return Question{Prompt: fmt.Sprintf("%d ÷ %d", divisor*quotient, divisor), Op: OpDiv, answer: whole(quotient)}
 }
 
-func genFrac(belt string) Question {
+func genFrac(grade int) Question {
 	var den int
-	switch belt {
-	case BeltWhite:
+	switch grade {
+	case 1:
+		den = []int{2, 3}[mrand.IntN(2)]
+	case 2:
 		den = []int{2, 3, 4}[mrand.IntN(3)]
-	case BeltYellow:
+	case 3:
 		den = randRange(3, 8)
-	default:
+	case 4:
 		den = randRange(5, 12)
+	default:
+		den = randRange(7, 16) // grade 5
 	}
 	// Same-denominator add or subtract; answers stay in (0, 1].
 	a := randRange(1, den-1)

@@ -22,15 +22,13 @@ const (
 	OpFrac   = "frac"
 )
 
-// Belt difficulty levels.
+// Grade levels supported by the slider.
 const (
-	BeltWhite  = "white"
-	BeltYellow = "yellow"
-	BeltBlack  = "black"
+	MinGrade = 1
+	MaxGrade = 5
 )
 
 var validOps = map[string]bool{OpAddSub: true, OpMul: true, OpDiv: true, OpFrac: true}
-var validBelts = map[string]bool{BeltWhite: true, BeltYellow: true, BeltBlack: true}
 var validCounts = map[int]bool{10: true, 20: true, 30: true}
 
 // Question is one problem. The answer never leaves the server.
@@ -44,9 +42,8 @@ type Question struct {
 type Sheet struct {
 	ID        string
 	Questions []Question
-	Belt      string
+	Grade     int
 	CreatedAt time.Time
-	graded    bool
 }
 
 // Result is the per-question outcome returned after grading.
@@ -65,8 +62,9 @@ type Store struct {
 
 func NewStore() *Store { return &Store{sheets: make(map[string]*Sheet)} }
 
-// Generate builds a sheet of count questions drawn evenly from ops at belt difficulty.
-func Generate(ops []string, belt string, count int) (*Sheet, error) {
+// Generate builds a sheet of count questions drawn evenly from ops at the
+// given grade level (1–5).
+func Generate(ops []string, grade, count int) (*Sheet, error) {
 	if len(ops) == 0 {
 		return nil, fmt.Errorf("pick at least one operation")
 	}
@@ -80,8 +78,8 @@ func Generate(ops []string, belt string, count int) (*Sheet, error) {
 		}
 		seen[op] = true
 	}
-	if !validBelts[belt] {
-		return nil, fmt.Errorf("unknown belt %q", belt)
+	if grade < MinGrade || grade > MaxGrade {
+		return nil, fmt.Errorf("grade must be between %d and %d", MinGrade, MaxGrade)
 	}
 	if !validCounts[count] {
 		return nil, fmt.Errorf("count must be 10, 20, or 30")
@@ -95,7 +93,7 @@ func Generate(ops []string, belt string, count int) (*Sheet, error) {
 
 	qs := make([]Question, 0, count)
 	for i := 0; i < count; i++ {
-		qs = append(qs, genQuestion(shuffled[i%len(shuffled)], belt))
+		qs = append(qs, genQuestion(shuffled[i%len(shuffled)], grade))
 	}
 	mrand.Shuffle(len(qs), func(i, j int) { qs[i], qs[j] = qs[j], qs[i] })
 
@@ -103,7 +101,7 @@ func Generate(ops []string, belt string, count int) (*Sheet, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Sheet{ID: id, Questions: qs, Belt: belt, CreatedAt: time.Now()}, nil
+	return &Sheet{ID: id, Questions: qs, Grade: grade, CreatedAt: time.Now()}, nil
 }
 
 // maxActiveSheets bounds memory use if a client hammers /api/sheet.

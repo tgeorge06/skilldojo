@@ -67,7 +67,7 @@ func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
 
 type newSheetRequest struct {
 	Ops   []string `json:"ops"`
-	Belt  string   `json:"belt"`
+	Grade int      `json:"grade"`
 	Count int      `json:"count"`
 }
 
@@ -81,7 +81,7 @@ func (s *server) handleNewSheet(w http.ResponseWriter, r *http.Request) {
 	if err := decodeJSON(w, r, &req); err != nil {
 		return
 	}
-	sh, err := sheet.Generate(req.Ops, req.Belt, req.Count)
+	sh, err := sheet.Generate(req.Ops, req.Grade, req.Count)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return

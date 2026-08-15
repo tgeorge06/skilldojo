@@ -5,7 +5,7 @@ function dojo() {
     busy: false,
     error: "",
     ops: ["addsub"],
-    belt: "white",
+    grade: 1,
     count: 10,
     sheetId: "",
     questions: [],
@@ -18,18 +18,19 @@ function dojo() {
       { id: "div", label: "Division", emoji: "➗", hint: "no remainders" },
       { id: "frac", label: "Fractions", emoji: "🍕", hint: "answer like 3/4" },
     ],
-    beltChoices: [
-      { id: "white", label: "White belt", emoji: "⬜" },
-      { id: "yellow", label: "Yellow belt", emoji: "🟨" },
-      { id: "black", label: "Black belt", emoji: "⬛" },
-    ],
+    gradeHints: {
+      1: "numbers up to 20",
+      2: "numbers up to 100",
+      3: "3-digit numbers, full times tables",
+      4: "big numbers, tricky tables",
+      5: "the toughest problems",
+    },
 
     toggleOp(id) {
       this.ops = this.ops.includes(id) ? this.ops.filter((o) => o !== id) : [...this.ops, id];
     },
-    beltEmoji() {
-      const b = this.beltChoices.find((b) => b.id === this.belt);
-      return b ? b.emoji : "";
+    gradeHint() {
+      return this.gradeHints[this.grade] || "";
     },
     answeredCount() {
       return this.answers.filter((a) => a && a.trim() !== "").length;
@@ -60,7 +61,7 @@ function dojo() {
       try {
         const data = await this.post("/api/sheet", {
           ops: this.ops,
-          belt: this.belt,
+          grade: this.grade,
           count: this.count,
         });
         this.sheetId = data.id;
