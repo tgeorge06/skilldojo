@@ -16,6 +16,17 @@ make run    # http://127.0.0.1:8080
 That's it — a single Go binary with all assets embedded (`make build` produces
 `./skilldojo`). Works fully offline.
 
+### Play from an iPad (same Wi-Fi)
+
+```sh
+make serve            # listens on 0.0.0.0:8080
+ipconfig getifaddr en0   # this Mac's LAN IP, e.g. 192.168.1.23
+```
+
+Then open `http://<that-IP>:8080` on the iPad. Approve the macOS firewall
+prompt the first time. The app has no login and no personal data; the sheet
+store is capped, and it's only reachable inside your own network.
+
 ## Practice options
 
 - **Add & Subtract** — multi-digit, never negative
