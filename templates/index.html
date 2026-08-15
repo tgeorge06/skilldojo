@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SkillDojo</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🥋</text></svg>">
+  <script defer src="/static/alpine.min.js"></script>
+</head>
+<body class="min-h-full bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 antialiased">
+<div x-data="dojo()" class="mx-auto max-w-3xl px-4 py-8 sm:py-12">
+
+  <!-- Header -->
+  <header class="mb-8 flex items-center gap-3">
+    <span class="text-4xl">🥋</span>
+    <div>
+      <h1 class="text-2xl font-bold tracking-tight">SkillDojo</h1>
+      <p class="text-sm text-slate-500 dark:text-slate-400">Math Dojo — train your skills, earn your belt</p>
+    </div>
+  </header>
+
+  <!-- Setup -->
+  <section x-show="view === 'setup'" x-cloak class="rounded-2xl bg-white dark:bg-slate-900 p-6 sm:p-8 shadow-sm border border-slate-200 dark:border-slate-800 space-y-8">
+    <div>
+      <h2 class="text-lg font-semibold mb-3">What do you want to practice?</h2>
+      <div class="grid grid-cols-2 gap-3">
+        <template x-for="op in opChoices" :key="op.id">
+          <button type="button" @click="toggleOp(op.id)"
+                  class="rounded-xl border-2 p-4 text-left transition"
+                  :class="ops.includes(op.id)
+                    ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-950 dark:border-emerald-400'
+                    : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'">
+            <div class="text-2xl mb-1" x-text="op.emoji"></div>
+            <div class="font-semibold" x-text="op.label"></div>
+            <div class="text-xs text-slate-500 dark:text-slate-400" x-text="op.hint"></div>
+          </button>
+        </template>
+      </div>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-semibold mb-3">Pick your belt</h2>
+      <div class="flex gap-3">
+        <template x-for="b in beltChoices" :key="b.id">
+          <button type="button" @click="belt = b.id"
+                  class="flex-1 rounded-xl border-2 p-3 text-center transition"
+                  :class="belt === b.id
+                    ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-950 dark:border-emerald-400'
+                    : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'">
+            <div class="text-2xl" x-text="b.emoji"></div>
+            <div class="font-semibold text-sm" x-text="b.label"></div>
+          </button>
+        </template>
+      </div>
+    </div>
+
+    <div>
+      <h2 class="text-lg font-semibold mb-3">How many questions?</h2>
+      <div class="flex gap-3">
+        <template x-for="n in [10, 20, 30]" :key="n">
+          <button type="button" @click="count = n"
+                  class="flex-1 rounded-xl border-2 p-3 text-xl font-bold transition"
+                  :class="count === n
+                    ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-950 dark:border-emerald-400'
+                    : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'"
+                  x-text="n"></button>
+        </template>
+      </div>
+    </div>
+
+    <p x-show="error" x-cloak class="rounded-lg bg-rose-50 dark:bg-rose-950 px-4 py-3 text-sm font-medium text-rose-700 dark:text-rose-300" x-text="error"></p>
+
+    <button type="button" @click="startSheet" :disabled="busy || ops.length === 0"
+            class="w-full rounded-xl bg-emerald-600 px-6 py-4 text-lg font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed">
+      Start training! 🥷
+    </button>
+  </section>
+
+  <!-- Sheet -->
+  <section x-show="view === 'sheet'" x-cloak class="space-y-6">
+    <div class="flex items-center justify-between rounded-xl bg-white dark:bg-slate-900 px-5 py-3 border border-slate-200 dark:border-slate-800 shadow-sm">
+      <span class="text-sm font-semibold text-slate-500 dark:text-slate-400">
+        Answered <span class="text-emerald-600 dark:text-emerald-400" x-text="answeredCount()"></span> of <span x-text="questions.length"></span>
+      </span>
+      <span class="text-2xl" x-text="beltEmoji()"></span>
+    </div>
+
+    <form @submit.prevent="submitSheet" class="space-y-3">
+      <template x-for="(q, i) in questions" :key="i">
+        <label class="flex items-center gap-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-5 py-4 shadow-sm">
+          <span class="w-8 shrink-0 text-sm font-bold text-slate-400" x-text="(i + 1) + '.'"></span>
+          <span class="flex-1 text-xl font-semibold tabular-nums" x-text="q.prompt + ' ='"></span>
+          <input type="text" x-model="answers[i]" inputmode="numeric" autocomplete="off"
+                 :aria-label="'Answer for question ' + (i + 1)"
+                 class="w-28 rounded-lg border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-center text-xl font-bold focus:border-emerald-600 dark:focus:border-emerald-400 focus:outline-none"
+                 :placeholder="q.op === 'frac' ? 'a/b' : '?'">
+        </label>
+      </template>
+
+      <p x-show="error" x-cloak class="rounded-lg bg-rose-50 dark:bg-rose-950 px-4 py-3 text-sm font-medium text-rose-700 dark:text-rose-300" x-text="error"></p>
+
+      <button type="submit" :disabled="busy"
+              class="w-full rounded-xl bg-emerald-600 px-6 py-4 text-lg font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-40">
+        Grade my sheet! ✅
+      </button>
+    </form>
+  </section>
+
+  <!-- Results -->
+  <section x-show="view === 'results'" x-cloak class="space-y-6">
+    <div class="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-8 text-center shadow-sm">
+      <div class="text-6xl mb-2" x-text="grade.percent === 100 ? '🏆' : grade.percent >= 80 ? '🎉' : grade.percent >= 60 ? '💪' : '🥋'"></div>
+      <div class="text-5xl font-black tabular-nums" :class="grade.percent >= 80 ? 'text-emerald-600 dark:text-emerald-400' : grade.percent >= 60 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'">
+        <span x-text="grade.percent"></span>%
+      </div>
+      <p class="mt-2 text-lg font-semibold text-slate-600 dark:text-slate-300">
+        <span x-text="grade.score"></span> out of <span x-text="grade.total"></span> correct
+      </p>
+      <p class="mt-1 text-sm text-slate-500 dark:text-slate-400" x-text="gradeMessage()"></p>
+    </div>
+
+    <div class="space-y-2">
+      <template x-for="(r, i) in grade.results" :key="i">
+        <div class="flex items-center gap-4 rounded-xl border px-5 py-3 shadow-sm"
+             :class="r.right
+               ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-200 dark:border-emerald-900'
+               : 'bg-rose-50 dark:bg-rose-950 border-rose-200 dark:border-rose-900'">
+          <span class="text-xl" x-text="r.right ? '✅' : '❌'"></span>
+          <span class="flex-1 font-semibold tabular-nums" x-text="r.prompt + ' = ' + r.correct"></span>
+          <span x-show="!r.right" class="text-sm font-medium text-rose-700 dark:text-rose-300">
+            you wrote: <span x-text="r.given || '(blank)'"></span>
+          </span>
+        </div>
+      </template>
+    </div>
+
+    <button type="button" @click="reset"
+            class="w-full rounded-xl bg-emerald-600 px-6 py-4 text-lg font-bold text-white shadow-sm transition hover:bg-emerald-700">
+      New sheet 🔁
+    </button>
+  </section>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
