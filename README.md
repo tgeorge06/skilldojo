@@ -24,8 +24,10 @@ ipconfig getifaddr en0   # this Mac's LAN IP, e.g. 192.168.1.23
 ```
 
 Then open `http://<that-IP>:8080` on the iPad. Approve the macOS firewall
-prompt the first time. The app has no login and no personal data; the sheet
-store is capped, and it's only reachable inside your own network.
+prompt the first time. The app has no login and no personal data, and the
+sheet store is capped — but `0.0.0.0` listens on every network interface the
+machine has, so only run `make serve` on a trusted network (home Wi-Fi behind
+your router). Use `make run` (localhost-only) everywhere else.
 
 ## Practice options
 
