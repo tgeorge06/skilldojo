@@ -6,8 +6,16 @@ const vm = require("node:vm");
 
 const root = path.join(__dirname, "..");
 
-function loadGame({ withAudio = false } = {}) {
+// blankedSentence() masks only the first whole-word match, so a sentence that
+// uses the answer twice would show the answer on screen.
+function assertSingleOccurrence({ word, sentence }) {
+  const matches = sentence.match(new RegExp(`\\b${word}\\b`, "gi")) || [];
+  assert.equal(matches.length, 1, `"${sentence}" must contain "${word}" exactly once`);
+}
+
+function loadGame({ withAudio = false, rejectPlayback = false } = {}) {
   const audioInstances = [];
+  const spoken = [];
   class FakeAudio {
     constructor(src) {
       this.src = src;
@@ -19,7 +27,7 @@ function loadGame({ withAudio = false } = {}) {
 
     play() {
       this.playCount += 1;
-      return Promise.resolve();
+      return rejectPlayback ? Promise.reject(new Error("NotAllowedError")) : Promise.resolve();
     }
 
     pause() {
@@ -27,8 +35,11 @@ function loadGame({ withAudio = false } = {}) {
     }
   }
 
+  class FakeUtterance { constructor(text) { this.text = text; } }
+  const fakeSpeech = { cancel() {}, speak(utterance) { spoken.push(utterance.text); } };
   const context = vm.createContext({
     console,
+    ...(rejectPlayback ? { SpeechSynthesisUtterance: FakeUtterance, setTimeout } : {}),
     Math,
     Set,
     RegExp,
@@ -36,6 +47,7 @@ function loadGame({ withAudio = false } = {}) {
       matchMedia: () => ({ matches: true }),
       scrollTo: () => {},
       ...(withAudio ? { Audio: FakeAudio } : {}),
+      ...(rejectPlayback ? { speechSynthesis: fakeSpeech, SpeechSynthesisUtterance: FakeUtterance } : {}),
     },
     document: {
       activeElement: null,
@@ -46,7 +58,7 @@ function loadGame({ withAudio = false } = {}) {
   vm.runInContext(fs.readFileSync(path.join(root, "static", "words.js"), "utf8"), context);
   vm.runInContext(fs.readFileSync(path.join(root, "static", "audio", "spelling", "manifest.js"), "utf8"), context);
   vm.runInContext(fs.readFileSync(path.join(root, "static", "app.js"), "utf8"), context);
-  return { game: context.dojo(), context, audioInstances };
+  return { game: context.dojo(), context, audioInstances, spoken };
 }
 
 test("every unique curriculum word has a nonempty recorded clip", () => {
@@ -83,6 +95,22 @@ test("hear the word plays only the current pre-rendered clip", () => {
   assert.equal(audioInstances[0].pauseCount, 1);
 });
 
+test("a late playback rejection never speaks the next word aloud", async () => {
+  const { game, spoken } = loadGame({ withAudio: true, rejectPlayback: true });
+  game.spellingCount = 2;
+  game.startSpelling();
+  const first = game.currentWord.word;
+
+  game.speakWord();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.deepEqual(spoken, [`${first}.`], "rejection during the round falls back to speech");
+
+  game.speakWord();
+  game.reset();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.deepEqual(spoken, [`${first}.`], "rejection after reset is ignored");
+});
+
 test("every grade has valid words and at least five examples per skill", () => {
   const { context } = loadGame();
   const banks = vm.runInContext("SPELLING_WORDS", context);
@@ -97,7 +125,7 @@ test("every grade has valid words and at least five examples per skill", () => {
     for (const entry of banks[grade]) {
       assert.match(entry.word, /^[a-z]+$/);
       assert.ok(entry.clue.length > 5);
-      assert.ok(entry.sentence.toLowerCase().includes(entry.word));
+      assertSingleOccurrence(entry);
       assert.ok(skillIds.has(entry.skill), `unknown skill ${entry.skill} for ${entry.word}`);
       allWords.push(entry.word);
     }
@@ -111,7 +139,7 @@ test("every grade has valid words and at least five examples per skill", () => {
       assert.match(entry.word, /^[a-z]+$/);
       assert.equal(entry.skill, "sight-words");
       assert.ok(Number.isInteger(entry.rank));
-      assert.ok(entry.sentence.toLowerCase().includes(entry.word));
+      assertSingleOccurrence(entry);
       allSightWords.push(entry.word);
     }
   }

@@ -267,7 +267,7 @@ const SIGHT_WORDS = {
     sightWord("we", 33, "The speaker together with other people", "We built a fort from blankets."),
     sightWord("me", 34, "Refers to the speaker as an object", "Please hand the marker to me."),
     sightWord("have", 35, "To own, hold, or experience something", "I have a story to share."),
-    sightWord("as", 36, "Can compare things or describe a role", "The snow felt as soft as feathers."),
+    sightWord("as", 36, "Can compare things or describe a role", "She worked as a lifeguard all summer."),
     sightWord("do", 37, "To perform an action", "Do your best on the challenge."),
     sightWord("like", 38, "To enjoy or find something pleasing", "I like stories about space."),
     sightWord("out", 39, "Away from the inside", "The rabbit hopped out of its burrow."),

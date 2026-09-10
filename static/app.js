@@ -366,14 +366,16 @@ function dojo() {
       }
 
       let fellBack = false;
+      const audio = this.wordAudio;
       const fallBackToSpeech = () => {
-        if (fellBack) return;
+        // A late rejection (after reset/next word) must not speak the new answer.
+        if (fellBack || this.wordAudio !== audio || this.roundDone) return;
         fellBack = true;
         this.speakWithBrowserVoice();
       };
-      this.wordAudio.onerror = fallBackToSpeech;
-      this.wordAudio.currentTime = 0;
-      const playback = this.wordAudio.play();
+      audio.onerror = fallBackToSpeech;
+      audio.currentTime = 0;
+      const playback = audio.play();
       if (playback?.catch) playback.catch(fallBackToSpeech);
       this.statusMessage = "Playing the word aloud.";
     },
