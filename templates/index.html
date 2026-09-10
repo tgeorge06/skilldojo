@@ -9,141 +9,231 @@
   <script defer src="/static/alpine.min.js"></script>
 </head>
 <body class="min-h-full bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 antialiased">
-<div x-data="dojo()" class="mx-auto max-w-3xl px-4 py-8 sm:py-12">
-
-  <!-- Header -->
+<a href="#main-content" class="skip-link">Skip to practice</a>
+<div x-data="dojo()" @keydown.window="handleKey($event)" class="mx-auto max-w-3xl px-4 py-8 sm:py-12">
   <header class="mb-8 flex items-center gap-3">
-    <span class="text-4xl">🥋</span>
+    <span class="text-4xl" aria-hidden="true">🥋</span>
     <div>
       <h1 class="text-2xl font-bold tracking-tight">SkillDojo</h1>
-      <p class="text-sm text-slate-500 dark:text-slate-400">Math Dojo — pick your grade, train your skills</p>
+      <p class="text-sm text-slate-500 dark:text-slate-400" x-text="headerSubtitle()"></p>
     </div>
   </header>
 
-  <!-- Setup -->
-  <section x-show="view === 'setup'" x-cloak class="rounded-2xl bg-white dark:bg-slate-900 p-6 sm:p-8 shadow-sm border border-slate-200 dark:border-slate-800 space-y-8">
-    <div>
-      <h2 class="text-lg font-semibold mb-3">What do you want to practice?</h2>
-      <div class="grid grid-cols-2 gap-3">
-        <template x-for="op in opChoices" :key="op.id">
-          <button type="button" @click="toggleOp(op.id)" :aria-pressed="ops.includes(op.id)"
-                  class="rounded-xl border-2 p-4 text-left transition"
-                  :class="ops.includes(op.id)
-                    ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-950 dark:border-emerald-400'
-                    : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'">
-            <div class="text-2xl mb-1" x-text="op.emoji"></div>
-            <div class="font-semibold" x-text="op.label"></div>
-            <div class="text-xs text-slate-500 dark:text-slate-400" x-text="op.hint"></div>
+  <main id="main-content" tabindex="-1">
+    <section x-show="view === 'setup'" x-cloak class="rounded-2xl bg-white dark:bg-slate-900 p-6 sm:p-8 shadow-sm border border-slate-200 dark:border-slate-800 space-y-8">
+      <div>
+        <h2 class="text-lg font-semibold mb-3">Choose your dojo</h2>
+        <div class="grid grid-cols-2 gap-3" role="group" aria-label="Subject">
+          <button type="button" @click="chooseSubject('math')" :aria-pressed="subject === 'math'" class="subject-card" :class="subject === 'math' ? 'subject-card-math-active' : 'subject-card-idle'">
+            <span class="text-3xl" aria-hidden="true">🧮</span>
+            <span class="font-bold">Math</span>
+            <span class="subject-card-hint">Solve & sharpen</span>
           </button>
-        </template>
-      </div>
-    </div>
-
-    <div>
-      <h2 class="text-lg font-semibold mb-3">Pick your grade</h2>
-      <div class="rounded-xl border-2 border-slate-200 dark:border-slate-800 p-5">
-        <div class="flex items-baseline justify-between mb-4">
-          <span class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">Grade <span x-text="grade"></span></span>
-          <span class="text-sm text-slate-500 dark:text-slate-400" x-text="gradeHint()"></span>
-        </div>
-        <input type="range" min="1" max="5" step="1" x-model.number="grade"
-               aria-label="Grade level"
-               class="w-full accent-emerald-600 dark:accent-emerald-400">
-        <div class="mt-2 flex justify-between text-xs font-semibold text-slate-400" aria-hidden="true">
-          <template x-for="g in [1, 2, 3, 4, 5]" :key="g">
-            <span :class="grade === g && 'text-emerald-600 dark:text-emerald-400'" x-text="g"></span>
-          </template>
+          <button type="button" @click="chooseSubject('spelling')" :aria-pressed="subject === 'spelling'" class="subject-card" :class="subject === 'spelling' ? 'subject-card-spelling-active' : 'subject-card-idle'">
+            <span class="text-3xl" aria-hidden="true">🔤</span>
+            <span class="font-bold">Spelling</span>
+            <span class="subject-card-hint">Listen & rescue words</span>
+          </button>
         </div>
       </div>
-    </div>
 
-    <div>
-      <h2 class="text-lg font-semibold mb-3">How many questions?</h2>
-      <div class="flex gap-3">
-        <template x-for="n in [10, 20, 30]" :key="n">
-          <button type="button" @click="count = n" :aria-pressed="count === n"
-                  class="flex-1 rounded-xl border-2 p-3 text-xl font-bold transition"
-                  :class="count === n
-                    ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-950 dark:border-emerald-400'
-                    : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'"
-                  x-text="n"></button>
-        </template>
+      <div x-show="subject === 'math'" class="space-y-8">
+        <div>
+          <h2 class="text-lg font-semibold mb-3">What do you want to practice?</h2>
+          <div class="grid grid-cols-2 gap-3">
+            <template x-for="op in opChoices" :key="op.id">
+              <button type="button" @click="toggleOp(op.id)" :aria-pressed="ops.includes(op.id)" class="rounded-xl border-2 p-4 text-left transition"
+                      :class="ops.includes(op.id) ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-950 dark:border-emerald-400' : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'">
+                <span class="block text-2xl mb-1" aria-hidden="true" x-text="op.emoji"></span>
+                <span class="block font-semibold" x-text="op.label"></span>
+                <span class="block text-sm text-slate-500 dark:text-slate-400" x-text="op.hint"></span>
+              </button>
+            </template>
+          </div>
+        </div>
+
+        <div>
+          <h2 class="text-lg font-semibold mb-3">Pick your grade</h2>
+          <div class="rounded-xl border-2 border-slate-200 dark:border-slate-800 p-5">
+            <div class="flex items-baseline justify-between gap-4 mb-4">
+              <span class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">Grade <span x-text="grade"></span></span>
+              <span class="text-sm text-right text-slate-500 dark:text-slate-400" x-text="gradeHint()"></span>
+            </div>
+            <input type="range" min="1" max="5" step="1" x-model.number="grade" aria-label="Math grade level" class="w-full accent-emerald-600 dark:accent-emerald-400">
+            <div class="mt-2 flex justify-between text-sm font-semibold text-slate-400" aria-hidden="true">
+              <template x-for="g in [1, 2, 3, 4, 5]" :key="g"><span :class="grade === g && 'text-emerald-600 dark:text-emerald-400'" x-text="g"></span></template>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h2 class="text-lg font-semibold mb-3">How many questions?</h2>
+          <div class="flex gap-3">
+            <template x-for="n in [10, 20, 30]" :key="n">
+              <button type="button" @click="count = n" :aria-pressed="count === n" class="flex-1 rounded-xl border-2 p-3 text-xl font-bold transition"
+                      :class="count === n ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-950 dark:border-emerald-400' : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'" x-text="n"></button>
+            </template>
+          </div>
+        </div>
       </div>
-    </div>
 
-    <p x-show="error" x-cloak role="alert" class="rounded-lg bg-rose-50 dark:bg-rose-950 px-4 py-3 text-sm font-medium text-rose-700 dark:text-rose-300" x-text="error"></p>
+      <div x-show="subject === 'spelling'" class="space-y-8">
+        <div class="rounded-xl bg-violet-50 dark:bg-violet-950 border border-violet-200 dark:border-violet-900 p-5">
+          <div class="flex gap-3">
+            <span class="text-3xl" aria-hidden="true">🏮</span>
+            <div>
+              <h2 class="font-bold text-violet-900 dark:text-violet-100">Word Rescue</h2>
+              <p class="mt-1 text-sm text-violet-800 dark:text-violet-200">Listen, use the clue, and uncover each word before your six lanterns go out.</p>
+            </div>
+          </div>
+        </div>
 
-    <button type="button" @click="startSheet" :disabled="busy || ops.length === 0"
-            class="w-full rounded-xl bg-emerald-600 px-6 py-4 text-lg font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed">
-      Start training! 🥷
-    </button>
-  </section>
+        <div>
+          <h2 class="text-lg font-semibold mb-3">Pick your grade</h2>
+          <div class="rounded-xl border-2 border-slate-200 dark:border-slate-800 p-5">
+            <div class="flex items-baseline justify-between gap-4 mb-4">
+              <span class="text-2xl font-bold text-violet-700 dark:text-violet-300">Grade <span x-text="spellingGrade"></span></span>
+              <span class="text-sm text-right text-slate-500 dark:text-slate-400" x-text="spellingGradeHint()"></span>
+            </div>
+            <input type="range" min="1" max="5" step="1" x-model.number="spellingGrade" @input="spellingFocus = 'mixed'" aria-label="Spelling grade level" class="w-full accent-violet-700 dark:accent-violet-400">
+            <div class="mt-2 flex justify-between text-sm font-semibold text-slate-400" aria-hidden="true">
+              <template x-for="g in [1, 2, 3, 4, 5]" :key="g"><span :class="spellingGrade === g && 'text-violet-700 dark:text-violet-300'" x-text="g"></span></template>
+            </div>
+          </div>
+        </div>
 
-  <!-- Sheet -->
-  <section x-show="view === 'sheet'" x-cloak class="space-y-6">
-    <div class="flex items-center justify-between rounded-xl bg-white dark:bg-slate-900 px-5 py-3 border border-slate-200 dark:border-slate-800 shadow-sm">
-      <span class="text-sm font-semibold text-slate-500 dark:text-slate-400">
-        Answered <span class="text-emerald-600 dark:text-emerald-400" x-text="answeredCount()"></span> of <span x-text="questions.length"></span>
-      </span>
-      <span class="text-sm font-bold text-emerald-600 dark:text-emerald-400">Grade <span x-text="grade"></span> 🥷</span>
-    </div>
+        <div>
+          <label for="spelling-focus" class="block text-lg font-semibold mb-3">Choose a practice focus</label>
+          <select id="spelling-focus" x-model="spellingFocus" class="w-full min-h-11 rounded-xl border-2 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-3 font-semibold">
+            <option value="mixed">Smart mix — several spelling patterns</option>
+            <template x-for="skill in spellingSkillChoices()" :key="skill.id">
+              <option :value="skill.id" x-text="skill.label"></option>
+            </template>
+          </select>
+          <p class="mt-2 text-sm text-slate-500 dark:text-slate-400" x-text="spellingFocusDescription()"></p>
+        </div>
 
-    <form @submit.prevent="submitSheet" class="space-y-3">
-      <template x-for="(q, i) in questions" :key="i">
-        <label class="flex items-center gap-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-5 py-4 shadow-sm">
-          <span class="w-8 shrink-0 text-sm font-bold text-slate-400" x-text="(i + 1) + '.'"></span>
-          <span class="flex-1 text-xl font-semibold tabular-nums" x-text="q.prompt + ' ='"></span>
-          <input type="text" x-model="answers[i]" inputmode="numeric" autocomplete="off"
-                 :aria-label="'Answer for question ' + (i + 1)"
-                 class="w-28 rounded-lg border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-center text-xl font-bold focus:border-emerald-600 dark:focus:border-emerald-400 focus:outline-none"
-                 :placeholder="q.op === 'frac' ? 'a/b' : '?'">
-        </label>
-      </template>
+        <div>
+          <h2 class="text-lg font-semibold mb-3">How many words?</h2>
+          <div class="flex gap-3">
+            <template x-for="n in [5, 10]" :key="n">
+              <button type="button" @click="spellingCount = n" :aria-pressed="spellingCount === n" class="flex-1 rounded-xl border-2 p-3 text-lg font-bold transition"
+                      :class="spellingCount === n ? 'border-violet-700 bg-violet-50 dark:bg-violet-950 dark:border-violet-400' : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'">
+                <span x-text="n"></span> words
+              </button>
+            </template>
+          </div>
+        </div>
+      </div>
 
       <p x-show="error" x-cloak role="alert" class="rounded-lg bg-rose-50 dark:bg-rose-950 px-4 py-3 text-sm font-medium text-rose-700 dark:text-rose-300" x-text="error"></p>
-
-      <button type="submit" :disabled="busy"
-              class="w-full rounded-xl bg-emerald-600 px-6 py-4 text-lg font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-40">
-        Grade my sheet! ✅
+      <button type="button" @click="startTraining" :disabled="busy || (subject === 'math' && ops.length === 0)" class="w-full rounded-xl px-6 py-4 text-lg font-bold text-white shadow-sm transition disabled:opacity-40 disabled:cursor-not-allowed" :class="subject === 'spelling' ? 'bg-violet-700 hover:bg-violet-800' : 'bg-emerald-600 hover:bg-emerald-700'">
+        <span x-text="busy ? 'Getting ready…' : subject === 'spelling' ? 'Start word rescue! 🏮' : 'Start math training! 🥷'"></span>
       </button>
-    </form>
-  </section>
+    </section>
 
-  <!-- Results -->
-  <section x-show="view === 'results'" x-cloak class="space-y-6">
-    <div class="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-8 text-center shadow-sm">
-      <div class="text-6xl mb-2" x-text="report.percent === 100 ? '🏆' : report.percent >= 80 ? '🎉' : report.percent >= 60 ? '💪' : '🥋'"></div>
-      <div class="text-5xl font-black tabular-nums" :class="report.percent >= 80 ? 'text-emerald-600 dark:text-emerald-400' : report.percent >= 60 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'">
-        <span x-text="report.percent"></span>%
+    <section x-show="view === 'math-sheet'" x-cloak class="space-y-6">
+      <div class="flex items-center justify-between rounded-xl bg-white dark:bg-slate-900 px-5 py-3 border border-slate-200 dark:border-slate-800 shadow-sm">
+        <span class="text-sm font-semibold text-slate-500 dark:text-slate-400">Answered <span class="text-emerald-600 dark:text-emerald-400" x-text="answeredCount()"></span> of <span x-text="questions.length"></span></span>
+        <span class="text-sm font-bold text-emerald-600 dark:text-emerald-400">Grade <span x-text="grade"></span> <span aria-hidden="true">🥷</span></span>
       </div>
-      <p class="mt-2 text-lg font-semibold text-slate-600 dark:text-slate-300">
-        <span x-text="report.score"></span> out of <span x-text="report.total"></span> correct
-      </p>
-      <p class="mt-1 text-sm text-slate-500 dark:text-slate-400" x-text="gradeMessage()"></p>
-    </div>
+      <form @submit.prevent="submitSheet" class="space-y-3">
+        <template x-for="(q, i) in questions" :key="i">
+          <label class="flex items-center gap-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-5 py-4 shadow-sm">
+            <span class="w-8 shrink-0 text-sm font-bold text-slate-500" x-text="(i + 1) + '.'"></span>
+            <span class="flex-1 text-xl font-semibold tabular-nums" x-text="q.prompt + ' ='"></span>
+            <input type="text" x-model="answers[i]" inputmode="numeric" autocomplete="off" :aria-label="'Answer for question ' + (i + 1)" class="w-28 rounded-lg border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-center text-xl font-bold focus:border-emerald-600 dark:focus:border-emerald-400" :placeholder="q.op === 'frac' ? 'a/b' : '?'">
+          </label>
+        </template>
+        <p x-show="error" x-cloak role="alert" class="rounded-lg bg-rose-50 dark:bg-rose-950 px-4 py-3 text-sm font-medium text-rose-700 dark:text-rose-300" x-text="error"></p>
+        <button type="submit" :disabled="busy" class="w-full rounded-xl bg-emerald-600 px-6 py-4 text-lg font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-40">Grade my sheet! ✅</button>
+      </form>
+    </section>
 
-    <div class="space-y-2">
-      <template x-for="(r, i) in report.results" :key="i">
-        <div class="flex items-center gap-4 rounded-xl border px-5 py-3 shadow-sm"
-             :class="r.right
-               ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-200 dark:border-emerald-900'
-               : 'bg-rose-50 dark:bg-rose-950 border-rose-200 dark:border-rose-900'">
-          <span class="text-xl" x-text="r.right ? '✅' : '❌'"></span>
-          <span class="flex-1 font-semibold tabular-nums" x-text="r.prompt + ' = ' + r.correct"></span>
-          <span x-show="!r.right" class="text-sm font-medium text-rose-700 dark:text-rose-300">
-            you wrote: <span x-text="r.given || '(blank)'"></span>
-          </span>
+    <section x-show="view === 'math-results'" x-cloak class="space-y-6">
+      <div class="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-8 text-center shadow-sm">
+        <div class="text-6xl mb-2" aria-hidden="true" x-text="report.percent === 100 ? '🏆' : report.percent >= 80 ? '🎉' : report.percent >= 60 ? '💪' : '🥋'"></div>
+        <h2 class="text-5xl font-black tabular-nums" :class="report.percent >= 80 ? 'text-emerald-600 dark:text-emerald-400' : report.percent >= 60 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'"><span x-text="report.percent"></span>%</h2>
+        <p class="mt-2 text-lg font-semibold text-slate-600 dark:text-slate-300"><span x-text="report.score"></span> out of <span x-text="report.total"></span> correct</p>
+        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400" x-text="gradeMessage()"></p>
+      </div>
+      <div class="space-y-2">
+        <template x-for="(r, i) in report.results" :key="i">
+          <div class="flex items-center gap-4 rounded-xl border px-5 py-3 shadow-sm" :class="r.right ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-200 dark:border-emerald-900' : 'bg-rose-50 dark:bg-rose-950 border-rose-200 dark:border-rose-900'">
+            <span class="text-xl" aria-hidden="true" x-text="r.right ? '✅' : '❌'"></span><span class="sr-only" x-text="r.right ? 'Correct:' : 'Incorrect:'"></span>
+            <span class="flex-1 font-semibold tabular-nums" x-text="r.prompt + ' = ' + r.correct"></span>
+            <span x-show="!r.right" class="text-sm font-medium text-rose-700 dark:text-rose-300">you wrote: <span x-text="r.given || '(blank)'"></span></span>
+          </div>
+        </template>
+      </div>
+      <button type="button" @click="reset" class="w-full rounded-xl bg-emerald-600 px-6 py-4 text-lg font-bold text-white shadow-sm transition hover:bg-emerald-700">Choose new training 🔁</button>
+    </section>
+
+    <section x-show="view === 'spelling-game'" x-cloak class="space-y-5">
+      <div class="rounded-xl bg-white dark:bg-slate-900 px-5 py-4 border border-slate-200 dark:border-slate-800 shadow-sm">
+        <div class="flex items-center justify-between gap-4 text-sm font-bold">
+          <span>Word <span x-text="spellingRound + 1"></span> of <span x-text="spellingWords.length"></span></span>
+          <span class="text-violet-700 dark:text-violet-300"><span aria-hidden="true">⭐</span> <span x-text="spellingScore"></span> rescued</span>
         </div>
-      </template>
-    </div>
+        <div class="game-progress mt-3" role="progressbar" :aria-valuenow="spellingRound + (roundDone ? 1 : 0)" aria-valuemin="0" :aria-valuemax="spellingWords.length" aria-label="Word rescue progress"><span :style="'width: ' + spellingProgress() + '%'" class="game-progress-fill"></span></div>
+      </div>
 
-    <button type="button" @click="reset"
-            class="w-full rounded-xl bg-emerald-600 px-6 py-4 text-lg font-bold text-white shadow-sm transition hover:bg-emerald-700">
-      New sheet 🔁
-    </button>
-  </section>
+      <article class="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 sm:p-8 text-center shadow-sm">
+        <div class="flex items-center justify-between gap-3 mb-5">
+          <p class="text-sm font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">Lantern power</p>
+          <p class="sr-only" aria-live="polite" x-text="triesLeft() + ' tries left'"></p>
+          <div class="flex gap-1" aria-hidden="true"><template x-for="n in 6" :key="n"><span class="lantern" :class="n <= triesLeft() ? 'lantern-on' : 'lantern-off'">🏮</span></template></div>
+        </div>
+        <div class="inline-flex items-center gap-2 rounded-full bg-violet-50 dark:bg-violet-950 px-4 py-2 text-sm font-semibold text-violet-900 dark:text-violet-100"><span aria-hidden="true">💡</span><span x-text="currentWord ? currentWord.clue : ''"></span></div>
+        <p class="mt-3 text-sm font-bold text-violet-700 dark:text-violet-300">Training: <span x-text="currentSkillLabel()"></span></p>
+        <h2 id="spelling-word-heading" tabindex="-1" class="mt-6 text-xl font-bold">Uncover the word</h2>
+        <div class="word-slots mt-5" role="group" :aria-label="maskedWordForScreenReader()"><template x-for="(letter, index) in maskedLetters()" :key="index"><span class="word-slot" :class="roundDone ? 'word-slot-complete' : ''" x-text="letter"></span></template></div>
+        <p class="mt-5 text-base text-slate-600 dark:text-slate-300"><span class="font-semibold">Sentence:</span> <span x-text="roundDone ? currentWord.sentence : blankedSentence()"></span></p>
+        <button type="button" @click="speakWord" :disabled="!hearingAvailable() || roundDone" class="mt-5 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border-2 border-violet-300 dark:border-violet-700 px-5 py-3 font-bold text-violet-800 dark:text-violet-200 transition hover:bg-violet-50 dark:hover:bg-violet-950 disabled:opacity-40"><span aria-hidden="true">🔊</span> Hear the word</button>
+        <p x-show="!hearingAvailable()" class="mt-2 text-sm text-slate-500 dark:text-slate-400">Audio isn’t available in this browser, but the clue and sentence still work.</p>
+
+        <div x-show="!roundDone" class="mt-7">
+          <p class="mb-3 text-sm font-semibold text-slate-600 dark:text-slate-300">Choose a letter or type on your keyboard</p>
+          <div class="letter-grid" role="group" aria-label="Letter choices">
+            <template x-for="letter in alphabet" :key="letter"><button type="button" @click="guessLetter(letter)" :disabled="guessedLetters.includes(letter)" class="letter-key" :class="letterState(letter)" :aria-label="letterButtonLabel(letter)" x-text="letter"></button></template>
+          </div>
+          <form @submit.prevent="guessWholeWord" class="mt-6 flex flex-col sm:flex-row gap-3 text-left">
+            <div class="flex-1"><label for="whole-word" class="block mb-2 text-sm font-semibold">Know the whole word?</label><input id="whole-word" type="text" x-model="wholeWordGuess" autocomplete="off" autocapitalize="none" spellcheck="false" class="w-full min-h-11 rounded-xl border-2 border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-4 py-3 text-lg font-bold" placeholder="Type your answer"></div>
+            <button type="submit" :disabled="wholeWordGuess.trim() === ''" class="sm:self-end min-h-11 rounded-xl bg-violet-700 px-6 py-3 font-bold text-white transition hover:bg-violet-800 disabled:opacity-40">Rescue word</button>
+          </form>
+        </div>
+
+        <div class="min-h-11 mt-5" role="status" aria-live="polite" aria-atomic="true"><p x-show="statusMessage" class="rounded-xl px-4 py-3 font-semibold" :class="roundDone ? (roundWon ? 'bg-emerald-50 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-200' : 'bg-amber-50 dark:bg-amber-950 text-amber-900 dark:text-amber-200') : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200'" x-text="statusMessage"></p></div>
+        <div x-show="roundDone" class="mt-3 rounded-xl border-2 border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-950 p-4 text-left">
+          <p class="font-bold text-violet-900 dark:text-violet-100"><span aria-hidden="true">🥋</span> Spelling lesson</p>
+          <p class="mt-1 text-sm text-violet-800 dark:text-violet-200" x-text="currentSkillTip()"></p>
+        </div>
+        <button id="next-spelling-button" x-show="roundDone" type="button" @click="nextSpellingWord" class="mt-3 w-full rounded-xl bg-violet-700 px-6 py-4 text-lg font-bold text-white shadow-sm transition hover:bg-violet-800"><span x-text="spellingRound + 1 === spellingWords.length ? 'See my results 🏆' : 'Next word →'"></span></button>
+      </article>
+    </section>
+
+    <section x-show="view === 'spelling-results'" x-cloak class="space-y-6">
+      <div class="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-8 text-center shadow-sm">
+        <div class="text-6xl mb-3" aria-hidden="true" x-text="spellingScore === spellingWords.length ? '🏆' : spellingScore >= Math.ceil(spellingWords.length * .6) ? '🌟' : '💪'"></div>
+        <h2 id="spelling-results-heading" tabindex="-1" class="text-3xl font-black">Word rescue complete!</h2>
+        <p class="mt-3 text-xl font-bold text-violet-700 dark:text-violet-300">You rescued <span x-text="spellingScore"></span> of <span x-text="spellingWords.length"></span> words</p>
+        <p class="mt-2 text-slate-600 dark:text-slate-300" x-text="spellingResultMessage()"></p>
+      </div>
+      <div class="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 sm:p-6 shadow-sm">
+        <h3 class="text-lg font-bold mb-4">Words you trained</h3>
+        <ul class="grid sm:grid-cols-2 gap-3">
+          <template x-for="result in spellingResults" :key="result.word"><li class="flex items-center gap-3 rounded-xl border px-4 py-3" :class="result.won ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-950' : 'border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950'"><span aria-hidden="true" x-text="result.won ? '✅' : '📖'"></span><span class="font-bold" x-text="result.word"></span><span class="sr-only" x-text="result.won ? 'rescued' : 'reviewed'"></span></li></template>
+        </ul>
+      </div>
+      <div class="grid sm:grid-cols-2 gap-3">
+        <button type="button" @click="startSpelling" class="rounded-xl bg-violet-700 px-6 py-4 text-lg font-bold text-white shadow-sm transition hover:bg-violet-800">Play again 🔁</button>
+        <button type="button" @click="reset" class="rounded-xl border-2 border-slate-300 dark:border-slate-700 px-6 py-4 text-lg font-bold transition hover:bg-white dark:hover:bg-slate-900">Choose another dojo</button>
+      </div>
+    </section>
+  </main>
 </div>
-
+<script src="/static/words.js"></script>
+<script src="/static/audio/spelling/manifest.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>

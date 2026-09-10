@@ -1,4 +1,4 @@
-// SkillDojo — a tiny practice-sheet app. Math is the first dojo.
+// SkillDojo — a tiny, offline-friendly learning app for kids.
 package main
 
 import (
@@ -10,7 +10,9 @@ import (
 	"io"
 	"io/fs"
 	"log"
+	"mime"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/tgeorge06/skilldojo/internal/sheet"
@@ -41,8 +43,18 @@ func main() {
 		log.Fatal(err)
 	}
 
+	if err := mime.AddExtensionType(".opus", "audio/ogg"); err != nil {
+		log.Printf("register Opus MIME type: %v", err)
+	}
+	staticHandler := http.StripPrefix("/static/", http.FileServerFS(staticFiles))
 	mux := http.NewServeMux()
-	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(staticFiles)))
+	mux.Handle("GET /static/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Audio-set directories are versioned, so clips can be cached forever.
+		if strings.HasSuffix(r.URL.Path, ".opus") && strings.Contains(r.URL.Path, "/audio/spelling/") {
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
+		}
+		staticHandler.ServeHTTP(w, r)
+	}))
 	mux.HandleFunc("GET /{$}", s.handleIndex)
 	mux.HandleFunc("POST /api/sheet", s.handleNewSheet)
 	mux.HandleFunc("POST /api/grade", s.handleGrade)

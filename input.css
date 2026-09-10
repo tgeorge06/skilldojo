@@ -35,3 +35,233 @@
 [x-cloak] {
   display: none !important;
 }
+
+@layer base {
+  :focus-visible {
+    outline: 3px solid #7c3aed;
+    outline-offset: 3px;
+  }
+}
+
+@layer components {
+  .skip-link {
+    position: fixed;
+    inset-block-start: 0.75rem;
+    inset-inline-start: 0.75rem;
+    z-index: 100;
+    transform: translateY(-200%);
+    border-radius: 0.75rem;
+    background: white;
+    padding: 0.75rem 1rem;
+    font-weight: 700;
+    color: #171c26;
+    box-shadow: 0 8px 24px rgb(15 23 42 / 0.2);
+  }
+
+  .skip-link:focus {
+    transform: translateY(0);
+  }
+
+  .subject-card {
+    display: flex;
+    min-height: 9rem;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 0.25rem;
+    border-width: 2px;
+    border-radius: 1rem;
+    padding: 1rem;
+    text-align: left;
+    transition: border-color 150ms, background-color 150ms, transform 150ms;
+  }
+
+  .subject-card:hover {
+    transform: translateY(-2px);
+  }
+
+  .subject-card-math-active {
+    border-color: #218a68;
+    background: #eefbf6;
+  }
+
+  .subject-card-spelling-active {
+    border-color: #6d28d9;
+    background: #f5f3ff;
+  }
+
+  .subject-card-idle {
+    border-color: #dde2ea;
+  }
+
+  .subject-card-hint {
+    font-size: 0.875rem;
+    color: #4d566b;
+  }
+
+  .game-progress {
+    height: 0.75rem;
+    overflow: hidden;
+    border-radius: 9999px;
+    background: #dde2ea;
+  }
+
+  .game-progress-fill {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: #7c3aed;
+    transition: width 300ms ease;
+  }
+
+  .lantern {
+    font-size: 1.4rem;
+    transition: filter 200ms, opacity 200ms, transform 200ms;
+  }
+
+  .lantern-on {
+    filter: drop-shadow(0 0 5px rgb(251 146 60 / 0.65));
+  }
+
+  .lantern-off {
+    filter: grayscale(1);
+    opacity: 0.28;
+    transform: scale(0.85);
+  }
+
+  .word-slots {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: clamp(0.3rem, 1.5vw, 0.65rem);
+  }
+
+  .word-slot {
+    display: inline-flex;
+    width: clamp(1.65rem, 7vw, 2.75rem);
+    height: clamp(2.4rem, 9vw, 3.5rem);
+    align-items: center;
+    justify-content: center;
+    border-bottom: 4px solid #7c3aed;
+    font-size: clamp(1.25rem, 5vw, 2rem);
+    font-weight: 900;
+    color: #4c1d95;
+  }
+
+  .word-slot-complete {
+    border-color: #218a68;
+    color: #185a46;
+  }
+
+  .letter-grid {
+    display: grid;
+    grid-template-columns: repeat(9, minmax(0, 1fr));
+    gap: 0.45rem;
+  }
+
+  .letter-key {
+    min-width: 0;
+    min-height: 2.75rem;
+    border-width: 2px;
+    border-radius: 0.65rem;
+    font-weight: 800;
+    transition: transform 100ms, border-color 100ms, background-color 100ms;
+  }
+
+  .letter-key-ready {
+    border-color: #c4b5fd;
+    background: #faf5ff;
+    color: #4c1d95;
+  }
+
+  .letter-key-ready:hover {
+    border-color: #7c3aed;
+    transform: translateY(-1px);
+  }
+
+  .letter-key-correct {
+    border-color: #218a68;
+    background: #eefbf6;
+    color: #185a46;
+    opacity: 1;
+  }
+
+  .letter-key-wrong {
+    border-color: #b9c1cf;
+    background: #edf0f4;
+    color: #667187;
+    text-decoration: line-through;
+    opacity: 1;
+  }
+
+  @media (max-width: 520px) {
+    .letter-grid {
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      scroll-behavior: auto !important;
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+    }
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  .subject-card-math-active {
+    border-color: #3fd9ac;
+    background: #0f2d27;
+  }
+
+  .subject-card-spelling-active {
+    border-color: #a78bfa;
+    background: #2e1065;
+  }
+
+  .subject-card-idle {
+    border-color: #232a38;
+  }
+
+  .subject-card-hint {
+    color: #b9c1cf;
+  }
+
+  .game-progress {
+    background: #39404d;
+  }
+
+  .game-progress-fill {
+    background: #a78bfa;
+  }
+
+  .word-slot {
+    border-color: #a78bfa;
+    color: #ddd6fe;
+  }
+
+  .word-slot-complete {
+    border-color: #3fd9ac;
+    color: #a7f3d0;
+  }
+
+  .letter-key-ready {
+    border-color: #6d28d9;
+    background: #2e1065;
+    color: #ede9fe;
+  }
+
+  .letter-key-correct {
+    border-color: #218a68;
+    background: #0f2d27;
+    color: #a7f3d0;
+  }
+
+  .letter-key-wrong {
+    border-color: #39404d;
+    background: #232a38;
+    color: #b9c1cf;
+  }
+}
