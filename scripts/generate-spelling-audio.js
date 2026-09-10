@@ -57,7 +57,7 @@ try {
     if (!force && fs.existsSync(output) && fs.statSync(output).size > 0) return;
 
     const source = path.join(tempDir, `${word}.aiff`);
-    const encoded = path.join(tempDir, `${word}.opus`);
+    const encoded = `${output}.tmp`; // same directory so the rename is atomic
     execFileSync("say", ["-v", voice, "-r", rate, "-o", source, `${word}.`]);
     execFileSync("ffmpeg", [
       "-hide_banner", "-loglevel", "error", "-y", "-i", source,
@@ -65,8 +65,8 @@ try {
       "-ac", "1", "-c:a", "libopus", "-b:a", "32k", "-vbr", "on", encoded,
     ]);
     if (fs.statSync(encoded).size === 0) throw new Error(`ffmpeg produced an empty clip for ${word}`);
-    // Encode in the temp dir and move into place so an interrupted run never
-    // leaves a partial clip that later runs would skip.
+    // Encode to a sibling temp file and rename into place so an interrupted
+    // run never leaves a partial clip that later runs would skip.
     fs.renameSync(encoded, output);
     fs.unlinkSync(source);
     generated += 1;
