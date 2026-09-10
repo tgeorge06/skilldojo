@@ -1,4 +1,4 @@
-.PHONY: run serve vet test build css clean
+.PHONY: run serve vet test build css audio clean
 
 run:
 	go run . -addr 127.0.0.1:8080
@@ -13,6 +13,7 @@ vet:
 
 test:
 	go test ./...
+	npm test
 
 build: css
 	go build -o skilldojo .
@@ -20,6 +21,10 @@ build: css
 # Rebuild static/app.css after template/class changes (needs `npm install` once).
 css:
 	./node_modules/.bin/tailwindcss -i input.css -o static/app.css --minify
+
+# Rebuild the versioned spelling clips (macOS `say` + ffmpeg).
+audio:
+	npm run audio:spelling
 
 clean:
 	rm -f skilldojo
