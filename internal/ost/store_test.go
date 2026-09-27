@@ -140,6 +140,11 @@ func TestStoreRoundTrip(t *testing.T) {
 	if g := AnalysisGrade(hist, 3); g != 4 {
 		t.Fatalf("analysis grade = %d", g)
 	}
+	// The most recently finished test wins, not the most recently started.
+	overlap := []Summary{{Grade: 5, Finished: true, FinishedAt: now}, {Grade: 3, Finished: true, FinishedAt: now.Add(time.Hour)}}
+	if g := AnalysisGrade(overlap, 4); g != 3 {
+		t.Fatalf("analysis grade with overlap = %d", g)
+	}
 	if got := OfGrade(append(hist, Summary{Grade: 3, Finished: true}), 4); len(got) != 1 {
 		t.Fatalf("OfGrade kept %d", len(got))
 	}

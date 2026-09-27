@@ -192,7 +192,10 @@ func sameNumber(given, key string) bool {
 	return ok1 && ok2 && math.Abs(g-k) < 1e-6
 }
 
-var thousands = regexp.MustCompile(`^-?\d{1,3}(,\d{3})+(\.\d+)?$`)
+var (
+	thousands = regexp.MustCompile(`^-?\d{1,3}(,\d{3})+(\.\d+)?$`)
+	plain     = regexp.MustCompile(`^-?(\d+\.?\d*|\.\d+)$`) // ordinary decimals only: no hex, exponent, inf
+)
 
 func parseNumber(s string) (float64, bool) {
 	s = strings.TrimSpace(s)
@@ -229,6 +232,9 @@ func parseNumber(s string) (float64, bool) {
 			return whole - n/d, true
 		}
 		return whole + n/d, true
+	}
+	if !plain.MatchString(s) {
+		return 0, false
 	}
 	v, err := strconv.ParseFloat(s, 64)
 	return v, err == nil

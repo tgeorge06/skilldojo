@@ -102,7 +102,7 @@ func TestCheckAndNumbers(t *testing.T) {
 			t.Errorf("%q should match 3/4", ok)
 		}
 	}
-	for _, bad := range []string{"", "4/3", "0.7", "three", "7.5e-1", "0,75"} {
+	for _, bad := range []string{"", "4/3", "0.7", "three", "7.5e-1", "0,75", "0x1.8p-1", "inf", "+.75"} {
 		if Check(num, Answer{Text: bad}) {
 			t.Errorf("%q should not match 3/4", bad)
 		}

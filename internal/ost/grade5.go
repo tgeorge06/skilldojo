@@ -77,7 +77,7 @@ func init() {
 		}},
 		Template{de, "5.NBT.3", 1, func(r *rand.Rand) Item {
 			n := between(r, 111, 999)
-			for n%10 == 0 || (n/10)%10 == 0 { // every digit nonzero, so each wrong form differs in value
+			for n%10 == 0 || (n/10)%10 == 0 || n%10 == (n/10)%10 { // nonzero, distinct tenths and hundredths, so each wrong form differs in value
 				n = between(r, 111, 999)
 			}
 			v := float64(n) / 100

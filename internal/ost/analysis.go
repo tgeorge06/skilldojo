@@ -1,6 +1,9 @@
 package ost
 
-import "sort"
+import (
+	"sort"
+	"time"
+)
 
 // Focus is one area a child should work on, with where in the app to do it.
 type Focus struct {
@@ -40,12 +43,13 @@ type Analysis struct {
 // recent finished attempt, so a child who moved up is judged on the new
 // test. Falls back to the child's nearest grade.
 func AnalysisGrade(history []Summary, fallback int) int {
+	grade, latest := fallback, time.Time{}
 	for _, h := range history {
-		if h.Finished {
-			return h.Grade
+		if h.Finished && h.FinishedAt.After(latest) {
+			grade, latest = h.Grade, h.FinishedAt
 		}
 	}
-	return fallback
+	return grade
 }
 
 // OfGrade keeps only one grade's attempts; results from different grades
