@@ -88,6 +88,9 @@ Find your computer's LAN IP (`ipconfig getifaddr en0` on macOS, `ipconfig` on
 Windows, `hostname -I` on Linux) and open `http://<that-IP>:8080` on the
 tablet. "Add to Home Screen" makes it feel like an app.
 
+Parent sign-in works on the tablet too: in `-dev` mode no email is sent, so
+after entering your address tap "open the sign-in link" on the page shown.
+
 Note: `0.0.0.0` listens on every network interface the machine has, so only
 run `make serve` on a trusted network (home Wi-Fi behind your router). Use
 `make run` (localhost-only) everywhere else.
