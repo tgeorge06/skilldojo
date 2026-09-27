@@ -8,6 +8,7 @@ import { chromium } from "playwright";
 
 const require = createRequire(import.meta.url);
 const KataSVG = require("../static/kata-svg.js");
+const DESIGNS = require("../static/kata-designs.js");
 const roster = JSON.parse(readFileSync(new URL("../internal/kata/kata.json", import.meta.url), "utf8")).creatures;
 const mode = process.argv[2] || "caught"; // caught | half | unknown | evolved
 const out = process.argv[3] || join(mkdtempSync(join(tmpdir(), "kata-")), `kata-${mode}.png`);
@@ -15,7 +16,7 @@ const out = process.argv[3] || join(mkdtempSync(join(tmpdir(), "kata-")), `kata-
 let cards = "";
 for (const c of roster) {
   const fills = mode === "unknown" ? 0 : mode === "half" ? Math.floor(c.regions / 2) : c.regions;
-  const svg = KataSVG.creature(c.seed, { palette: c.palette, regions: c.regions, fills, evolved: mode === "evolved", name: c.name, size: 150, silhouette: mode === "unknown" });
+  const svg = KataSVG.creature(c.seed, { design: DESIGNS[c.id], grade: c.grade, regions: c.regions, fills, evolved: mode === "evolved", name: c.name, size: 150, silhouette: mode === "unknown" });
   cards += `<div class="card">${svg}<p>${c.name}<br><small>${c.id}</small></p></div>`;
 }
 const html = `<!doctype html><meta charset="utf-8"><style>

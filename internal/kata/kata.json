@@ -9,7 +9,7 @@
    "hint_vague": "Something small hums between two consonants.",
    "hint_specific": "Practice Short vowels, Grade 1 Spelling.",
    "seed": 1,
-   "regions": 14,
+   "regions": 10,
    "palette": "meadow"
   },
   {
@@ -21,7 +21,7 @@
    "hint_vague": "Two letters whisper as one sound in the reeds.",
    "hint_specific": "Practice Consonant teams, Grade 1 Spelling.",
    "seed": 2,
-   "regions": 14,
+   "regions": 10,
    "palette": "meadow"
   },
   {
@@ -33,7 +33,7 @@
    "hint_vague": "Where two sounds run side by side, it runs too.",
    "hint_specific": "Practice Consonant blends, Grade 1 Spelling.",
    "seed": 3,
-   "regions": 14,
+   "regions": 15,
    "palette": "meadow"
   },
   {
@@ -45,7 +45,7 @@
    "hint_vague": "A quiet letter at the end of the trail keeps it company.",
    "hint_specific": "Practice Silent e, Grade 1 Spelling.",
    "seed": 4,
-   "regions": 14,
+   "regions": 10,
    "palette": "meadow"
   },
   {
@@ -57,7 +57,7 @@
    "hint_vague": "It only appears when two vowels sing together.",
    "hint_specific": "Practice Vowel teams, Grade 1 Spelling.",
    "seed": 5,
-   "regions": 14,
+   "regions": 13,
    "palette": "meadow"
   },
   {
@@ -69,7 +69,7 @@
    "hint_vague": "It hides in the little words you must learn by heart.",
    "hint_specific": "Practice Heart words, Grade 1 Spelling.",
    "seed": 6,
-   "regions": 14,
+   "regions": 10,
    "palette": "meadow"
   },
   {
@@ -81,7 +81,7 @@
    "hint_vague": "Nesting in the longer vowel songs.",
    "hint_specific": "Practice Advanced vowel teams, Grade 2 Spelling.",
    "seed": 7,
-   "regions": 16,
+   "regions": 10,
    "palette": "tide"
   },
   {
@@ -93,7 +93,7 @@
    "hint_vague": "Wherever an r bends a vowel, it growls along.",
    "hint_specific": "Practice R-controlled vowels, Grade 2 Spelling.",
    "seed": 8,
-   "regions": 16,
+   "regions": 12,
    "palette": "tide"
   },
   {
@@ -105,7 +105,7 @@
    "hint_vague": "It walks in two steps, never one.",
    "hint_specific": "Practice Two-syllable words, Grade 2 Spelling.",
    "seed": 9,
-   "regions": 16,
+   "regions": 14,
    "palette": "tide"
   },
   {
@@ -117,7 +117,7 @@
    "hint_vague": "Look at the tail ends of words.",
    "hint_specific": "Practice Word endings, Grade 2 Spelling.",
    "seed": 10,
-   "regions": 16,
+   "regions": 11,
    "palette": "tide"
   },
   {
@@ -129,7 +129,7 @@
    "hint_vague": "Among the most common words with a surprising twist.",
    "hint_specific": "Practice High-frequency heart words, Grade 2 Spelling.",
    "seed": 11,
-   "regions": 16,
+   "regions": 19,
    "palette": "tide"
   },
   {
@@ -141,7 +141,7 @@
    "hint_vague": "It hops from syllable to syllable across long words.",
    "hint_specific": "Practice Longer words, Grade 3 Spelling.",
    "seed": 12,
-   "regions": 18,
+   "regions": 10,
    "palette": "ember"
   },
   {
@@ -153,7 +153,7 @@
    "hint_vague": "It always goes first, before the base word.",
    "hint_specific": "Practice Prefixes, Grade 3 Spelling.",
    "seed": 13,
-   "regions": 18,
+   "regions": 14,
    "palette": "ember"
   },
   {
@@ -165,7 +165,7 @@
    "hint_vague": "It clings to the ends of base words.",
    "hint_specific": "Practice Suffixes, Grade 3 Spelling.",
    "seed": 14,
-   "regions": 18,
+   "regions": 14,
    "palette": "ember"
   },
   {
@@ -177,7 +177,7 @@
    "hint_vague": "It appears when a word changes shape to take an ending.",
    "hint_specific": "Practice Suffix spelling changes, Grade 3 Spelling.",
    "seed": 15,
-   "regions": 18,
+   "regions": 15,
    "palette": "ember"
   },
   {
@@ -189,7 +189,7 @@
    "hint_vague": "Found where common words play tricks.",
    "hint_specific": "Practice Common tricky words, Grade 3 Spelling.",
    "seed": 16,
-   "regions": 18,
+   "regions": 12,
    "palette": "ember"
   },
   {
@@ -201,7 +201,7 @@
    "hint_vague": "It gathers long words one chunk at a time.",
    "hint_specific": "Practice Multisyllable words, Grade 4 Spelling.",
    "seed": 17,
-   "regions": 20,
+   "regions": 11,
    "palette": "dusk"
   },
   {
@@ -213,7 +213,7 @@
    "hint_vague": "Lurking in the words people most often get wrong.",
    "hint_specific": "Practice Commonly misspelled words, Grade 4 Spelling.",
    "seed": 18,
-   "regions": 20,
+   "regions": 17,
    "palette": "dusk"
   },
   {
@@ -225,7 +225,7 @@
    "hint_vague": "It burrows under words to their roots.",
    "hint_specific": "Practice Roots and prefixes, Grade 4 Spelling.",
    "seed": 19,
-   "regions": 20,
+   "regions": 10,
    "palette": "dusk"
   },
   {
@@ -237,7 +237,7 @@
    "hint_vague": "At home in the grand endings of long words.",
    "hint_specific": "Practice Advanced suffixes, Grade 4 Spelling.",
    "seed": 20,
-   "regions": 20,
+   "regions": 14,
    "palette": "dusk"
   },
   {
@@ -249,7 +249,7 @@
    "hint_vague": "It reads the words that schoolbooks use.",
    "hint_specific": "Practice Academic vocabulary, Grade 4 Spelling.",
    "seed": 21,
-   "regions": 20,
+   "regions": 11,
    "palette": "dusk"
   },
   {
@@ -261,7 +261,7 @@
    "hint_vague": "Ancient parts from Greece and Rome are its nest.",
    "hint_specific": "Practice Greek and Latin parts, Grade 5 Spelling.",
    "seed": 22,
-   "regions": 22,
+   "regions": 10,
    "palette": "aurora"
   },
   {
@@ -273,7 +273,7 @@
    "hint_vague": "Where -tion, -ous and -ity gather, so does it.",
    "hint_specific": "Practice Complex suffixes, Grade 5 Spelling.",
    "seed": 23,
-   "regions": 22,
+   "regions": 12,
    "palette": "aurora"
   },
   {
@@ -285,7 +285,7 @@
    "hint_vague": "The longest words are its stomping ground.",
    "hint_specific": "Practice Complex multisyllable words, Grade 5 Spelling.",
    "seed": 24,
-   "regions": 22,
+   "regions": 20,
    "palette": "aurora"
   },
   {
@@ -297,7 +297,7 @@
    "hint_vague": "It collects the words of scholars.",
    "hint_specific": "Practice Academic vocabulary, Grade 5 Spelling.",
    "seed": 25,
-   "regions": 22,
+   "regions": 10,
    "palette": "aurora"
   },
   {
@@ -309,7 +309,7 @@
    "hint_vague": "In the strangest spellings of all.",
    "hint_specific": "Practice Advanced tricky words, Grade 5 Spelling.",
    "seed": 26,
-   "regions": 22,
+   "regions": 11,
    "palette": "aurora"
   },
   {
@@ -321,7 +321,7 @@
    "hint_vague": "In the words you see on almost every page.",
    "hint_specific": "Practice Sight words, Grade 1 Spelling.",
    "seed": 27,
-   "regions": 14,
+   "regions": 16,
    "palette": "meadow"
   },
   {
@@ -333,7 +333,7 @@
    "hint_vague": "Among the everyday words of early readers.",
    "hint_specific": "Practice Sight words, Grade 2 Spelling.",
    "seed": 28,
-   "regions": 16,
+   "regions": 10,
    "palette": "tide"
   },
   {
@@ -345,7 +345,7 @@
    "hint_vague": "Shining from common words with hidden corners.",
    "hint_specific": "Practice Sight words, Grade 3 Spelling.",
    "seed": 29,
-   "regions": 18,
+   "regions": 12,
    "palette": "ember"
   },
   {
@@ -357,7 +357,7 @@
    "hint_vague": "In the small words that hold big sentences together.",
    "hint_specific": "Practice Sight words, Grade 4 Spelling.",
    "seed": 30,
-   "regions": 20,
+   "regions": 12,
    "palette": "dusk"
   },
   {
@@ -369,7 +369,7 @@
    "hint_vague": "Where the most familiar words keep their secrets.",
    "hint_specific": "Practice Sight words, Grade 5 Spelling.",
    "seed": 31,
-   "regions": 22,
+   "regions": 10,
    "palette": "aurora"
   },
   {
@@ -381,7 +381,7 @@
    "hint_vague": "Somewhere numbers are joined and taken apart.",
    "hint_specific": "Practice Add & Subtract (within 20), Grade 1 Math.",
    "seed": 32,
-   "regions": 14,
+   "regions": 15,
    "palette": "meadow"
   },
   {
@@ -393,7 +393,7 @@
    "hint_vague": "Somewhere numbers are joined and taken apart.",
    "hint_specific": "Practice Add & Subtract (two-digit sums), Grade 2 Math.",
    "seed": 33,
-   "regions": 16,
+   "regions": 15,
    "palette": "tide"
   },
   {
@@ -405,7 +405,7 @@
    "hint_vague": "Somewhere numbers are joined and taken apart.",
    "hint_specific": "Practice Add & Subtract (three-digit sums), Grade 3 Math.",
    "seed": 34,
-   "regions": 18,
+   "regions": 16,
    "palette": "ember"
   },
   {
@@ -417,7 +417,7 @@
    "hint_vague": "Somewhere numbers are joined and taken apart.",
    "hint_specific": "Practice Add & Subtract (four-digit sums), Grade 4 Math.",
    "seed": 35,
-   "regions": 20,
+   "regions": 14,
    "palette": "dusk"
   },
   {
@@ -429,7 +429,7 @@
    "hint_vague": "Somewhere numbers are joined and taken apart.",
    "hint_specific": "Practice Add & Subtract (five-digit sums), Grade 5 Math.",
    "seed": 36,
-   "regions": 22,
+   "regions": 20,
    "palette": "aurora"
   },
   {
@@ -453,7 +453,7 @@
    "hint_vague": "It counts in rows and columns.",
    "hint_specific": "Practice Multiplication (times tables to 5), Grade 2 Math.",
    "seed": 38,
-   "regions": 16,
+   "regions": 12,
    "palette": "tide"
   },
   {
@@ -465,7 +465,7 @@
    "hint_vague": "It counts in rows and columns.",
    "hint_specific": "Practice Multiplication (times tables to 10), Grade 3 Math.",
    "seed": 39,
-   "regions": 18,
+   "regions": 17,
    "palette": "ember"
   },
   {
@@ -477,7 +477,7 @@
    "hint_vague": "It counts in rows and columns.",
    "hint_specific": "Practice Multiplication (times tables to 12), Grade 4 Math.",
    "seed": 40,
-   "regions": 20,
+   "regions": 16,
    "palette": "dusk"
   },
   {
@@ -489,7 +489,7 @@
    "hint_vague": "It counts in rows and columns.",
    "hint_specific": "Practice Multiplication (two-digit multiplication), Grade 5 Math.",
    "seed": 41,
-   "regions": 22,
+   "regions": 15,
    "palette": "aurora"
   },
   {
@@ -501,7 +501,7 @@
    "hint_vague": "It shares things out evenly.",
    "hint_specific": "Practice Division (halving), Grade 1 Math.",
    "seed": 42,
-   "regions": 14,
+   "regions": 10,
    "palette": "meadow"
   },
   {
@@ -513,7 +513,7 @@
    "hint_vague": "It shares things out evenly.",
    "hint_specific": "Practice Division (dividing by 2 to 5), Grade 2 Math.",
    "seed": 43,
-   "regions": 16,
+   "regions": 10,
    "palette": "tide"
   },
   {
@@ -525,7 +525,7 @@
    "hint_vague": "It shares things out evenly.",
    "hint_specific": "Practice Division (tables-based division), Grade 3 Math.",
    "seed": 44,
-   "regions": 18,
+   "regions": 13,
    "palette": "ember"
   },
   {
@@ -537,7 +537,7 @@
    "hint_vague": "It shares things out evenly.",
    "hint_specific": "Practice Division (division to 12), Grade 4 Math.",
    "seed": 45,
-   "regions": 20,
+   "regions": 12,
    "palette": "dusk"
   },
   {
@@ -549,7 +549,7 @@
    "hint_vague": "It shares things out evenly.",
    "hint_specific": "Practice Division (larger division), Grade 5 Math.",
    "seed": 46,
-   "regions": 22,
+   "regions": 15,
    "palette": "aurora"
   },
   {
@@ -561,7 +561,7 @@
    "hint_vague": "It lives in the parts of a whole.",
    "hint_specific": "Practice Fractions (enrichment fractions), Grade 1 Math.",
    "seed": 47,
-   "regions": 14,
+   "regions": 11,
    "palette": "meadow"
   },
   {
@@ -573,7 +573,7 @@
    "hint_vague": "It lives in the parts of a whole.",
    "hint_specific": "Practice Fractions (enrichment fractions), Grade 2 Math.",
    "seed": 48,
-   "regions": 16,
+   "regions": 14,
    "palette": "tide"
   },
   {
@@ -585,7 +585,7 @@
    "hint_vague": "It lives in the parts of a whole.",
    "hint_specific": "Practice Fractions (enrichment fractions), Grade 3 Math.",
    "seed": 49,
-   "regions": 18,
+   "regions": 16,
    "palette": "ember"
   },
   {
@@ -597,7 +597,7 @@
    "hint_vague": "It lives in the parts of a whole.",
    "hint_specific": "Practice Fractions (same-denominator fractions), Grade 4 Math.",
    "seed": 50,
-   "regions": 20,
+   "regions": 13,
    "palette": "dusk"
   },
   {
@@ -609,7 +609,7 @@
    "hint_vague": "It lives in the parts of a whole.",
    "hint_specific": "Practice Fractions (fraction fluency), Grade 5 Math.",
    "seed": 51,
-   "regions": 22,
+   "regions": 23,
    "palette": "aurora"
   }
  ]

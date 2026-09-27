@@ -75,7 +75,7 @@ func Load(cur *curriculum.Curriculum) (*Roster, error) {
 			return nil, fmt.Errorf("kata: duplicate creature %q", c.ID)
 		case names[strings.ToLower(c.Name)]:
 			return nil, fmt.Errorf("kata: duplicate name %q", c.Name)
-		case c.Grade < 1 || c.Grade > 5, c.Regions < 12 || c.Regions > 40, c.Seed <= 0:
+		case c.Grade < 1 || c.Grade > 5, c.Regions < 8 || c.Regions > 40, c.Seed <= 0:
 			return nil, fmt.Errorf("kata: creature %q has bad grade/regions/seed", c.ID)
 		case c.Kind != "math" && c.Kind != "spelling":
 			return nil, fmt.Errorf("kata: creature %q kind %q", c.ID, c.Kind)

@@ -227,15 +227,23 @@ func TestSeenCaughtEvolvedThroughRounds(t *testing.T) {
 		t.Fatalf("grade 2 totals: %v", idx.ByGrade[2])
 	}
 
-	// Enough rounds to color all 20 regions: caught, without evolving.
-	for i := 2; i <= 4; i++ {
+	// Enough rounds to color every region: caught, without evolving. The
+	// round that crosses the line reports Caught exactly once.
+	caughtRounds := 0
+	for i := 2; i <= 6; i++ {
 		fin = e.play(t, "kata-round-"+string(rune('0'+i)), skill, 2, day0.Add(time.Duration(i)*time.Hour))
-	}
-	json.Unmarshal(fin.Reward.Creatures, &touched)
-	for _, tc := range touched {
-		if tc.ID == skill && (!tc.Caught || tc.State != StateCaught || tc.Fills != tc.Regions) {
-			t.Fatalf("should be caught on the fourth round: %+v", tc)
+		json.Unmarshal(fin.Reward.Creatures, &touched)
+		for _, tc := range touched {
+			if tc.ID == skill && tc.Caught {
+				caughtRounds++
+				if tc.State != StateCaught || tc.Fills != tc.Regions {
+					t.Fatalf("caught with wrong state: %+v", tc)
+				}
+			}
 		}
+	}
+	if caughtRounds != 1 {
+		t.Fatalf("caught should be reported exactly once, got %d", caughtRounds)
 	}
 	idx = e.index(t, day0)
 	if entry(idx, skill).State != StateCaught || idx.ByGrade[2][0] != 1 {
