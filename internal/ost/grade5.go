@@ -76,7 +76,11 @@ func init() {
 			return numeric(fmt.Sprintf("%s × %d = ?", dec(v, 1), p), dec(v*float64(p), 0), "Multiplying by a power of ten moves the decimal point to the right.")
 		}},
 		Template{de, "5.NBT.3", 1, func(r *rand.Rand) Item {
-			v := float64(between(r, 101, 999)) / 100
+			n := between(r, 111, 999)
+			for n%10 == 0 || (n/10)%10 == 0 { // every digit nonzero, so each wrong form differs in value
+				n = between(r, 111, 999)
+			}
+			v := float64(n) / 100
 			return choices(r, fmt.Sprintf("Which shows %s in expanded form?", dec(v, 2)), expanded(v), []string{expandedWrong(v, 1), expandedWrong(v, 2), expandedWrong(v, 3)}, "Write each digit times its place value.")
 		}},
 		Template{de, "5.NBT.3", 2, func(r *rand.Rand) Item {

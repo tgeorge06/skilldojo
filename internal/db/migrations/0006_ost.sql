@@ -20,3 +20,6 @@ CREATE TABLE ost_attempts (
     report_json  TEXT NOT NULL DEFAULT '{}'
 );
 CREATE INDEX ost_attempts_child ON ost_attempts(child_id, finished_at, started_at);
+-- One unfinished test per child, subject and grade, so two tabs starting
+-- at once resume the same attempt instead of creating two.
+CREATE UNIQUE INDEX ost_attempts_open ON ost_attempts(account_id, child_id, subject, grade) WHERE finished_at IS NULL;

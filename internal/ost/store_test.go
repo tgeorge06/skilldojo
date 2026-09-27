@@ -96,6 +96,13 @@ func TestStoreRoundTrip(t *testing.T) {
 	if err != nil || resumed.ID != a.ID || len(resumed.Answers) != 29 {
 		t.Fatalf("resume: %v id %s answers %d", err, resumed.ID, len(resumed.Answers))
 	}
+	// A second unfinished attempt for the same grade cannot exist, even if
+	// two requests race past the resume check: the insert is refused.
+	_, err = d.ExecContext(ctx, `INSERT INTO ost_attempts (id, account_id, child_id, subject, grade, seed, items_json, started_at, updated_at)
+		VALUES ('dup', ?, ?, 'math', 4, 1, '[]', '2026', '2026')`, acct.ID, kid.ID)
+	if err == nil {
+		t.Fatal("a second open attempt for the same grade should violate the unique index")
+	}
 	// Another grade is a separate attempt in progress.
 	g5, err := s.Start(ctx, child, 5, now)
 	if err != nil || g5.ID == a.ID || g5.Grade != 5 {
@@ -121,6 +128,20 @@ func TestStoreRoundTrip(t *testing.T) {
 	}
 	if _, err := s.Attempt(ctx, Child{AccountID: acct.ID + 1, ChildID: kid.ID}, a.ID); err != ErrNotFound {
 		t.Fatalf("other account: %v", err)
+	}
+	other := Child{AccountID: acct.ID + 1, ChildID: kid.ID, Grade: 4}
+	if err := s.SaveAnswer(ctx, other, g5.ID, "q01", Answer{Text: "1"}, now); err != ErrNotFound {
+		t.Fatalf("other account save: %v", err)
+	}
+	if _, err := s.Submit(ctx, other, g5.ID, now); err != ErrNotFound {
+		t.Fatalf("other account submit: %v", err)
+	}
+	// Analysis picks the latest finished grade and ignores other grades.
+	if g := AnalysisGrade(hist, 3); g != 4 {
+		t.Fatalf("analysis grade = %d", g)
+	}
+	if got := OfGrade(append(hist, Summary{Grade: 3, Finished: true}), 4); len(got) != 1 {
+		t.Fatalf("OfGrade kept %d", len(got))
 	}
 }
 

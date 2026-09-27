@@ -36,6 +36,30 @@ type Analysis struct {
 	Strong     []string
 }
 
+// AnalysisGrade picks which test grade to analyse: the grade of the most
+// recent finished attempt, so a child who moved up is judged on the new
+// test. Falls back to the child's nearest grade.
+func AnalysisGrade(history []Summary, fallback int) int {
+	for _, h := range history {
+		if h.Finished {
+			return h.Grade
+		}
+	}
+	return fallback
+}
+
+// OfGrade keeps only one grade's attempts; results from different grades
+// are different tests and must not be averaged together.
+func OfGrade(history []Summary, grade int) []Summary {
+	var out []Summary
+	for _, h := range history {
+		if h.Grade == grade {
+			out = append(out, h)
+		}
+	}
+	return out
+}
+
 // NeedsWorkBelow is the recent-percent line under which a category is
 // flagged. Proficient on the real test sits near the middle of the scale.
 const NeedsWorkBelow = 70

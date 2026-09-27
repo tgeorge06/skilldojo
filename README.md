@@ -75,8 +75,8 @@ attempts are unlimited. Each attempt is graded with a percent, per-category
 and per-standard tallies, and an estimated Ohio performance level (Limited to
 Advanced) that is a rough guide only. The parent report shows every attempt,
 a score trend, and areas needing improvement that link straight to the
-matching dojo drill. Items follow the published blueprint category weights
-and are original, not released test questions.
+matching dojo drill. Items follow the published blueprint's reporting-category weights (not its
+depth-of-knowledge mix) and are original, not released test questions.
 
 ## Play from a tablet on the same Wi-Fi
 

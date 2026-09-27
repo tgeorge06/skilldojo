@@ -34,6 +34,9 @@ func init() {
 		}},
 		Template{md, "3.OA.5", 2, func(r *rand.Rand) Item {
 			a, b := between(r, 2, 9), between(r, 2, 9)
+			for b == a { // a × a reads the same either way, and 2 + 2 = 2 × 2
+				b = between(r, 2, 9)
+			}
 			return choices(r, fmt.Sprintf("Which expression is equal to %d × %d?", a, b),
 				fmt.Sprintf("%d × %d", b, a), []string{fmt.Sprintf("%d + %d", a, b), fmt.Sprintf("%d × %d", a, b+1), fmt.Sprintf("%d ÷ %d", a*b, b+1)},
 				"Changing the order of the factors does not change the product.")
@@ -87,7 +90,7 @@ func init() {
 			a, b := between(r, 500, 980), between(r, 120, 480)
 			return numeric(fmt.Sprintf("A library had %d books. It lent out %d. How many books are left?", a, b), itoa(a-b), fmt.Sprintf("%d − %d = %d.", a, b, a-b))
 		}},
-		Template{no, "3.NBT.3", 1, func(r *rand.Rand) Item {
+		Template{md, "3.NBT.3", 1, func(r *rand.Rand) Item {
 			a, b := between(r, 2, 9), between(r, 2, 9)*10
 			return numeric(fmt.Sprintf("%d × %d = ?", a, b), itoa(a*b), fmt.Sprintf("%d × %d tens = %d tens = %d.", a, b/10, a*b/10, a*b))
 		}},

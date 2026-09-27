@@ -136,12 +136,13 @@ func writeOSTError(w http.ResponseWriter, err error) {
 // Parent report.
 
 type childReport struct {
-	Child      account.Child
-	TestGrade  int
-	InProgress *ost.Summary
-	History    []attemptRow
-	Analysis   ost.Analysis
-	Categories []string
+	Child         account.Child
+	TestGrade     int // default grade for a new test
+	AnalysisGrade int // grade whose attempts the analysis covers
+	InProgress    *ost.Summary
+	History       []attemptRow
+	Analysis      ost.Analysis
+	Categories    []string
 }
 
 type attemptRow struct {
@@ -215,7 +216,9 @@ func (s *server) childReport(r *http.Request, acct account.Account, child accoun
 	if err != nil {
 		loc = time.UTC
 	}
-	rep := &childReport{Child: child, TestGrade: ost.NearestGrade(child.Grade), Categories: ost.Categories(ost.NearestGrade(child.Grade))}
+	rep := &childReport{Child: child, TestGrade: ost.NearestGrade(child.Grade)}
+	rep.AnalysisGrade = ost.AnalysisGrade(history, rep.TestGrade)
+	rep.Categories = ost.Categories(rep.AnalysisGrade)
 	for _, h := range history {
 		if !h.Finished && rep.InProgress == nil {
 			hh := h
@@ -223,7 +226,7 @@ func (s *server) childReport(r *http.Request, acct account.Account, child accoun
 		}
 		rep.History = append(rep.History, attemptRow{Summary: h, When: h.StartedAt.In(loc).Format("Jan 2, 2006 3:04 PM")})
 	}
-	rep.Analysis = ost.Analyze(history, rep.TestGrade)
+	rep.Analysis = ost.Analyze(ost.OfGrade(history, rep.AnalysisGrade), rep.AnalysisGrade)
 	return rep, nil
 }
 

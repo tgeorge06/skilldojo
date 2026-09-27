@@ -164,6 +164,10 @@ func (s *Store) Start(ctx context.Context, child Child, grade int, now time.Time
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		id, child.AccountID, child.ChildID, SubjectMath, grade, int64(seed), string(itemsJSON), ts(now), ts(now), len(items))
 	if err != nil {
+		if strings.Contains(err.Error(), "UNIQUE") {
+			// Another request started this child's test first; resume it.
+			return s.Start(ctx, child, grade, now)
+		}
 		return Attempt{}, err
 	}
 	return s.Attempt(ctx, child, id)
@@ -238,19 +242,22 @@ func (s *Store) SaveAnswer(ctx context.Context, child Child, id, itemID string, 
 		return err
 	}
 	defer tx.Rollback() //nolint:errcheck
-	var itemsJSON, answersJSON string
-	var finished sql.NullString
-	err = tx.QueryRowContext(ctx,
-		`SELECT items_json, answers_json, finished_at FROM ost_attempts WHERE id = ? AND child_id = ? AND account_id = ?`,
-		id, child.ChildID, child.AccountID).Scan(&itemsJSON, &answersJSON, &finished)
-	if errors.Is(err, sql.ErrNoRows) {
-		return ErrNotFound
-	}
+	// Take the write lock before reading, so the read-merge-write below
+	// cannot interleave with another save or with Submit. A finished
+	// attempt matches no row here.
+	locked, err := s.lockOpen(ctx, tx, child, id, now)
 	if err != nil {
 		return err
 	}
-	if finished.Valid {
-		return ErrFinished
+	if !locked {
+		return s.openOrFinished(ctx, child, id)
+	}
+	var itemsJSON, answersJSON string
+	err = tx.QueryRowContext(ctx,
+		`SELECT items_json, answers_json FROM ost_attempts WHERE id = ? AND child_id = ? AND account_id = ?`,
+		id, child.ChildID, child.AccountID).Scan(&itemsJSON, &answersJSON)
+	if err != nil {
+		return err
 	}
 	var items []Item
 	if err := json.Unmarshal([]byte(itemsJSON), &items); err != nil {
@@ -289,33 +296,88 @@ func (s *Store) SaveAnswer(ctx context.Context, child Child, id, itemID string, 
 		answers[itemID] = ans
 	}
 	out, _ := json.Marshal(answers)
-	if _, err := tx.ExecContext(ctx, `UPDATE ost_attempts SET answers_json = ?, updated_at = ? WHERE id = ?`, string(out), ts(now), id); err != nil {
+	if _, err := tx.ExecContext(ctx,
+		`UPDATE ost_attempts SET answers_json = ?, updated_at = ? WHERE id = ? AND child_id = ? AND account_id = ? AND finished_at IS NULL`,
+		string(out), ts(now), id, child.ChildID, child.AccountID); err != nil {
 		return err
 	}
 	return tx.Commit()
 }
 
+// lockOpen touches the child's unfinished attempt inside tx, which takes
+// SQLite's write lock for the rest of the transaction. It reports false
+// when the attempt is missing, belongs to someone else, or is finished.
+func (s *Store) lockOpen(ctx context.Context, tx *sql.Tx, child Child, id string, now time.Time) (bool, error) {
+	res, err := tx.ExecContext(ctx,
+		`UPDATE ost_attempts SET updated_at = ? WHERE id = ? AND child_id = ? AND account_id = ? AND finished_at IS NULL`,
+		ts(now), id, child.ChildID, child.AccountID)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
+}
+
+// openOrFinished distinguishes "not yours" from "already turned in".
+func (s *Store) openOrFinished(ctx context.Context, child Child, id string) error {
+	var finished sql.NullString
+	err := s.db.QueryRowContext(ctx, `SELECT finished_at FROM ost_attempts WHERE id = ? AND child_id = ? AND account_id = ?`,
+		id, child.ChildID, child.AccountID).Scan(&finished)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	}
+	if err != nil {
+		return err
+	}
+	if finished.Valid {
+		return ErrFinished
+	}
+	return ErrNotFound
+}
+
 // Submit grades an attempt. A repeated submit returns the stored report.
+// The attempt is locked before its answers are read, so a save racing
+// the submit either lands before grading or is refused as finished.
 func (s *Store) Submit(ctx context.Context, child Child, id string, now time.Time) (Attempt, error) {
-	rw, err := s.load(ctx, child, id)
+	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return Attempt{}, err
 	}
-	if rw.finish.Valid {
-		return s.Attempt(ctx, child, id)
+	defer tx.Rollback() //nolint:errcheck
+	locked, err := s.lockOpen(ctx, tx, child, id, now)
+	if err != nil {
+		return Attempt{}, err
 	}
-	rep := Grade(rw.items, rw.answers)
+	if !locked {
+		if err := s.openOrFinished(ctx, child, id); errors.Is(err, ErrFinished) {
+			return s.Attempt(ctx, child, id)
+		} else if err != nil {
+			return Attempt{}, err
+		}
+		return Attempt{}, ErrNotFound
+	}
+	var itemsJSON, answersJSON string
+	if err := tx.QueryRowContext(ctx, `SELECT items_json, answers_json FROM ost_attempts WHERE id = ?`, id).Scan(&itemsJSON, &answersJSON); err != nil {
+		return Attempt{}, err
+	}
+	var items []Item
+	answers := map[string]Answer{}
+	if err := json.Unmarshal([]byte(itemsJSON), &items); err != nil {
+		return Attempt{}, fmt.Errorf("ost: stored items: %w", err)
+	}
+	if err := json.Unmarshal([]byte(answersJSON), &answers); err != nil {
+		return Attempt{}, fmt.Errorf("ost: stored answers: %w", err)
+	}
+	rep := Grade(items, answers)
 	repJSON, _ := json.Marshal(rep)
-	res, err := s.db.ExecContext(ctx,
+	if _, err := tx.ExecContext(ctx,
 		`UPDATE ost_attempts SET finished_at = ?, updated_at = ?, score = ?, total = ?, percent = ?, level = ?, report_json = ?
 		 WHERE id = ? AND child_id = ? AND account_id = ? AND finished_at IS NULL`,
-		ts(now), ts(now), rep.Score, rep.Total, rep.Percent, rep.Level, string(repJSON), id, child.ChildID, child.AccountID)
-	if err != nil {
+		ts(now), ts(now), rep.Score, rep.Total, rep.Percent, rep.Level, string(repJSON), id, child.ChildID, child.AccountID); err != nil {
 		return Attempt{}, err
 	}
-	if n, _ := res.RowsAffected(); n == 0 {
-		// Lost a race with another submit; the stored report wins.
-		return s.Attempt(ctx, child, id)
+	if err := tx.Commit(); err != nil {
+		return Attempt{}, err
 	}
 	return s.Attempt(ctx, child, id)
 }

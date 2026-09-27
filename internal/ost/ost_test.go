@@ -102,7 +102,7 @@ func TestCheckAndNumbers(t *testing.T) {
 			t.Errorf("%q should match 3/4", ok)
 		}
 	}
-	for _, bad := range []string{"", "4/3", "0.7", "three"} {
+	for _, bad := range []string{"", "4/3", "0.7", "three", "7.5e-1", "0,75"} {
 		if Check(num, Answer{Text: bad}) {
 			t.Errorf("%q should not match 3/4", bad)
 		}
@@ -110,6 +110,10 @@ func TestCheckAndNumbers(t *testing.T) {
 	mixed := Item{Type: TypeNumber, Numeric: "1 3/4"}
 	if !Check(mixed, Answer{Text: "7/4"}) || !Check(mixed, Answer{Text: "1.75"}) {
 		t.Error("mixed number equivalents should match")
+	}
+	big := Item{Type: TypeNumber, Numeric: "1234"}
+	if !Check(big, Answer{Text: "1,234"}) || Check(big, Answer{Text: "1,2,34"}) || Check(big, Answer{Text: "12,34"}) {
+		t.Error("commas must be thousands separators")
 	}
 	money := Item{Type: TypeNumber, Numeric: "12.50"}
 	if !Check(money, Answer{Text: "$12.5"}) || !Check(money, Answer{Text: "12.50"}) {

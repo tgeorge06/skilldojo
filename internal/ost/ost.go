@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand/v2"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -191,11 +192,19 @@ func sameNumber(given, key string) bool {
 	return ok1 && ok2 && math.Abs(g-k) < 1e-6
 }
 
+var thousands = regexp.MustCompile(`^-?\d{1,3}(,\d{3})+(\.\d+)?$`)
+
 func parseNumber(s string) (float64, bool) {
-	s = strings.TrimSpace(strings.ReplaceAll(s, ",", ""))
+	s = strings.TrimSpace(s)
 	s = strings.TrimPrefix(s, "$")
-	if s == "" {
-		return 0, false
+	if s == "" || strings.ContainsAny(s, "eE") {
+		return 0, false // no exponents; "1e3" is not a grade-school answer
+	}
+	if strings.Contains(s, ",") {
+		if !thousands.MatchString(s) {
+			return 0, false // "1,2,3" is not a number
+		}
+		s = strings.ReplaceAll(s, ",", "")
 	}
 	if strings.Contains(s, "/") {
 		// mixed number "1 3/4" or fraction "3/4"
