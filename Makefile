@@ -1,4 +1,4 @@
-.PHONY: run serve vet test build css audio clean
+.PHONY: run serve vet test build css words audio clean
 
 run:
 	go run . -addr 127.0.0.1:8080
@@ -21,6 +21,10 @@ build: css
 # Rebuild static/app.css after template/class changes (needs `npm install` once).
 css:
 	./node_modules/.bin/tailwindcss -i input.css -o static/app.css --minify
+
+# Regenerate static/words.js from internal/curriculum/spelling.json.
+words:
+	node scripts/generate-words.js
 
 # Rebuild the versioned spelling clips (macOS `say` + ffmpeg).
 audio:

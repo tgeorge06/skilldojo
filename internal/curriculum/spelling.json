@@ -1,0 +1,1253 @@
+{
+  "skills": {
+    "1": [
+      {
+        "id": "g1-short-vowels",
+        "label": "Short vowels",
+        "tip": "Listen for the short vowel sound in the middle of a simple word."
+      },
+      {
+        "id": "g1-digraphs",
+        "label": "Consonant teams",
+        "tip": "Two consonants can work together to make one sound, as in sh, ch, th, and wh."
+      },
+      {
+        "id": "g1-blends",
+        "label": "Consonant blends",
+        "tip": "In a blend, you can still hear each consonant sound."
+      },
+      {
+        "id": "g1-final-e",
+        "label": "Silent e",
+        "tip": "A silent e can make the earlier vowel say its name."
+      },
+      {
+        "id": "g1-vowel-teams",
+        "label": "Vowel teams",
+        "tip": "Two vowels can work together to represent one vowel sound."
+      },
+      {
+        "id": "g1-irregular",
+        "label": "Heart words",
+        "tip": "Some common words have an unexpected part that must be learned by heart."
+      }
+    ],
+    "2": [
+      {
+        "id": "g2-vowel-teams",
+        "label": "Advanced vowel teams",
+        "tip": "Vowel teams can represent long vowels and other sounds; notice the whole team."
+      },
+      {
+        "id": "g2-r-controlled",
+        "label": "R-controlled vowels",
+        "tip": "A vowel followed by r makes a special sound, as in ar, er, ir, or, and ur."
+      },
+      {
+        "id": "g2-two-syllable",
+        "label": "Two-syllable words",
+        "tip": "Say each syllable slowly, then spell and join the parts."
+      },
+      {
+        "id": "g2-endings",
+        "label": "Word endings",
+        "tip": "Look for a base word before adding endings such as -ing, -ed, -es, or -s."
+      },
+      {
+        "id": "g2-irregular",
+        "label": "High-frequency heart words",
+        "tip": "Map the regular sounds first, then remember the unexpected letters by heart."
+      }
+    ],
+    "3": [
+      {
+        "id": "g3-multisyllable",
+        "label": "Longer words",
+        "tip": "Break a longer word into spoken syllables before spelling each part."
+      },
+      {
+        "id": "g3-prefixes",
+        "label": "Prefixes",
+        "tip": "A prefix is a meaningful part added to the beginning of a base word."
+      },
+      {
+        "id": "g3-suffixes",
+        "label": "Suffixes",
+        "tip": "A suffix is a meaningful ending; find the base word before adding it."
+      },
+      {
+        "id": "g3-spelling-changes",
+        "label": "Suffix spelling changes",
+        "tip": "Adding a suffix can double a consonant, drop silent e, or change y to i."
+      },
+      {
+        "id": "g3-irregular",
+        "label": "Common tricky words",
+        "tip": "Pronounce the word, identify its regular parts, and study only the unexpected part."
+      }
+    ],
+    "4": [
+      {
+        "id": "g4-multisyllable",
+        "label": "Multisyllable words",
+        "tip": "Use syllable boundaries to spell one meaningful chunk at a time."
+      },
+      {
+        "id": "g4-tricky",
+        "label": "Commonly misspelled words",
+        "tip": "Find the surprising letter sequence and connect it to a memory clue."
+      },
+      {
+        "id": "g4-roots",
+        "label": "Roots and prefixes",
+        "tip": "Recognizing roots and prefixes makes long words easier to analyze and spell."
+      },
+      {
+        "id": "g4-suffixes",
+        "label": "Advanced suffixes",
+        "tip": "Keep the base word in mind while checking whether its spelling changes."
+      },
+      {
+        "id": "g4-academic",
+        "label": "Academic vocabulary",
+        "tip": "Connect spelling, meaning, and use so the word becomes useful in real writing."
+      }
+    ],
+    "5": [
+      {
+        "id": "g5-greek-latin",
+        "label": "Greek and Latin parts",
+        "tip": "Greek and Latin roots carry stable meanings and often stable spellings."
+      },
+      {
+        "id": "g5-suffixes",
+        "label": "Complex suffixes",
+        "tip": "Separate the base or root from endings such as -tion, -ous, -able, and -ity."
+      },
+      {
+        "id": "g5-multisyllable",
+        "label": "Complex multisyllable words",
+        "tip": "Combine syllable, sound, and meaningful-part strategies for long words."
+      },
+      {
+        "id": "g5-academic",
+        "label": "Academic vocabulary",
+        "tip": "Study the word's pronunciation, structure, meaning, and use together."
+      },
+      {
+        "id": "g5-irregular",
+        "label": "Advanced tricky words",
+        "tip": "Mark the unexpected letter sequence and retrieve the full spelling from memory."
+      }
+    ]
+  },
+  "words": {
+    "1": [
+      {
+        "word": "cat",
+        "skill": "g1-short-vowels",
+        "clue": "A small pet that purrs",
+        "sentence": "The cat naps in a sunny spot."
+      },
+      {
+        "word": "dog",
+        "skill": "g1-short-vowels",
+        "clue": "A pet that barks",
+        "sentence": "The dog runs after the red ball."
+      },
+      {
+        "word": "sun",
+        "skill": "g1-short-vowels",
+        "clue": "The bright star we see in the sky",
+        "sentence": "The sun warms the playground."
+      },
+      {
+        "word": "pet",
+        "skill": "g1-short-vowels",
+        "clue": "An animal cared for at home",
+        "sentence": "Our pet likes to play with us."
+      },
+      {
+        "word": "pig",
+        "skill": "g1-short-vowels",
+        "clue": "A farm animal with a snout",
+        "sentence": "The pink pig rolled in the mud."
+      },
+      {
+        "word": "fish",
+        "skill": "g1-digraphs",
+        "clue": "An animal that swims and has fins",
+        "sentence": "The fish glides through the clear water."
+      },
+      {
+        "word": "ship",
+        "skill": "g1-digraphs",
+        "clue": "A large boat",
+        "sentence": "The ship sailed across the bay."
+      },
+      {
+        "word": "chat",
+        "skill": "g1-digraphs",
+        "clue": "To talk in a friendly way",
+        "sentence": "We like to chat during lunch."
+      },
+      {
+        "word": "thin",
+        "skill": "g1-digraphs",
+        "clue": "Not thick",
+        "sentence": "The thin paper folded easily."
+      },
+      {
+        "word": "when",
+        "skill": "g1-digraphs",
+        "clue": "A question word about time",
+        "sentence": "When will the movie begin?"
+      },
+      {
+        "word": "frog",
+        "skill": "g1-blends",
+        "clue": "A small animal that hops and croaks",
+        "sentence": "The green frog sits beside the pond."
+      },
+      {
+        "word": "jump",
+        "skill": "g1-blends",
+        "clue": "To push off the ground with your feet",
+        "sentence": "Can you jump over the little puddle?"
+      },
+      {
+        "word": "stop",
+        "skill": "g1-blends",
+        "clue": "To end movement or an action",
+        "sentence": "The bus will stop at the corner."
+      },
+      {
+        "word": "hand",
+        "skill": "g1-blends",
+        "clue": "The part at the end of your arm",
+        "sentence": "Raise your hand if you know the answer."
+      },
+      {
+        "word": "flag",
+        "skill": "g1-blends",
+        "clue": "A piece of cloth used as a symbol",
+        "sentence": "The flag waved in the wind."
+      },
+      {
+        "word": "cake",
+        "skill": "g1-final-e",
+        "clue": "A sweet baked food",
+        "sentence": "We shared a cake at the party."
+      },
+      {
+        "word": "home",
+        "skill": "g1-final-e",
+        "clue": "The place where you live",
+        "sentence": "We walked home after school."
+      },
+      {
+        "word": "bike",
+        "skill": "g1-final-e",
+        "clue": "A vehicle with two wheels",
+        "sentence": "My bike has a silver bell."
+      },
+      {
+        "word": "cute",
+        "skill": "g1-final-e",
+        "clue": "Pretty or lovable",
+        "sentence": "The puppy looked cute in its tiny bed."
+      },
+      {
+        "word": "game",
+        "skill": "g1-final-e",
+        "clue": "An activity played for fun",
+        "sentence": "We learned a new card game."
+      },
+      {
+        "word": "tree",
+        "skill": "g1-vowel-teams",
+        "clue": "A tall plant with a trunk and leaves",
+        "sentence": "A bird made its nest in the tree."
+      },
+      {
+        "word": "rain",
+        "skill": "g1-vowel-teams",
+        "clue": "Water drops that fall from clouds",
+        "sentence": "The rain taps softly on the window."
+      },
+      {
+        "word": "book",
+        "skill": "g1-vowel-teams",
+        "clue": "Pages with a story inside",
+        "sentence": "We read a funny book before bed."
+      },
+      {
+        "word": "seed",
+        "skill": "g1-vowel-teams",
+        "clue": "A small part of a plant that can grow",
+        "sentence": "We planted the seed in soft soil."
+      },
+      {
+        "word": "boat",
+        "skill": "g1-vowel-teams",
+        "clue": "A small vessel that travels on water",
+        "sentence": "The blue boat floated near the dock."
+      },
+      {
+        "word": "said",
+        "skill": "g1-irregular",
+        "clue": "The past tense of say",
+        "sentence": "Mia said hello to her new neighbor."
+      },
+      {
+        "word": "have",
+        "skill": "g1-irregular",
+        "clue": "To own or hold something",
+        "sentence": "I have two crayons in my pocket."
+      },
+      {
+        "word": "come",
+        "skill": "g1-irregular",
+        "clue": "To move toward a place",
+        "sentence": "Please come sit beside me."
+      },
+      {
+        "word": "some",
+        "skill": "g1-irregular",
+        "clue": "An amount that is not all",
+        "sentence": "Would you like some apple slices?"
+      },
+      {
+        "word": "give",
+        "skill": "g1-irregular",
+        "clue": "To hand something to someone",
+        "sentence": "I will give you the first turn."
+      }
+    ],
+    "2": [
+      {
+        "word": "yellow",
+        "skill": "g2-vowel-teams",
+        "clue": "The color of lemons and sunshine",
+        "sentence": "She wore a bright yellow hat."
+      },
+      {
+        "word": "school",
+        "skill": "g2-vowel-teams",
+        "clue": "A place where students learn",
+        "sentence": "Our school has a big library."
+      },
+      {
+        "word": "clean",
+        "skill": "g2-vowel-teams",
+        "clue": "Free from dirt",
+        "sentence": "We helped clean the paintbrushes."
+      },
+      {
+        "word": "night",
+        "skill": "g2-vowel-teams",
+        "clue": "The dark part of each day",
+        "sentence": "The moon shone at night."
+      },
+      {
+        "word": "play",
+        "skill": "g2-vowel-teams",
+        "clue": "To have fun with a game or activity",
+        "sentence": "We play outside after lunch."
+      },
+      {
+        "word": "winter",
+        "skill": "g2-r-controlled",
+        "clue": "The coldest season of the year",
+        "sentence": "We build snow forts in winter."
+      },
+      {
+        "word": "sister",
+        "skill": "g2-r-controlled",
+        "clue": "A girl who shares your parent",
+        "sentence": "My sister taught me a new game."
+      },
+      {
+        "word": "garden",
+        "skill": "g2-r-controlled",
+        "clue": "A place where flowers or vegetables grow",
+        "sentence": "Tomatoes are growing in our garden."
+      },
+      {
+        "word": "storm",
+        "skill": "g2-r-controlled",
+        "clue": "Weather with strong wind, rain, or snow",
+        "sentence": "The storm rattled the windows."
+      },
+      {
+        "word": "turn",
+        "skill": "g2-r-controlled",
+        "clue": "To change direction",
+        "sentence": "Turn left at the playground."
+      },
+      {
+        "word": "rabbit",
+        "skill": "g2-two-syllable",
+        "clue": "A furry animal with long ears",
+        "sentence": "The rabbit nibbled a crisp carrot."
+      },
+      {
+        "word": "planet",
+        "skill": "g2-two-syllable",
+        "clue": "A large world that travels around a star",
+        "sentence": "Earth is the planet we call home."
+      },
+      {
+        "word": "basket",
+        "skill": "g2-two-syllable",
+        "clue": "A container woven to carry things",
+        "sentence": "We packed lunch in the picnic basket."
+      },
+      {
+        "word": "napkin",
+        "skill": "g2-two-syllable",
+        "clue": "A small cloth or paper used while eating",
+        "sentence": "Please put a napkin beside each plate."
+      },
+      {
+        "word": "picnic",
+        "skill": "g2-two-syllable",
+        "clue": "A meal eaten outdoors",
+        "sentence": "Our family had a picnic by the lake."
+      },
+      {
+        "word": "jumping",
+        "skill": "g2-endings",
+        "clue": "Moving into the air from your feet",
+        "sentence": "The child was jumping over the rope."
+      },
+      {
+        "word": "boxes",
+        "skill": "g2-endings",
+        "clue": "More than one box",
+        "sentence": "We stacked the empty boxes neatly."
+      },
+      {
+        "word": "played",
+        "skill": "g2-endings",
+        "clue": "Took part in a game in the past",
+        "sentence": "We played soccer yesterday."
+      },
+      {
+        "word": "hoped",
+        "skill": "g2-endings",
+        "clue": "Wanted something to happen",
+        "sentence": "I hoped the rain would stop."
+      },
+      {
+        "word": "cries",
+        "skill": "g2-endings",
+        "clue": "Sheds tears or calls out",
+        "sentence": "The baby cries when she is hungry."
+      },
+      {
+        "word": "little",
+        "skill": "g2-irregular",
+        "clue": "Small in size",
+        "sentence": "A little snail crossed the path."
+      },
+      {
+        "word": "people",
+        "skill": "g2-irregular",
+        "clue": "More than one person",
+        "sentence": "Many people cheered for the team."
+      },
+      {
+        "word": "could",
+        "skill": "g2-irregular",
+        "clue": "Was able to",
+        "sentence": "I could hear music through the door."
+      },
+      {
+        "word": "would",
+        "skill": "g2-irregular",
+        "clue": "A word used for a possible choice",
+        "sentence": "I would choose the blue backpack."
+      },
+      {
+        "word": "again",
+        "skill": "g2-irregular",
+        "clue": "One more time",
+        "sentence": "Please read that funny page again."
+      }
+    ],
+    "3": [
+      {
+        "word": "animal",
+        "skill": "g3-multisyllable",
+        "clue": "A living creature that is not a plant",
+        "sentence": "The zookeeper cared for every animal."
+      },
+      {
+        "word": "morning",
+        "skill": "g3-multisyllable",
+        "clue": "The first part of the day",
+        "sentence": "Birds began singing early in the morning."
+      },
+      {
+        "word": "kitchen",
+        "skill": "g3-multisyllable",
+        "clue": "The room where food is prepared",
+        "sentence": "A delicious smell drifted from the kitchen."
+      },
+      {
+        "word": "rainbow",
+        "skill": "g3-multisyllable",
+        "clue": "A colorful arc seen after rain",
+        "sentence": "A rainbow appeared above the hills."
+      },
+      {
+        "word": "together",
+        "skill": "g3-multisyllable",
+        "clue": "With one another in the same place",
+        "sentence": "We worked together to build the tower."
+      },
+      {
+        "word": "unhappy",
+        "skill": "g3-prefixes",
+        "clue": "Not feeling happy",
+        "sentence": "The soggy sandwich made him unhappy."
+      },
+      {
+        "word": "retell",
+        "skill": "g3-prefixes",
+        "clue": "To tell a story again",
+        "sentence": "Can you retell the story in your own words?"
+      },
+      {
+        "word": "preview",
+        "skill": "g3-prefixes",
+        "clue": "To look at something before the full version",
+        "sentence": "We watched a preview of the new show."
+      },
+      {
+        "word": "dislike",
+        "skill": "g3-prefixes",
+        "clue": "To not like something",
+        "sentence": "I dislike waking up before sunrise."
+      },
+      {
+        "word": "rewrite",
+        "skill": "g3-prefixes",
+        "clue": "To write something again",
+        "sentence": "I will rewrite the sentence more clearly."
+      },
+      {
+        "word": "careful",
+        "skill": "g3-suffixes",
+        "clue": "Taking care to avoid mistakes or danger",
+        "sentence": "Be careful when carrying the full glass."
+      },
+      {
+        "word": "helpful",
+        "skill": "g3-suffixes",
+        "clue": "Ready or able to help",
+        "sentence": "The map was helpful during our hike."
+      },
+      {
+        "word": "slowly",
+        "skill": "g3-suffixes",
+        "clue": "At a slow speed",
+        "sentence": "The turtle moved slowly across the path."
+      },
+      {
+        "word": "kindness",
+        "skill": "g3-suffixes",
+        "clue": "The quality of being kind",
+        "sentence": "Her kindness made the new student feel welcome."
+      },
+      {
+        "word": "movement",
+        "skill": "g3-suffixes",
+        "clue": "The act of changing position",
+        "sentence": "We noticed movement behind the curtain."
+      },
+      {
+        "word": "sitting",
+        "skill": "g3-spelling-changes",
+        "clue": "Resting on a seat",
+        "sentence": "The puppy was sitting near the door."
+      },
+      {
+        "word": "smiled",
+        "skill": "g3-spelling-changes",
+        "clue": "Made a happy expression in the past",
+        "sentence": "She smiled when she saw the surprise."
+      },
+      {
+        "word": "carried",
+        "skill": "g3-spelling-changes",
+        "clue": "Moved something while holding it",
+        "sentence": "We carried the groceries inside."
+      },
+      {
+        "word": "happiness",
+        "skill": "g3-spelling-changes",
+        "clue": "The feeling of being happy",
+        "sentence": "His face showed pure happiness."
+      },
+      {
+        "word": "running",
+        "skill": "g3-spelling-changes",
+        "clue": "Moving quickly on foot",
+        "sentence": "They were running around the track."
+      },
+      {
+        "word": "because",
+        "skill": "g3-irregular",
+        "clue": "A word that gives a reason",
+        "sentence": "We stayed inside because it was stormy."
+      },
+      {
+        "word": "friend",
+        "skill": "g3-irregular",
+        "clue": "A person you like and trust",
+        "sentence": "My friend helped me finish the puzzle."
+      },
+      {
+        "word": "answer",
+        "skill": "g3-irregular",
+        "clue": "A response to a question",
+        "sentence": "I wrote the answer under the question."
+      },
+      {
+        "word": "often",
+        "skill": "g3-irregular",
+        "clue": "Many times",
+        "sentence": "We often visit the park on Saturdays."
+      },
+      {
+        "word": "enough",
+        "skill": "g3-irregular",
+        "clue": "As much as is needed",
+        "sentence": "There is enough soup for everyone."
+      }
+    ],
+    "4": [
+      {
+        "word": "calendar",
+        "skill": "g4-multisyllable",
+        "clue": "A chart that shows days, weeks, and months",
+        "sentence": "I marked the field trip on my calendar."
+      },
+      {
+        "word": "library",
+        "skill": "g4-multisyllable",
+        "clue": "A place where books can be read or borrowed",
+        "sentence": "I found a mystery novel at the library."
+      },
+      {
+        "word": "mountain",
+        "skill": "g4-multisyllable",
+        "clue": "A very high area of rocky land",
+        "sentence": "Snow covered the top of the mountain."
+      },
+      {
+        "word": "journey",
+        "skill": "g4-multisyllable",
+        "clue": "A trip from one place to another",
+        "sentence": "Our journey across the state took all day."
+      },
+      {
+        "word": "remember",
+        "skill": "g4-multisyllable",
+        "clue": "To bring something back to mind",
+        "sentence": "Remember to pack your water bottle."
+      },
+      {
+        "word": "separate",
+        "skill": "g4-tricky",
+        "clue": "To keep or move things apart",
+        "sentence": "Please separate the dark socks from the white ones."
+      },
+      {
+        "word": "surprise",
+        "skill": "g4-tricky",
+        "clue": "Something unexpected",
+        "sentence": "The secret party was a wonderful surprise."
+      },
+      {
+        "word": "favorite",
+        "skill": "g4-tricky",
+        "clue": "The one you like best",
+        "sentence": "Mango is my favorite fruit."
+      },
+      {
+        "word": "business",
+        "skill": "g4-tricky",
+        "clue": "Work involving goods or services",
+        "sentence": "The family opened a small business."
+      },
+      {
+        "word": "probably",
+        "skill": "g4-tricky",
+        "clue": "Very likely to happen",
+        "sentence": "It will probably rain this afternoon."
+      },
+      {
+        "word": "telephone",
+        "skill": "g4-roots",
+        "clue": "A device used to talk across a distance",
+        "sentence": "The telephone rang during dinner."
+      },
+      {
+        "word": "autograph",
+        "skill": "g4-roots",
+        "clue": "A person's written signature",
+        "sentence": "The author signed an autograph for me."
+      },
+      {
+        "word": "transport",
+        "skill": "g4-roots",
+        "clue": "To carry something from one place to another",
+        "sentence": "Trucks transport food across the country."
+      },
+      {
+        "word": "submarine",
+        "skill": "g4-roots",
+        "clue": "A vessel that travels underwater",
+        "sentence": "The submarine explored the deep ocean."
+      },
+      {
+        "word": "bicycle",
+        "skill": "g4-roots",
+        "clue": "A vehicle with two wheels",
+        "sentence": "She rode her bicycle to the park."
+      },
+      {
+        "word": "different",
+        "skill": "g4-suffixes",
+        "clue": "Not the same as something else",
+        "sentence": "Each shell had a different pattern."
+      },
+      {
+        "word": "curious",
+        "skill": "g4-suffixes",
+        "clue": "Eager to know or learn something",
+        "sentence": "The curious child asked many questions."
+      },
+      {
+        "word": "careless",
+        "skill": "g4-suffixes",
+        "clue": "Not giving enough attention",
+        "sentence": "A careless spill soaked the drawing."
+      },
+      {
+        "word": "comfortable",
+        "skill": "g4-suffixes",
+        "clue": "Feeling relaxed and at ease",
+        "sentence": "The soft chair was comfortable."
+      },
+      {
+        "word": "decision",
+        "skill": "g4-suffixes",
+        "clue": "A choice made after thinking",
+        "sentence": "Choosing a team name was a hard decision."
+      },
+      {
+        "word": "habitat",
+        "skill": "g4-academic",
+        "clue": "The natural home of a plant or animal",
+        "sentence": "The wetland is a habitat for many birds."
+      },
+      {
+        "word": "conservation",
+        "skill": "g4-academic",
+        "clue": "Protection of nature and resources",
+        "sentence": "Water conservation helps during a drought."
+      },
+      {
+        "word": "evidence",
+        "skill": "g4-academic",
+        "clue": "Information that helps prove something",
+        "sentence": "The scientist recorded evidence from the test."
+      },
+      {
+        "word": "describe",
+        "skill": "g4-academic",
+        "clue": "To tell what something is like",
+        "sentence": "Please describe the character in three sentences."
+      },
+      {
+        "word": "measure",
+        "skill": "g4-academic",
+        "clue": "To find the size or amount of something",
+        "sentence": "We used a ruler to measure the desk."
+      }
+    ],
+    "5": [
+      {
+        "word": "photograph",
+        "skill": "g5-greek-latin",
+        "clue": "A picture made with a camera",
+        "sentence": "We took a photograph of the waterfall."
+      },
+      {
+        "word": "biology",
+        "skill": "g5-greek-latin",
+        "clue": "The study of living things",
+        "sentence": "Biology helps us understand plants and animals."
+      },
+      {
+        "word": "geography",
+        "skill": "g5-greek-latin",
+        "clue": "The study of places and Earth's features",
+        "sentence": "In geography we studied mountain ranges."
+      },
+      {
+        "word": "thermometer",
+        "skill": "g5-greek-latin",
+        "clue": "A tool that measures temperature",
+        "sentence": "The thermometer showed that the air was cold."
+      },
+      {
+        "word": "aquatic",
+        "skill": "g5-greek-latin",
+        "clue": "Living or growing in water",
+        "sentence": "The aquarium contains many aquatic plants."
+      },
+      {
+        "word": "permission",
+        "skill": "g5-suffixes",
+        "clue": "Approval to do something",
+        "sentence": "We asked permission before starting the project."
+      },
+      {
+        "word": "courageous",
+        "skill": "g5-suffixes",
+        "clue": "Very brave",
+        "sentence": "The courageous firefighter entered the building."
+      },
+      {
+        "word": "reliable",
+        "skill": "g5-suffixes",
+        "clue": "Able to be trusted",
+        "sentence": "Our reliable clock keeps accurate time."
+      },
+      {
+        "word": "curiosity",
+        "skill": "g5-suffixes",
+        "clue": "A strong desire to know something",
+        "sentence": "Her curiosity led to a clever experiment."
+      },
+      {
+        "word": "celebration",
+        "skill": "g5-suffixes",
+        "clue": "A joyful event for a special occasion",
+        "sentence": "The championship ended with a celebration."
+      },
+      {
+        "word": "environment",
+        "skill": "g5-multisyllable",
+        "clue": "The natural world and our surroundings",
+        "sentence": "Recycling helps protect the environment."
+      },
+      {
+        "word": "temperature",
+        "skill": "g5-multisyllable",
+        "clue": "A measure of how hot or cold something is",
+        "sentence": "The temperature dropped as evening arrived."
+      },
+      {
+        "word": "community",
+        "skill": "g5-multisyllable",
+        "clue": "People who live or work together in an area",
+        "sentence": "Our community planted trees in the park."
+      },
+      {
+        "word": "dictionary",
+        "skill": "g5-multisyllable",
+        "clue": "A tool that explains what words mean",
+        "sentence": "I checked the spelling in a dictionary."
+      },
+      {
+        "word": "adventure",
+        "skill": "g5-multisyllable",
+        "clue": "An exciting or unusual experience",
+        "sentence": "Exploring the cave became a great adventure."
+      },
+      {
+        "word": "knowledge",
+        "skill": "g5-academic",
+        "clue": "Facts and understanding gained by learning",
+        "sentence": "Reading builds knowledge about the world."
+      },
+      {
+        "word": "language",
+        "skill": "g5-academic",
+        "clue": "A system of words used to communicate",
+        "sentence": "She is learning a new language at school."
+      },
+      {
+        "word": "excellent",
+        "skill": "g5-academic",
+        "clue": "Extremely good",
+        "sentence": "Your science project showed excellent work."
+      },
+      {
+        "word": "communicate",
+        "skill": "g5-academic",
+        "clue": "To share information or ideas",
+        "sentence": "People communicate through speech and writing."
+      },
+      {
+        "word": "opportunity",
+        "skill": "g5-academic",
+        "clue": "A useful or favorable chance",
+        "sentence": "The contest was an opportunity to share her art."
+      },
+      {
+        "word": "beautiful",
+        "skill": "g5-irregular",
+        "clue": "Very pleasing to see or hear",
+        "sentence": "The sunset painted a beautiful orange sky."
+      },
+      {
+        "word": "necessary",
+        "skill": "g5-irregular",
+        "clue": "Needed or required",
+        "sentence": "Water is necessary for every living thing."
+      },
+      {
+        "word": "restaurant",
+        "skill": "g5-irregular",
+        "clue": "A place where meals are prepared and served",
+        "sentence": "The restaurant serves food from many cultures."
+      },
+      {
+        "word": "rhythm",
+        "skill": "g5-irregular",
+        "clue": "A repeated pattern of sound or movement",
+        "sentence": "The drummer kept a steady rhythm."
+      },
+      {
+        "word": "privilege",
+        "skill": "g5-irregular",
+        "clue": "A special right or advantage",
+        "sentence": "It is a privilege to represent our school."
+      }
+    ]
+  },
+  "sightWordSkill": {
+    "id": "sight-words",
+    "label": "Sight words",
+    "tip": "These words appear often in children's books. Map the sounds you know to letters, then learn any unexpected part by heart."
+  },
+  "sightWords": {
+    "1": [
+      {
+        "word": "the",
+        "rank": 1,
+        "clue": "Used before a particular person, place, or thing",
+        "sentence": "The moon glowed above us."
+      },
+      {
+        "word": "and",
+        "rank": 2,
+        "clue": "Joins words or ideas together",
+        "sentence": "We packed apples and crackers."
+      },
+      {
+        "word": "a",
+        "rank": 3,
+        "clue": "Used before one nonspecific thing",
+        "sentence": "A bird landed on the fence."
+      },
+      {
+        "word": "to",
+        "rank": 4,
+        "clue": "Can show direction or introduce an action",
+        "sentence": "We walked to the playground."
+      },
+      {
+        "word": "you",
+        "rank": 6,
+        "clue": "The person or people being spoken to",
+        "sentence": "You can choose the next book."
+      },
+      {
+        "word": "in",
+        "rank": 7,
+        "clue": "Inside a place or thing",
+        "sentence": "The pencils are in the box."
+      },
+      {
+        "word": "of",
+        "rank": 8,
+        "clue": "Shows belonging, connection, or amount",
+        "sentence": "We saw a flock of birds."
+      },
+      {
+        "word": "it",
+        "rank": 9,
+        "clue": "Refers to a thing already mentioned",
+        "sentence": "The puppy found a ball and chased it."
+      },
+      {
+        "word": "he",
+        "rank": 10,
+        "clue": "Refers to a boy or man",
+        "sentence": "He carried the basket carefully."
+      },
+      {
+        "word": "is",
+        "rank": 11,
+        "clue": "A present-tense form of be",
+        "sentence": "The water is cold today."
+      }
+    ],
+    "2": [
+      {
+        "word": "was",
+        "rank": 12,
+        "clue": "A past-tense form of be",
+        "sentence": "The tiny seed was under the soil."
+      },
+      {
+        "word": "for",
+        "rank": 13,
+        "clue": "Shows purpose or who receives something",
+        "sentence": "This card is for my teacher."
+      },
+      {
+        "word": "on",
+        "rank": 14,
+        "clue": "Touching or supported by a surface",
+        "sentence": "The notebook is on the desk."
+      },
+      {
+        "word": "that",
+        "rank": 15,
+        "clue": "Points to a particular thing or idea",
+        "sentence": "That cloud looks like a dragon."
+      },
+      {
+        "word": "with",
+        "rank": 16,
+        "clue": "Together or accompanied by",
+        "sentence": "I baked muffins with my aunt."
+      },
+      {
+        "word": "but",
+        "rank": 17,
+        "clue": "Connects ideas that contrast",
+        "sentence": "The path was muddy but safe."
+      },
+      {
+        "word": "his",
+        "rank": 18,
+        "clue": "Belonging to a boy or man",
+        "sentence": "His backpack has a bright patch."
+      },
+      {
+        "word": "all",
+        "rank": 19,
+        "clue": "The whole amount or every one",
+        "sentence": "All the lights turned on."
+      },
+      {
+        "word": "they",
+        "rank": 20,
+        "clue": "Refers to more than one person or thing",
+        "sentence": "They planted flowers by the gate."
+      },
+      {
+        "word": "my",
+        "rank": 21,
+        "clue": "Belonging to the speaker",
+        "sentence": "My shoes are beside the door."
+      }
+    ],
+    "3": [
+      {
+        "word": "so",
+        "rank": 22,
+        "clue": "Can show a result or mean very",
+        "sentence": "It rained, so we played indoors."
+      },
+      {
+        "word": "be",
+        "rank": 23,
+        "clue": "To exist or have a state",
+        "sentence": "Please be ready before noon."
+      },
+      {
+        "word": "she",
+        "rank": 24,
+        "clue": "Refers to a girl or woman",
+        "sentence": "She solved the riddle quickly."
+      },
+      {
+        "word": "up",
+        "rank": 25,
+        "clue": "Toward a higher place",
+        "sentence": "We climbed up the steep hill."
+      },
+      {
+        "word": "at",
+        "rank": 26,
+        "clue": "Shows a place, time, or target",
+        "sentence": "Meet me at the garden gate."
+      },
+      {
+        "word": "are",
+        "rank": 27,
+        "clue": "A present-tense form of be",
+        "sentence": "The ripe peaches are sweet."
+      },
+      {
+        "word": "one",
+        "rank": 28,
+        "clue": "The number before two",
+        "sentence": "Only one cookie remained."
+      },
+      {
+        "word": "said",
+        "rank": 29,
+        "clue": "The past tense of say",
+        "sentence": "Nora said the answer clearly."
+      },
+      {
+        "word": "what",
+        "rank": 30,
+        "clue": "A question word asking for information",
+        "sentence": "What made that funny sound?"
+      },
+      {
+        "word": "this",
+        "rank": 31,
+        "clue": "Points to a nearby thing or idea",
+        "sentence": "This puzzle has one piece left."
+      }
+    ],
+    "4": [
+      {
+        "word": "when",
+        "rank": 32,
+        "clue": "A question or connecting word about time",
+        "sentence": "When will the concert begin?"
+      },
+      {
+        "word": "we",
+        "rank": 33,
+        "clue": "The speaker together with other people",
+        "sentence": "We built a fort from blankets."
+      },
+      {
+        "word": "me",
+        "rank": 34,
+        "clue": "Refers to the speaker as an object",
+        "sentence": "Please hand the marker to me."
+      },
+      {
+        "word": "have",
+        "rank": 35,
+        "clue": "To own, hold, or experience something",
+        "sentence": "I have a story to share."
+      },
+      {
+        "word": "as",
+        "rank": 36,
+        "clue": "Can compare things or describe a role",
+        "sentence": "She worked as a lifeguard all summer."
+      },
+      {
+        "word": "do",
+        "rank": 37,
+        "clue": "To perform an action",
+        "sentence": "Do your best on the challenge."
+      },
+      {
+        "word": "like",
+        "rank": 38,
+        "clue": "To enjoy or find something pleasing",
+        "sentence": "I like stories about space."
+      },
+      {
+        "word": "out",
+        "rank": 39,
+        "clue": "Away from the inside",
+        "sentence": "The rabbit hopped out of its burrow."
+      },
+      {
+        "word": "can",
+        "rank": 40,
+        "clue": "To be able to do something",
+        "sentence": "You can finish one step at a time."
+      },
+      {
+        "word": "her",
+        "rank": 41,
+        "clue": "Refers to or belongs to a girl or woman",
+        "sentence": "Her painting filled the whole page."
+      }
+    ],
+    "5": [
+      {
+        "word": "not",
+        "rank": 42,
+        "clue": "Makes a statement negative",
+        "sentence": "The answer is not on this page."
+      },
+      {
+        "word": "then",
+        "rank": 43,
+        "clue": "At that time or next in order",
+        "sentence": "Mix the batter, then add the berries."
+      },
+      {
+        "word": "your",
+        "rank": 44,
+        "clue": "Belonging to the person being spoken to",
+        "sentence": "Your idea could solve the problem."
+      },
+      {
+        "word": "no",
+        "rank": 45,
+        "clue": "A negative answer or none",
+        "sentence": "There was no wind after sunset."
+      },
+      {
+        "word": "there",
+        "rank": 46,
+        "clue": "At or in that place",
+        "sentence": "Set the empty basket over there."
+      },
+      {
+        "word": "day",
+        "rank": 47,
+        "clue": "A period of twenty-four hours",
+        "sentence": "The first day of spring felt warm."
+      },
+      {
+        "word": "just",
+        "rank": 48,
+        "clue": "Can mean exactly, fairly, or very recently",
+        "sentence": "The train has just arrived."
+      },
+      {
+        "word": "see",
+        "rank": 50,
+        "clue": "To notice something with your eyes",
+        "sentence": "Can you see the nest in the tree?"
+      },
+      {
+        "word": "little",
+        "rank": 51,
+        "clue": "Small in size or amount",
+        "sentence": "A little frog rested on the rock."
+      },
+      {
+        "word": "time",
+        "rank": 52,
+        "clue": "How events are ordered and measured",
+        "sentence": "It is time to begin the experiment."
+      }
+    ]
+  }
+}
