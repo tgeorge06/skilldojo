@@ -195,6 +195,31 @@ test("sight-word focus produces a full sight-word session", () => {
   assert.equal(game.blankedSentence(), "_____ bird landed on the fence.");
 });
 
+test("the browser round rules match the shared replay fixtures", () => {
+  const fixtures = JSON.parse(fs.readFileSync(path.join(root, "tests", "fixtures", "replay.json"), "utf8"));
+  assert.ok(fixtures.length >= 10);
+  for (const fixture of fixtures) {
+    const { game } = loadGame();
+    game.spellingCount = 1;
+    game.startSpelling();
+    // Point the round at the fixture word; Alpine state is plain data.
+    game.currentWord = { word: fixture.word, skill: "test", clue: "", sentence: fixture.word };
+    game.spellingWords = [game.currentWord];
+    for (const guess of fixture.guesses) {
+      if (guess.kind === "letter") game.guessLetter(guess.value);
+      else {
+        game.wholeWordGuess = guess.value;
+        game.guessWholeWord();
+      }
+    }
+    assert.deepEqual(
+      { won: game.roundWon, done: game.roundDone, mistakes: game.mistakes },
+      fixture.want,
+      fixture.name
+    );
+  }
+});
+
 test("guessing every distinct letter rescues a word", () => {
   const { game } = loadGame();
   game.spellingCount = 1;

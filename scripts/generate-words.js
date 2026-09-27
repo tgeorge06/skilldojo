@@ -13,6 +13,25 @@ const target = path.join(root, "static", "words.js");
 const data = JSON.parse(fs.readFileSync(source, "utf8"));
 
 const js = (value) => JSON.stringify(value);
+
+// Grade keys must be the canonical strings "1".."5" and identical across
+// banks, and every word must be lowercase a-z: the Go side enforces the same
+// invariants, so a bad JSON fails here before it can reach the browser.
+const CANONICAL = ["1", "2", "3", "4", "5"];
+function validateGrades(name, bank) {
+  const keys = Object.keys(bank).sort();
+  if (keys.some((k) => !CANONICAL.includes(k))) throw new Error(`${name}: grade keys must be "1".."5", got ${keys}`);
+  return keys.map(Number).sort((a, b) => a - b);
+}
+const skillGrades = validateGrades("skills", data.skills);
+for (const [name, bank] of [["words", data.words], ["sightWords", data.sightWords]]) {
+  const grades = validateGrades(name, bank);
+  if (grades.join() !== skillGrades.join()) throw new Error(`${name} grades ${grades} differ from skills grades ${skillGrades}`);
+  for (const entry of Object.values(bank).flat()) {
+    if (!/^[a-z]+$/.test(entry.word)) throw new Error(`${name}: word ${js(entry.word)} must be lowercase a-z`);
+    if (name === "sightWords" && !Number.isInteger(entry.rank)) throw new Error(`sightWords: ${entry.word} needs an integer rank`);
+  }
+}
 const grades = (bank) => Object.keys(bank).map(Number).sort((a, b) => a - b);
 
 const lines = [];
@@ -70,7 +89,7 @@ lines.push(
 for (const grade of grades(data.sightWords)) {
   lines.push(`  ${grade}: [`);
   for (const entry of data.sightWords[grade]) {
-    lines.push(`    sightWord(${js(entry.word)}, ${entry.rank}, ${js(entry.clue)}, ${js(entry.sentence)}),`);
+    lines.push(`    sightWord(${js(entry.word)}, ${js(entry.rank)}, ${js(entry.clue)}, ${js(entry.sentence)}),`);
   }
   lines.push("  ],");
 }

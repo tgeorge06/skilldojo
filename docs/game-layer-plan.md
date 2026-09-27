@@ -50,9 +50,9 @@ Guiding rules, restated so every PR can be checked against them:
 | Decision | Choice | Why |
 |---|---|---|
 | SQLite driver | `modernc.org/sqlite` (pure Go) | No cgo, so `go build` and the Fly image stay trivial. Single writer is fine: one process, WAL mode, `busy_timeout`. |
-| Migrations | Embedded SQL files under `internal/db/migrations/`, applied at boot inside a transaction with a `schema_version` table | Hobby-scale app with one instance. **Decision to confirm:** this breaks Tyson's "migrations never auto-applied" rule for Vector services. Alternative is a `skilldojo migrate` subcommand run by hand before deploy. |
+| Migrations | Embedded SQL files under `internal/db/migrations/`, applied at boot inside a transaction with a `schema_version` table | Hobby-scale app with one instance. Confirmed by Tyson 2026-09-27 as the right call for this repo (the "never auto-apply" rule is for Vector services with shared databases). |
 | Curriculum source of truth | Move to `internal/curriculum/spelling.json`; a script generates `static/words.js` from it (same pattern as `manifest.js`); Go embeds the JSON | The server must know every word to grade spelling rounds and to bind creatures to skills. One source, two consumers, a CI check that the generated file is in sync (same as the CSS check). |
-| Spelling verification | Client still plays the round locally for instant feedback. At round end it posts the ordered guess sequence. The server replays the guesses against its own copy of the word and decides won/lost | Deterministic, cheap, and makes a forged result impossible without changing the kid's experience. Lesson applied: *a fallback to client-posted data is a forgery path unless bounded by something the client cannot produce*. |
+| Spelling verification | Client still plays the round locally for instant feedback. At round end it posts the ordered guess events, each tagged `letter` or `word` because the two kinds have different rules. The server replays the guesses against its own copy of the word and decides won/lost | Deterministic, cheap, and makes a forged result impossible without changing the kid's experience. Lesson applied: *a fallback to client-posted data is a forgery path unless bounded by something the client cannot produce*. |
 | Sessions | Random 32-byte token, stored as SHA-256 hash, HttpOnly Secure SameSite=Lax cookie, 90-day expiry | Standard. Lesson applied: tokens are high-entropy and hashed at rest; `SESSION_SECRET`/`RESEND_API_KEY` refuse empty or placeholder values at boot. |
 | Active child | Signed value in the session row (`sessions.active_child_id`), not a cookie the client writes | Every write handler re-binds `child_id` to `account_id` in the query anyway; this just picks the default. |
 | Client structure | Keep the no-bundler setup. Split `app.js` into `app.js` (core), `kata.js`, `paint.js`, each exporting a mixin merged in `dojo()` via `Object.assign` | `app.js` is 400 lines today and would triple. Files load in order like `words.js` does now. The `vm` test harness loads them the same way. |
@@ -358,7 +358,7 @@ After PR 4 ships to skilldojo.io with one account and one child profile:
 
 ---
 
-## 11. Decisions to confirm before PR 1
+## 11. Decisions (confirmed 2026-09-27)
 
 1. Migrations at boot versus a manual `migrate` subcommand.
 2. Curriculum moves to JSON with generated `words.js` (the alternative,

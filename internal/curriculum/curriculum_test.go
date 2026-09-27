@@ -1,6 +1,9 @@
 package curriculum
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"regexp"
 	"testing"
 )
@@ -69,10 +72,16 @@ func TestSentencesContainWordExactlyOnce(t *testing.T) {
 
 func TestParseRejectsBadData(t *testing.T) {
 	cases := map[string]string{
-		"unknown skill":  `{"skills":{"1":[]},"words":{"1":[{"word":"cat","skill":"nope"}]},"sightWordSkill":{"id":"sight-words"},"sightWords":{}}`,
-		"duplicate word": `{"skills":{"1":[{"id":"a"}]},"words":{"1":[{"word":"cat","skill":"a"},{"word":"cat","skill":"a"}]},"sightWordSkill":{"id":"sight-words"},"sightWords":{}}`,
-		"bad grade":      `{"skills":{"9":[]},"words":{},"sightWordSkill":{"id":"sight-words"},"sightWords":{}}`,
-		"wrong sight id": `{"skills":{},"words":{},"sightWordSkill":{"id":"sight"},"sightWords":{}}`,
+		"unknown skill":        `{"skills":{"1":[]},"words":{"1":[{"word":"cat","skill":"nope"}]},"sightWordSkill":{"id":"sight-words"},"sightWords":{"1":[]}}`,
+		"duplicate word":       `{"skills":{"1":[{"id":"a"}]},"words":{"1":[{"word":"cat","skill":"a"},{"word":"cat","skill":"a"}]},"sightWordSkill":{"id":"sight-words"},"sightWords":{"1":[]}}`,
+		"bad grade":            `{"skills":{"9":[]},"words":{"9":[]},"sightWordSkill":{"id":"sight-words"},"sightWords":{"9":[]}}`,
+		"noncanonical grade":   `{"skills":{"01":[]},"words":{"01":[]},"sightWordSkill":{"id":"sight-words"},"sightWords":{"01":[]}}`,
+		"grade sets differ":    `{"skills":{"1":[]},"words":{"1":[],"2":[]},"sightWordSkill":{"id":"sight-words"},"sightWords":{"1":[]}}`,
+		"wrong sight id":       `{"skills":{},"words":{},"sightWordSkill":{"id":"sight"},"sightWords":{}}`,
+		"padded word":          `{"skills":{"1":[{"id":"a"}]},"words":{"1":[{"word":" cat ","skill":"a"}]},"sightWordSkill":{"id":"sight-words"},"sightWords":{"1":[]}}`,
+		"uppercase word":       `{"skills":{"1":[{"id":"a"}]},"words":{"1":[{"word":"Cat","skill":"a"}]},"sightWordSkill":{"id":"sight-words"},"sightWords":{"1":[]}}`,
+		"empty word":           `{"skills":{"1":[{"id":"a"}]},"words":{"1":[{"word":"","skill":"a"}]},"sightWordSkill":{"id":"sight-words"},"sightWords":{"1":[]}}`,
+		"sight word with dash": `{"skills":{"1":[]},"words":{"1":[]},"sightWordSkill":{"id":"sight-words"},"sightWords":{"1":[{"word":"don't","rank":1}]}}`,
 	}
 	for name, raw := range cases {
 		if _, err := parse([]byte(raw)); err == nil {
@@ -81,30 +90,50 @@ func TestParseRejectsBadData(t *testing.T) {
 	}
 }
 
-func TestReplay(t *testing.T) {
-	cases := []struct {
-		name    string
-		word    string
-		guesses []string
-		want    Outcome
-	}{
-		{"all letters win", "cat", []string{"C", "A", "T"}, Outcome{Won: true, Done: true, Guesses: 3}},
-		{"case and whitespace tolerant", "cat", []string{" c", "a", "t "}, Outcome{Won: true, Done: true, Guesses: 3}},
-		{"six wrong letters lose", "cat", []string{"B", "D", "E", "F", "G", "H"}, Outcome{Done: true, Mistakes: 6, Guesses: 6}},
-		{"five wrong is still open", "cat", []string{"B", "D", "E", "F", "G"}, Outcome{Mistakes: 5, Guesses: 5}},
-		{"repeated letter ignored", "cat", []string{"B", "B", "B", "B", "B", "B", "B"}, Outcome{Mistakes: 1, Guesses: 1}},
-		{"whole word rescues", "cat", []string{"B", "cat"}, Outcome{Won: true, Done: true, Mistakes: 1, Guesses: 2}},
-		{"wrong whole word costs a try", "cat", []string{"cot", "cut", "cap", "can", "car", "cab"}, Outcome{Done: true, Mistakes: 6, Guesses: 6}},
-		{"guesses after done ignored", "cat", []string{"C", "A", "T", "Z", "Z", "Z", "Z", "Z", "Z"}, Outcome{Won: true, Done: true, Guesses: 3}},
-		{"guesses after loss ignored", "cat", []string{"B", "D", "E", "F", "G", "H", "cat"}, Outcome{Done: true, Mistakes: 6, Guesses: 6}},
-		{"blank and non-letter ignored", "cat", []string{"", " ", "1", "C", "A", "T"}, Outcome{Won: true, Done: true, Guesses: 3}},
-		{"repeated letters in word", "boat", []string{"B", "O", "A", "T"}, Outcome{Won: true, Done: true, Guesses: 4}},
-		{"letter repeats need one guess", "cries", []string{"C", "R", "I", "E", "S"}, Outcome{Won: true, Done: true, Guesses: 5}},
-		{"no guesses", "cat", nil, Outcome{}},
+// replayFixture mirrors tests/fixtures/replay.json, which the JS suite also
+// drives through the real game component so both runtimes agree.
+type replayFixture struct {
+	Name    string  `json:"name"`
+	Word    string  `json:"word"`
+	Guesses []Guess `json:"guesses"`
+	Want    Outcome `json:"want"`
+}
+
+func TestReplayMatchesSharedFixtures(t *testing.T) {
+	raw, err := os.ReadFile(filepath.Join("..", "..", "tests", "fixtures", "replay.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var cases []replayFixture
+	if err := json.Unmarshal(raw, &cases); err != nil {
+		t.Fatal(err)
+	}
+	if len(cases) < 10 {
+		t.Fatalf("only %d fixtures", len(cases))
 	}
 	for _, tc := range cases {
-		if got := Replay(tc.word, tc.guesses); got != tc.want {
-			t.Errorf("%s: Replay = %+v, want %+v", tc.name, got, tc.want)
+		if got := Replay(tc.Word, tc.Guesses); got != tc.Want {
+			t.Errorf("%s: Replay = %+v, want %+v", tc.Name, got, tc.Want)
 		}
+	}
+}
+
+// Server-only strictness: inputs the browser might accept through Unicode
+// case folding or exotic whitespace are charged, never rewarded.
+func TestReplayIsNeverKinderThanTheBrowser(t *testing.T) {
+	for _, v := range []string{"\u212Aite", "kite\u0085", "\u00a0kite", "KITE", "Kite"} {
+		got := Replay("kite", []Guess{{GuessWord, v}})
+		if got.Won || got.Mistakes != 1 {
+			t.Errorf("word guess %q: %+v, want one mistake and no win", v, got)
+		}
+	}
+	for _, v := range []string{"k", "kk", "", "1", "\u212A"} {
+		got := Replay("kite", []Guess{{GuessLetter, v}})
+		if got.Won || got.Mistakes != 0 {
+			t.Errorf("letter guess %q: %+v, want ignored", v, got)
+		}
+	}
+	if got := Replay(" cat ", []Guess{{GuessWord, "cat"}}); got.Won {
+		t.Error("malformed target must never be winnable")
 	}
 }

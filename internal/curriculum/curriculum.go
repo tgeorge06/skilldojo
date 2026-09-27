@@ -7,6 +7,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -44,6 +45,10 @@ type data struct {
 	SightWordSkill Skill              `json:"sightWordSkill"`
 	SightWords     map[string][]Word  `json:"sightWords"`
 }
+
+// wordShape is the invariant every curriculum word satisfies; the browser
+// compares guesses against these bytes exactly.
+var wordShape = regexp.MustCompile(`^[a-z]+$`)
 
 var (
 	loadOnce sync.Once
@@ -93,12 +98,31 @@ func parse(raw []byte) (*Curriculum, error) {
 		byID:       map[string]Skill{d.SightWordSkill.ID: d.SightWordSkill},
 		byWord:     map[string]Word{},
 	}
+	// Grade keys must be exactly "1".."5": the generator and the browser index
+	// by the canonical string, so "01" would silently split a grade.
 	gradeOf := func(key string) (int, error) {
 		g, err := strconv.Atoi(key)
-		if err != nil || g < 1 || g > 5 {
+		if err != nil || g < 1 || g > 5 || strconv.Itoa(g) != key {
 			return 0, fmt.Errorf("curriculum: bad grade key %q", key)
 		}
 		return g, nil
+	}
+	sameGrades := func(name string, bank map[string][]Word) error {
+		if len(bank) != len(d.Skills) {
+			return fmt.Errorf("curriculum: %s covers %d grades, skills cover %d", name, len(bank), len(d.Skills))
+		}
+		for key := range bank {
+			if _, ok := d.Skills[key]; !ok {
+				return fmt.Errorf("curriculum: %s has grade %q with no skills", name, key)
+			}
+		}
+		return nil
+	}
+	if err := sameGrades("words", d.Words); err != nil {
+		return nil, err
+	}
+	if err := sameGrades("sightWords", d.SightWords); err != nil {
+		return nil, err
 	}
 	for key, skills := range d.Skills {
 		g, err := gradeOf(key)
@@ -126,6 +150,9 @@ func parse(raw []byte) (*Curriculum, error) {
 			}
 			for i := range words {
 				w := words[i]
+				if !wordShape.MatchString(w.Word) {
+					return fmt.Errorf("curriculum: word %q must be lowercase a-z with no spaces", w.Word)
+				}
 				if wantSkill != "" {
 					w.Skill = wantSkill
 					words[i].Skill = wantSkill
@@ -192,67 +219,84 @@ func (c *Curriculum) AllWords() []Word {
 
 // Outcome is the server-side verdict of a replayed Word Rescue round.
 type Outcome struct {
-	Won      bool
-	Done     bool
-	Mistakes int
-	// Guesses is the number of guesses that changed state; ignored guesses
-	// (repeats, blanks, anything after the round ended) are not counted.
-	Guesses int
+	Won      bool `json:"won"`
+	Done     bool `json:"done"`
+	Mistakes int  `json:"mistakes"`
 }
 
-// Replay applies a client's ordered guesses to a word exactly as app.js does:
-// a single letter reveals or costs a try; anything longer is a whole-word
-// guess that either rescues the word or costs a try; six tries ends the
-// round. Repeated letters, blanks, and guesses after the round ends are
-// ignored, so a replay can never be steered into a better result than the
-// client actually earned.
-func Replay(word string, guesses []string) Outcome {
-	target := strings.ToUpper(strings.TrimSpace(word))
+// Guess is one event from the client, tagged by how it was made: a letter
+// from the board or keyboard, or a whole-word submission from the text box.
+// The kinds have different rules, so the client must say which it was.
+type Guess struct {
+	Kind  string `json:"kind"` // "letter" or "word"
+	Value string `json:"value"`
+}
+
+const (
+	GuessLetter = "letter"
+	GuessWord   = "word"
+)
+
+// Replay applies a client's ordered guesses to a word with the same rules
+// as app.js: a letter reveals or costs a try and is ignored if already
+// guessed; a whole-word submission rescues the word or costs a try every
+// time, even when repeated; six tries end the round; events after the round
+// ends are ignored.
+//
+// Where the browser is more permissive (Unicode case folding, exotic
+// whitespace), the server is deliberately stricter: a word guess counts as
+// a rescue only if, after trimming ASCII whitespace, it is byte-for-byte the
+// curriculum word. Anything else is charged as a wrong guess. That means a
+// replay can be harsher than the browser in bizarre inputs but never
+// kinder, so it cannot be steered into a win the client did not earn.
+func Replay(word string, guesses []Guess) Outcome {
 	var out Outcome
-	revealed := map[rune]bool{}
-	need := map[rune]bool{}
-	for _, r := range target {
-		need[r] = true
+	if !wordShape.MatchString(word) {
+		return out
 	}
+	target := strings.ToUpper(word)
+	revealed := map[byte]bool{}
 	allRevealed := func() bool {
-		for r := range need {
-			if !revealed[r] {
+		for i := 0; i < len(target); i++ {
+			if !revealed[target[i]] {
 				return false
 			}
 		}
 		return true
 	}
-	for _, raw := range guesses {
+	for _, g := range guesses {
 		if out.Done {
 			break
 		}
-		g := strings.ToUpper(strings.TrimSpace(raw))
-		runes := []rune(g)
-		switch {
-		case len(runes) == 0:
-			continue
-		case len(runes) == 1:
-			r := runes[0]
-			if r < 'A' || r > 'Z' || revealed[r] {
+		switch g.Kind {
+		case GuessLetter:
+			if len(g.Value) != 1 || g.Value[0] < 'A' || g.Value[0] > 'Z' {
+				continue // the board and keyboard filter only produce A-Z
+			}
+			letter := g.Value[0]
+			if revealed[letter] {
 				continue
 			}
-			// Any letter is recorded as guessed, matching guessedLetters.
-			revealed[r] = true
-			out.Guesses++
-			if need[r] {
+			revealed[letter] = true
+			if strings.IndexByte(target, letter) >= 0 {
 				if allRevealed() {
 					out.Won, out.Done = true, true
 				}
 				continue
 			}
 			out.Mistakes++
-		default:
-			out.Guesses++
-			if g == target {
+		case GuessWord:
+			v := strings.Trim(g.Value, " \t\r\n")
+			if v == "" {
+				continue // guessWholeWord ignores blank submissions
+			}
+			if v == word {
 				out.Won, out.Done = true, true
 				continue
 			}
 			out.Mistakes++
+		default:
+			continue
 		}
 		if out.Mistakes >= MaxMistakes {
 			out.Done = true
