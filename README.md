@@ -4,8 +4,11 @@ A tiny learning web app for kids. Choose a subject, slide to your grade level,
 and train with quick feedback — with confetti for a perfect score. Practice
 math worksheets or play Word Rescue, a friendly letter-guessing spelling game.
 
-No login, no database, no accounts, no tracking. Math answers live only in
-server memory; spelling words are bundled into the offline app. 🙂
+Practice needs no login and no account: math answers live only in server
+memory and spelling words are bundled into the offline app. Parents can
+optionally sign in with an email link to add nickname-only child profiles,
+which is the foundation for progress and the game layer
+([docs/game-layer-plan.md](docs/game-layer-plan.md)). No tracking, no ads. 🙂
 
 ![SkillDojo setup screen](docs/screenshot.png)
 
@@ -19,6 +22,11 @@ go run .        # or: make run
 
 Open http://127.0.0.1:8080. `make build` produces a single self-contained
 `./skilldojo` binary with all assets embedded — it works fully offline.
+
+`make run` starts in `-dev` mode: sign-in emails are logged instead of
+sent (the link is also shown on the page), and the session cookie works over
+plain http. The SQLite database defaults to `./skilldojo.db` (`-db` or
+`DATABASE_PATH`); migrations apply automatically at start.
 
 ## Practice options
 
@@ -76,6 +84,9 @@ run `make serve` on a trusted network (home Wi-Fi behind your router). Use
   committed.
 - `make vet` / `make test` — the math generators and spelling game state are
   covered by automated tests.
+- `make ui-test` boots the binary and drives every page in headless Chromium
+  (`npx playwright install chromium` once). It fails on any page error, which
+  is the only way to catch a template bound to a helper that does not exist.
 - After changing templates or Tailwind classes: `npm install` once, then
   `make css` to rebuild `static/app.css`.
 - The spelling curriculum lives in `internal/curriculum/spelling.json`.
@@ -85,6 +96,24 @@ run `make serve` on a trusted network (home Wi-Fi behind your router). Use
   Samantha voice. This development-only task also requires `ffmpeg`; the app
   itself has no audio dependency or runtime speech-processing cost.
 - CI runs vet, tests, build, and verifies the committed CSS is in sync.
+
+## Deploy (Fly.io)
+
+The `Dockerfile` builds the Go binary and runs it under
+[Litestream](https://litestream.io), which streams the SQLite file to an
+S3-compatible bucket. `fly.toml` pins one machine with a volume at `/data`.
+
+```sh
+fly launch --no-deploy          # once; creates the app from fly.toml
+fly volumes create skilldojo_data --size 1
+fly secrets set RESEND_API_KEY=re_... \
+  LITESTREAM_BUCKET=... LITESTREAM_ENDPOINT=https://<account>.r2.cloudflarestorage.com \
+  LITESTREAM_ACCESS_KEY_ID=... LITESTREAM_SECRET_ACCESS_KEY=...
+fly deploy
+```
+
+Outside `-dev` the server refuses to start unless `BASE_URL` is https,
+`RESEND_API_KEY` looks like a Resend key, and `MAIL_FROM` is set.
 
 ## License
 

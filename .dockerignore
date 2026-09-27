@@ -1,0 +1,8 @@
+node_modules
+skilldojo
+*.db
+*.db-wal
+*.db-shm
+.git
+docs
+tests
