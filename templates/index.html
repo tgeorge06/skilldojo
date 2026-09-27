@@ -166,6 +166,7 @@
         <h2 class="text-5xl font-black tabular-nums" :class="report.percent >= 80 ? 'text-emerald-600 dark:text-emerald-400' : report.percent >= 60 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'"><span x-text="report.percent"></span>%</h2>
         <p class="mt-2 text-lg font-semibold text-slate-600 dark:text-slate-300"><span x-text="report.score"></span> out of <span x-text="report.total"></span> correct</p>
         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400" x-text="gradeMessage()"></p>
+        <p x-show="rewardSummary()" x-cloak class="mt-3 inline-block rounded-full bg-emerald-100 px-4 py-1 text-sm font-semibold text-emerald-800 dark:bg-emerald-900 dark:text-emerald-100" x-text="rewardSummary()"></p>
       </div>
       <div class="space-y-2">
         <template x-for="(r, i) in report.results" :key="i">
@@ -228,6 +229,7 @@
         <h2 id="spelling-results-heading" tabindex="-1" class="text-3xl font-black">Word rescue complete!</h2>
         <p class="mt-3 text-xl font-bold text-violet-700 dark:text-violet-300">You rescued <span x-text="spellingScore"></span> of <span x-text="spellingWords.length"></span> words</p>
         <p class="mt-2 text-slate-600 dark:text-slate-300" x-text="spellingResultMessage()"></p>
+        <p x-show="rewardSummary()" x-cloak class="mt-3 inline-block rounded-full bg-violet-100 px-4 py-1 text-sm font-semibold text-violet-800 dark:bg-violet-900 dark:text-violet-100" x-text="rewardSummary()"></p>
       </div>
       <div class="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 sm:p-6 shadow-sm">
         <h3 class="text-lg font-bold mb-4">Words you trained</h3>
@@ -236,7 +238,7 @@
         </ul>
       </div>
       <div class="grid sm:grid-cols-2 gap-3">
-        <button type="button" @click="startSpelling" class="rounded-xl bg-violet-700 px-6 py-4 text-lg font-bold text-white shadow-sm transition hover:bg-violet-800">Play again 🔁</button>
+        <button type="button" @click="startSpelling" :disabled="busy" class="rounded-xl bg-violet-700 px-6 py-4 text-lg font-bold text-white shadow-sm transition hover:bg-violet-800 disabled:opacity-40">Play again 🔁</button>
         <button type="button" @click="reset" class="rounded-xl border-2 border-slate-300 dark:border-slate-700 px-6 py-4 text-lg font-bold transition hover:bg-white dark:hover:bg-slate-900">Choose another dojo</button>
       </div>
     </section>

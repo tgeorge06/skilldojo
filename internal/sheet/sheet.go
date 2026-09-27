@@ -130,6 +130,19 @@ func (s *Store) Put(sh *Sheet) error {
 	return nil
 }
 
+// Peek returns a stored, unexpired sheet without consuming it, so a client
+// that reloads mid-round can get its questions back.
+func (s *Store) Peek(id string) (*Sheet, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	sh, ok := s.sheets[id]
+	if ok && sh.CreatedAt.Before(time.Now().Add(-sheetTTL)) {
+		delete(s.sheets, id)
+		return nil, false
+	}
+	return sh, ok
+}
+
 // Grade scores answers against the stored sheet and removes it.
 func (s *Store) Grade(id string, answers []string) ([]Result, error) {
 	s.mu.Lock()

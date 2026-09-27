@@ -217,7 +217,30 @@ test("the browser round rules match the shared replay fixtures", () => {
       fixture.want,
       fixture.name
     );
+    // The log the server will replay records every event the component
+    // acted on, tagged, in order. Events the component ignored (repeats,
+    // blanks, post-round) are absent, which the server also ignores.
+    const acted = fixture.guesses.filter((g, i, all) => {
+      if (g.kind === "word") return g.value.trim() !== "";
+      return !all.slice(0, i).some((p) => p.kind === "letter" && p.value === g.value);
+    });
+    const logged = game.guessLog[0];
+    assert.ok(logged.length <= acted.length, `${fixture.name}: log has extra events`);
+    // JSON round-trip: the log lives in the vm realm, so prototypes differ.
+    assert.equal(JSON.stringify(logged), JSON.stringify(acted.slice(0, logged.length)), `${fixture.name}: log order`);
   }
+});
+
+test("anonymous play never calls the round endpoints and keeps no log server could use", () => {
+  const { game, context } = loadGame();
+  let fetched = false;
+  context.fetch = () => { fetched = true; return Promise.reject(new Error("no")); };
+  game.spellingCount = 5;
+  game.startSpelling();
+  assert.equal(game.child, null);
+  assert.equal(game.roundId, "");
+  assert.equal(game.guessLog.length, 5);
+  assert.equal(fetched, false);
 });
 
 test("guessing every distinct letter rescues a word", () => {
