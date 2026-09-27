@@ -286,6 +286,29 @@ test("the paint mixin draws the mosaic and lays out pages deterministically", ()
   assert.match(game.cooldownSVG(), /#ef476f/);
 });
 
+test("the battle mixin ignores responses for a battle that is no longer on screen", async () => {
+  const { context } = loadGame();
+  vm.runInContext(fs.readFileSync(path.join(root, "static", "kata-svg.js"), "utf8"), context);
+  vm.runInContext(fs.readFileSync(path.join(root, "static", "kata.js"), "utf8"), context);
+  vm.runInContext(fs.readFileSync(path.join(root, "static", "battle.js"), "utf8"), context);
+  const game = context.dojo();
+  assert.equal(game.canBattle(), false, "anonymous children never battle");
+  assert.equal(JSON.stringify(game.hearts(3)), JSON.stringify([true, true, true, false, false]));
+  game.battleId = "battle-a";
+  game.battle = { turn: 2, done: false, child: {}, opponent: {} };
+  game.battleAnswer = "cat";
+  let resolve;
+  game.post = () => new Promise((r) => { resolve = r; });
+  const pending = game.submitBattleAnswer();
+  // The child leaves before the answer comes back.
+  game.battleId = "";
+  game.battle = null;
+  resolve({ turn: 3, done: true, won: true, child: {}, opponent: {}, log: [] });
+  await pending;
+  assert.equal(game.battle, null, "a stale response must not resurrect the battle");
+  assert.equal(game.battleBusy, true, "busy flag belongs to the abandoned battle and is left alone");
+});
+
 test("the kata mixin is merged and renders deterministic creatures", () => {
   const { context } = loadGame();
   vm.runInContext(fs.readFileSync(path.join(root, "static", "kata-svg.js"), "utf8"), context);

@@ -21,6 +21,7 @@ import (
 	_ "time/tzdata" // Fly's base image has no zoneinfo; embed it.
 
 	"github.com/tgeorge06/skilldojo/internal/account"
+	"github.com/tgeorge06/skilldojo/internal/battle"
 	"github.com/tgeorge06/skilldojo/internal/curriculum"
 	"github.com/tgeorge06/skilldojo/internal/db"
 	"github.com/tgeorge06/skilldojo/internal/kata"
@@ -45,6 +46,9 @@ type config struct {
 	behindProxy bool // trust Fly-Client-IP for rate limiting
 	resendKey   string
 	mailFrom    string
+	// battlesDisabled hides the battle endpoints (BATTLES_DISABLED=1) so
+	// the pilot in docs/game-layer-plan.md can run without them.
+	battlesDisabled bool
 }
 
 func (c config) validate() error {
@@ -74,6 +78,7 @@ type server struct {
 	progress *progress.Store
 	kata     *kata.Store
 	paint    *paint.Store
+	battles  *battle.Store
 	cur      *curriculum.Curriculum
 	mailer   mail.Mailer
 	tmpl     *template.Template
@@ -87,6 +92,8 @@ func main() {
 		behindProxy: os.Getenv("BEHIND_PROXY") == "1",
 		resendKey:   os.Getenv("RESEND_API_KEY"),
 		mailFrom:    os.Getenv("MAIL_FROM"),
+
+		battlesDisabled: os.Getenv("BATTLES_DISABLED") == "1",
 	}
 	flag.StringVar(&cfg.addr, "addr", "127.0.0.1:8080", "listen address")
 	flag.StringVar(&cfg.dbPath, "db", envOr("DATABASE_PATH", "skilldojo.db"), "SQLite database path")
@@ -167,6 +174,8 @@ func newServer(cfg config, database *sql.DB, mailer mail.Mailer) (*server, error
 		return nil, err
 	}
 	prog.AddSink(painter)
+	battles := battle.New(database, cur, roster)
+	prog.AddSink(battles)
 	return &server{
 		cfg:      cfg,
 		store:    sheets,
@@ -174,6 +183,7 @@ func newServer(cfg config, database *sql.DB, mailer mail.Mailer) (*server, error
 		progress: prog,
 		kata:     creatures,
 		paint:    painter,
+		battles:  battles,
 		cur:      cur,
 		mailer:   mailer,
 		tmpl:     tmpl,
@@ -208,6 +218,9 @@ func (s *server) handler() http.Handler {
 	mux.HandleFunc("GET /api/mosaic/week", s.handleMosaicWeek)
 	mux.HandleFunc("POST /api/paint/page", s.handlePageStart)
 	mux.HandleFunc("POST /api/paint/fill", s.handlePageFill)
+	mux.HandleFunc("GET /api/battle/credits", s.handleBattleCredits)
+	mux.HandleFunc("POST /api/battle/start", s.handleBattleStart)
+	mux.HandleFunc("POST /api/battle/turn", s.handleBattleTurn)
 
 	mux.HandleFunc("GET /login", s.handleLoginPage)
 	mux.HandleFunc("POST /auth/magic", s.handleMagic)
@@ -247,10 +260,11 @@ type indexData struct {
 	SignedIn    bool
 	ActiveChild *account.Child
 	Children    []account.Child
+	Battles     bool
 }
 
 func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
-	data := indexData{}
+	data := indexData{Battles: !s.cfg.battlesDisabled}
 	if sess, ok := s.currentSession(r); ok {
 		data.SignedIn = true
 		if kids, err := s.accounts.Children(r.Context(), sess.AccountID); err == nil {

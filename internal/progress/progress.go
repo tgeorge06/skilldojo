@@ -107,6 +107,7 @@ type Reward struct {
 	Evolved      []string        `json:"evolved"`    // skill ids that reached mastery in this round
 	Creatures    json.RawMessage `json:"creatures,omitempty"`
 	Mosaic       json.RawMessage `json:"mosaic,omitempty"`
+	RoundID      string          `json:"-"` // for sinks that key on the round
 }
 
 // Sink is applied inside the finishing transaction, once per round, with
@@ -600,6 +601,7 @@ func (s *Store) Finish(ctx context.Context, child Child, req FinishRequest, now 
 		return FinishResponse{}, err
 	}
 	resp.Reward = computeReward(items, childGrade, previouslyMissed)
+	resp.Reward.RoundID = req.RoundID
 	resp.Reward.Evolved = evolved
 	if resp.Reward.ReviewDue, err = countMissed(ctx, tx, child, now); err != nil {
 		return FinishResponse{}, err

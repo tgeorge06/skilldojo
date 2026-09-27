@@ -141,6 +141,7 @@ function dojo() {
           const data = await this.post("/api/round/finish", { round_id: this.roundId, answers: this.answers });
           this.report = { results: data.results, score: data.score, total: data.total, percent: data.percent };
           this.reward = data.reward;
+          if (typeof this.loadBattleCredits === "function") this.loadBattleCredits();
         } else {
           this.report = await this.post("/api/grade", { id: this.sheetId, answers: this.answers });
         }
@@ -358,6 +359,7 @@ function dojo() {
       try {
         const data = await this.post("/api/round/finish", { round_id: this.roundId, guesses: this.guessLog });
         this.reward = data.reward;
+        if (typeof this.loadBattleCredits === "function") this.loadBattleCredits();
         this.spellingScore = data.score;
         this.spellingResults = data.word_results.map(({ word, won }) => ({ word, won }));
         return true;
@@ -478,7 +480,8 @@ function dojo() {
   return Object.assign(
     core,
     typeof kataMixin === "function" ? kataMixin() : {},
-    typeof paintMixin === "function" ? paintMixin() : {}
+    typeof paintMixin === "function" ? paintMixin() : {},
+    typeof battleMixin === "function" ? battleMixin() : {}
   );
 }
 
