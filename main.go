@@ -180,7 +180,8 @@ func (s *server) handler() http.Handler {
 
 	mux.HandleFunc("GET /login", s.handleLoginPage)
 	mux.HandleFunc("POST /auth/magic", s.handleMagic)
-	mux.HandleFunc("GET /auth/verify", s.handleVerify)
+	mux.HandleFunc("GET /auth/verify", s.handleVerifyPage)
+	mux.HandleFunc("POST /auth/verify", s.handleVerify)
 	mux.HandleFunc("POST /auth/logout", s.handleLogout)
 	mux.HandleFunc("GET /family", s.handleFamily)
 	mux.HandleFunc("POST /family/children", s.handleCreateChild)
@@ -204,6 +205,7 @@ func (s *server) housekeeping(ctx context.Context) {
 			if err := s.accounts.PurgeExpired(ctx, s.now()); err != nil {
 				log.Printf("purge expired: %v", err)
 			}
+			s.limiter.purge(s.now())
 		}
 	}
 }

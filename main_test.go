@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
@@ -123,10 +124,20 @@ func (e *testEnv) signIn(t *testing.T, email string) *http.Client {
 	if link == "" {
 		t.Fatalf("no link in mail: %q", e.mailer.last().Text)
 	}
+	// GET only confirms; it must not consume the token.
 	res, err := c.Get(e.srv.URL + link)
 	if err != nil {
 		t.Fatal(err)
 	}
+	if page := body(t, res); res.StatusCode != http.StatusOK || !strings.Contains(page, "Sign in as "+strings.ToLower(email)) {
+		t.Fatalf("verify page: %d %s", res.StatusCode, page[:300])
+	}
+	res, _ = c.Get(e.srv.URL + link)
+	if body(t, res); res.StatusCode != http.StatusOK {
+		t.Fatalf("second GET of the link should still confirm, got %d", res.StatusCode)
+	}
+	token := strings.TrimPrefix(link, "/auth/verify?t=")
+	res = e.postForm(t, c, "/auth/verify", url.Values{"t": {token}})
 	body(t, res)
 	if res.StatusCode != http.StatusSeeOther || res.Header.Get("Location") != "/family" {
 		t.Fatalf("verify: %d -> %q", res.StatusCode, res.Header.Get("Location"))
@@ -138,11 +149,29 @@ func TestMagicLinkSignInFlow(t *testing.T) {
 	e := newTestEnv(t)
 	c := e.signIn(t, "Parent@Example.com")
 
-	// The link is single use.
+	// The link is single use: both the page and the redeem refuse it now.
 	link := linkRE.FindString(e.mailer.last().Text)
 	res, _ := c.Get(e.srv.URL + link)
 	if page := body(t, res); res.StatusCode != http.StatusBadRequest || !strings.Contains(page, "expired or was already used") {
-		t.Fatalf("reused link: %d %s", res.StatusCode, page)
+		t.Fatalf("reused link page: %d %s", res.StatusCode, page)
+	}
+	res = e.postForm(t, c, "/auth/verify", url.Values{"t": {strings.TrimPrefix(link, "/auth/verify?t=")}})
+	if page := body(t, res); res.StatusCode != http.StatusBadRequest || !strings.Contains(page, "expired or was already used") {
+		t.Fatalf("reused link redeem: %d", res.StatusCode)
+	}
+	// A cross-site redeem is refused before the token is touched.
+	c3 := e.client(t)
+	e.postForm(t, c3, "/auth/magic", url.Values{"email": {"other@example.com"}}).Body.Close()
+	tok := strings.TrimPrefix(linkRE.FindString(e.mailer.last().Text), "/auth/verify?t=")
+	res = e.postForm(t, c3, "/auth/verify", url.Values{"t": {tok}}, "Sec-Fetch-Site", "cross-site")
+	body(t, res)
+	if res.StatusCode != http.StatusForbidden {
+		t.Fatalf("cross-site redeem: %d", res.StatusCode)
+	}
+	res = e.postForm(t, c3, "/auth/verify", url.Values{"t": {tok}})
+	body(t, res)
+	if res.StatusCode != http.StatusSeeOther {
+		t.Fatalf("token should survive a refused cross-site attempt: %d", res.StatusCode)
 	}
 
 	// Signed-in parent sees the family page with their (normalized) email.
@@ -208,7 +237,7 @@ func TestSessionCookieAttributes(t *testing.T) {
 	c := e.client(t)
 	e.postForm(t, c, "/auth/magic", url.Values{"email": {"a@example.com"}}).Body.Close()
 	link := linkRE.FindString(e.mailer.last().Text)
-	res, _ := c.Get(e.srv.URL + link)
+	res := e.postForm(t, c, "/auth/verify", url.Values{"t": {strings.TrimPrefix(link, "/auth/verify?t=")}})
 	body(t, res)
 	raw := res.Header.Get("Set-Cookie")
 	for _, want := range []string{"HttpOnly", "SameSite=Lax", "Path=/", "Max-Age=7776000"} {
@@ -328,6 +357,39 @@ func TestFreeTierIsUntouchedWithoutSession(t *testing.T) {
 	}
 	if page := body(t, res); res.StatusCode != http.StatusOK || !strings.Contains(page, `"questions"`) {
 		t.Fatalf("api/sheet without session: %d %s", res.StatusCode, page)
+	}
+}
+
+func TestRateLimiterIsBoundedAndChecksIPFirst(t *testing.T) {
+	l := newRateLimiter()
+	l.maxKeys = 3
+	base := time.Date(2026, 9, 27, 12, 0, 0, 0, time.UTC)
+	for i, key := range []string{"a", "b", "c"} {
+		if !l.allow(key, 1, base) {
+			t.Fatalf("key %d denied", i)
+		}
+	}
+	if l.allow("d", 1, base) {
+		t.Fatal("table full: a new key must be denied, not grown")
+	}
+	if l.allow("a", 1, base) {
+		t.Fatal("limit 1 exceeded")
+	}
+	// After the window the sweep frees space.
+	if !l.allow("d", 1, base.Add(16*time.Minute)) {
+		t.Fatal("expired keys should be swept when full")
+	}
+
+	e := newTestEnv(t)
+	c := e.client(t)
+	for i := 0; i < 12; i++ {
+		e.postForm(t, c, "/auth/magic", url.Values{"email": {fmt.Sprintf("u%d@example.com", i)}}).Body.Close()
+	}
+	if n := len(e.mailer.sent); n != 10 {
+		t.Fatalf("one IP sent %d mails, want 10", n)
+	}
+	if len(e.s.limiter.hits) != 11 { // ip + 10 emails; the 2 denied never added keys
+		t.Fatalf("denied requests added limiter keys: %d", len(e.s.limiter.hits))
 	}
 }
 

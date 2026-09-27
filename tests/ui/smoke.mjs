@@ -91,6 +91,8 @@ try {
   await parent.click("button[type=submit]");
   await parent.locator("text=Check your email").waitFor({ timeout: 5000 });
   await parent.click("text=open the sign-in link");
+  await parent.locator("text=You are about to sign in as").waitFor({ timeout: 5000 });
+  await parent.getByRole("button", { name: /Sign in as/ }).click();
   await parent.locator("text=Who's training?").waitFor({ timeout: 5000 });
   await parent.fill("input[name=nickname]", "Nova");
   await parent.selectOption("select[name=grade]", "2");

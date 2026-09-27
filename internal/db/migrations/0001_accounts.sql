@@ -10,14 +10,18 @@ CREATE TABLE accounts (
     created_at    TEXT NOT NULL
 );
 
+-- A login token is a challenge for an email address. The account row is
+-- created (or its timezone refreshed) only when the token is redeemed, so an
+-- unverified request can never create or alter an account.
 CREATE TABLE login_tokens (
     id         INTEGER PRIMARY KEY,
-    account_id INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    email      TEXT NOT NULL,
+    timezone   TEXT NOT NULL DEFAULT 'UTC',
     token_hash TEXT NOT NULL UNIQUE,
     expires_at TEXT NOT NULL,
     used_at    TEXT
 );
-CREATE INDEX login_tokens_account ON login_tokens(account_id);
+CREATE INDEX login_tokens_expires ON login_tokens(expires_at);
 
 CREATE TABLE children (
     id         INTEGER PRIMARY KEY,

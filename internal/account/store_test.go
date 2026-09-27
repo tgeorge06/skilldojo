@@ -70,41 +70,74 @@ func TestValidateTimezone(t *testing.T) {
 func TestLoginTokenLifecycle(t *testing.T) {
 	s := newStore(t)
 	ctx := context.Background()
-	a, err := s.EnsureAccount(ctx, "Parent@Example.com", "America/Chicago", now)
-	if err != nil {
-		t.Fatal(err)
-	}
-	again, _ := s.EnsureAccount(ctx, "parent@example.com", "UTC", now.Add(time.Hour))
-	if again.ID != a.ID || again.Timezone != "America/Chicago" {
-		t.Fatalf("EnsureAccount is not idempotent: %+v vs %+v", a, again)
-	}
 
-	plain, err := s.CreateLoginToken(ctx, a.ID, now)
+	plain, err := s.CreateLoginToken(ctx, "Parent@Example.com", "America/Chicago", now)
 	if err != nil || len(plain) < 40 {
 		t.Fatalf("token %q, %v", plain, err)
 	}
-	if _, err := s.ConsumeLoginToken(ctx, plain, now.Add(LoginTokenTTL+time.Second)); !errors.Is(err, ErrInvalidToken) {
+	// Requesting a link creates no account.
+	if _, err := s.AccountByID(ctx, 1); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("account created before redemption: %v", err)
+	}
+	if email, err := s.PeekLoginToken(ctx, plain, now); err != nil || email != "parent@example.com" {
+		t.Fatalf("peek = %q, %v", email, err)
+	}
+	if _, _, err := s.RedeemLoginToken(ctx, plain, now.Add(LoginTokenTTL+time.Second)); !errors.Is(err, ErrInvalidToken) {
 		t.Fatalf("expired token accepted: %v", err)
 	}
-	id, err := s.ConsumeLoginToken(ctx, plain, now.Add(time.Minute))
-	if err != nil || id != a.ID {
-		t.Fatalf("consume = %d, %v", id, err)
+	sess, acct, err := s.RedeemLoginToken(ctx, plain, now.Add(time.Minute))
+	if err != nil || acct.Email != "parent@example.com" || acct.Timezone != "America/Chicago" || acct.Plan != "trial" {
+		t.Fatalf("redeem = %+v, %v", acct, err)
 	}
-	if _, err := s.ConsumeLoginToken(ctx, plain, now.Add(time.Minute)); !errors.Is(err, ErrInvalidToken) {
+	if got, err := s.SessionByToken(ctx, sess, now.Add(time.Minute)); err != nil || got.AccountID != acct.ID {
+		t.Fatalf("session after redeem = %+v, %v", got, err)
+	}
+	if _, _, err := s.RedeemLoginToken(ctx, plain, now.Add(time.Minute)); !errors.Is(err, ErrInvalidToken) {
 		t.Fatalf("token reusable: %v", err)
 	}
+	if _, err := s.PeekLoginToken(ctx, plain, now.Add(time.Minute)); !errors.Is(err, ErrInvalidToken) {
+		t.Fatal("peek of used token succeeded")
+	}
 	for _, bad := range []string{"", "nope", plain + "x"} {
-		if _, err := s.ConsumeLoginToken(ctx, bad, now); !errors.Is(err, ErrInvalidToken) {
-			t.Errorf("ConsumeLoginToken(%q) = %v", bad, err)
+		if _, _, err := s.RedeemLoginToken(ctx, bad, now); !errors.Is(err, ErrInvalidToken) {
+			t.Errorf("RedeemLoginToken(%q) = %v", bad, err)
 		}
 	}
+
+	// A second sign-in for the same address reuses the account and refreshes
+	// the timezone, because ownership is proven by redemption.
+	plain2, _ := s.CreateLoginToken(ctx, "parent@example.com", "Europe/Paris", now)
+	_, again, err := s.RedeemLoginToken(ctx, plain2, now.Add(time.Minute))
+	if err != nil || again.ID != acct.ID || again.Timezone != "Europe/Paris" {
+		t.Fatalf("second redeem = %+v, %v", again, err)
+	}
+	// An unredeemed request with a bogus timezone changes nothing.
+	_, _ = s.CreateLoginToken(ctx, "parent@example.com", "Mars/Olympus", now)
+	got, _ := s.AccountByID(ctx, acct.ID)
+	if got.Timezone != "Europe/Paris" {
+		t.Fatalf("unredeemed request altered timezone: %q", got.Timezone)
+	}
+}
+
+// ensureAccount is the test shorthand for a redeemed sign-in.
+func ensureAccount(t *testing.T, s *Store, email string) Account {
+	t.Helper()
+	plain, err := s.CreateLoginToken(context.Background(), email, "UTC", now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, acct, err := s.RedeemLoginToken(context.Background(), plain, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return acct
 }
 
 func TestSessionsAndChildrenAreFencedByAccount(t *testing.T) {
 	s := newStore(t)
 	ctx := context.Background()
-	a, _ := s.EnsureAccount(ctx, "a@example.com", "UTC", now)
-	b, _ := s.EnsureAccount(ctx, "b@example.com", "UTC", now)
+	a := ensureAccount(t, s, "a@example.com")
+	b := ensureAccount(t, s, "b@example.com")
 
 	tokA, _ := s.CreateSession(ctx, a.ID, now)
 	sessA, err := s.SessionByToken(ctx, tokA, now)
@@ -184,8 +217,8 @@ func TestSessionsAndChildrenAreFencedByAccount(t *testing.T) {
 func TestPurgeExpired(t *testing.T) {
 	s := newStore(t)
 	ctx := context.Background()
-	a, _ := s.EnsureAccount(ctx, "a@example.com", "UTC", now)
-	_, _ = s.CreateLoginToken(ctx, a.ID, now)
+	a := ensureAccount(t, s, "a@example.com")
+	_, _ = s.CreateLoginToken(ctx, "a@example.com", "UTC", now)
 	tok, _ := s.CreateSession(ctx, a.ID, now)
 	if err := s.PurgeExpired(ctx, now.Add(SessionTTL+time.Hour)); err != nil {
 		t.Fatal(err)

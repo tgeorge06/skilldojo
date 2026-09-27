@@ -137,32 +137,94 @@ func parseTS(s string) time.Time {
 	return t
 }
 
-// EnsureAccount returns the account for email, creating it on first sight.
-// Signing up and signing in are the same action.
-func (s *Store) EnsureAccount(ctx context.Context, email, timezone string, now time.Time) (Account, error) {
+// CreateLoginToken mints a single-use magic-link challenge for an email
+// address and returns the plaintext to embed in the email. Only its hash is
+// stored, and no account row exists until the token is redeemed.
+func (s *Store) CreateLoginToken(ctx context.Context, email, timezone string, now time.Time) (string, error) {
 	email, err := NormalizeEmail(email)
 	if err != nil {
-		return Account{}, err
+		return "", err
 	}
-	if _, err := s.db.ExecContext(ctx,
-		`INSERT OR IGNORE INTO accounts (email, timezone, plan, created_at) VALUES (?, ?, 'trial', ?)`,
-		email, ValidateTimezone(timezone), ts(now)); err != nil {
-		return Account{}, err
+	plain, hash, err := newToken()
+	if err != nil {
+		return "", err
 	}
-	return s.accountByEmail(ctx, email)
+	_, err = s.db.ExecContext(ctx,
+		`INSERT INTO login_tokens (email, timezone, token_hash, expires_at) VALUES (?, ?, ?, ?)`,
+		email, ValidateTimezone(timezone), hash, ts(now.Add(LoginTokenTTL)))
+	return plain, err
 }
 
-func (s *Store) accountByEmail(ctx context.Context, email string) (Account, error) {
-	var a Account
-	var created string
-	err := s.db.QueryRowContext(ctx,
-		`SELECT id, email, timezone, plan, created_at FROM accounts WHERE email = ?`, email).
-		Scan(&a.ID, &a.Email, &a.Timezone, &a.Plan, &created)
-	if errors.Is(err, sql.ErrNoRows) {
-		return Account{}, ErrNotFound
+// PeekLoginToken returns the email a live token belongs to without
+// consuming it, so a confirmation page can say who is about to sign in.
+func (s *Store) PeekLoginToken(ctx context.Context, plain string, now time.Time) (string, error) {
+	if plain == "" || len(plain) > 128 {
+		return "", ErrInvalidToken
 	}
-	a.CreatedAt = parseTS(created)
-	return a, err
+	var email string
+	err := s.db.QueryRowContext(ctx,
+		`SELECT email FROM login_tokens WHERE token_hash = ? AND used_at IS NULL AND expires_at > ?`,
+		hashToken(plain), ts(now)).Scan(&email)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrInvalidToken
+	}
+	return email, err
+}
+
+// RedeemLoginToken consumes a token, creates the account on first sight (or
+// refreshes its timezone, now that mailbox ownership is proven), and starts
+// a session, all in one transaction so a failure never burns the link
+// without signing the parent in. Returns the session cookie value.
+func (s *Store) RedeemLoginToken(ctx context.Context, plain string, now time.Time) (string, Account, error) {
+	if plain == "" || len(plain) > 128 {
+		return "", Account{}, ErrInvalidToken
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return "", Account{}, err
+	}
+	defer tx.Rollback()
+
+	var email, timezone string
+	err = tx.QueryRowContext(ctx,
+		`UPDATE login_tokens SET used_at = ?
+		 WHERE token_hash = ? AND used_at IS NULL AND expires_at > ?
+		 RETURNING email, timezone`,
+		ts(now), hashToken(plain), ts(now)).Scan(&email, &timezone)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", Account{}, ErrInvalidToken
+	}
+	if err != nil {
+		return "", Account{}, err
+	}
+	if _, err := tx.ExecContext(ctx,
+		`INSERT INTO accounts (email, timezone, plan, created_at) VALUES (?, ?, 'trial', ?)
+		 ON CONFLICT(email) DO UPDATE SET timezone = excluded.timezone`,
+		email, timezone, ts(now)); err != nil {
+		return "", Account{}, err
+	}
+	var acct Account
+	var created string
+	if err := tx.QueryRowContext(ctx,
+		`SELECT id, email, timezone, plan, created_at FROM accounts WHERE email = ?`, email).
+		Scan(&acct.ID, &acct.Email, &acct.Timezone, &acct.Plan, &created); err != nil {
+		return "", Account{}, err
+	}
+	acct.CreatedAt = parseTS(created)
+
+	sessionPlain, sessionHash, err := newToken()
+	if err != nil {
+		return "", Account{}, err
+	}
+	if _, err := tx.ExecContext(ctx,
+		`INSERT INTO sessions (account_id, token_hash, created_at, expires_at) VALUES (?, ?, ?, ?)`,
+		acct.ID, sessionHash, ts(now), ts(now.Add(SessionTTL))); err != nil {
+		return "", Account{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return "", Account{}, err
+	}
+	return sessionPlain, acct, nil
 }
 
 // AccountByID loads one account.
@@ -179,38 +241,9 @@ func (s *Store) AccountByID(ctx context.Context, id int64) (Account, error) {
 	return a, err
 }
 
-// CreateLoginToken mints a single-use magic-link token and returns the
-// plaintext to embed in the email. Only its hash is stored.
-func (s *Store) CreateLoginToken(ctx context.Context, accountID int64, now time.Time) (string, error) {
-	plain, hash, err := newToken()
-	if err != nil {
-		return "", err
-	}
-	_, err = s.db.ExecContext(ctx,
-		`INSERT INTO login_tokens (account_id, token_hash, expires_at) VALUES (?, ?, ?)`,
-		accountID, hash, ts(now.Add(LoginTokenTTL)))
-	return plain, err
-}
-
-// ConsumeLoginToken marks a token used and returns its account id. The
-// UPDATE is the atomic claim: two concurrent clicks cannot both succeed.
-func (s *Store) ConsumeLoginToken(ctx context.Context, plain string, now time.Time) (int64, error) {
-	if plain == "" || len(plain) > 128 {
-		return 0, ErrInvalidToken
-	}
-	var accountID int64
-	err := s.db.QueryRowContext(ctx,
-		`UPDATE login_tokens SET used_at = ?
-		 WHERE token_hash = ? AND used_at IS NULL AND expires_at > ?
-		 RETURNING account_id`,
-		ts(now), hashToken(plain), ts(now)).Scan(&accountID)
-	if errors.Is(err, sql.ErrNoRows) {
-		return 0, ErrInvalidToken
-	}
-	return accountID, err
-}
-
-// CreateSession starts a signed-in session and returns the cookie value.
+// CreateSession starts a signed-in session for an existing account and
+// returns the cookie value. Sign-in goes through RedeemLoginToken; this is
+// for tests and future flows that already proved identity.
 func (s *Store) CreateSession(ctx context.Context, accountID int64, now time.Time) (string, error) {
 	plain, hash, err := newToken()
 	if err != nil {

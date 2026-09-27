@@ -18,18 +18,24 @@ const sessionCookie = "sd_session"
 // Form bodies are tiny; cap them well below the JSON limit.
 const formBodyLimit = 4 << 10
 
-// rateLimiter is a fixed-window counter keyed by string (email or IP).
+// rateLimiter is a sliding-window counter keyed by string (email or IP).
+// It is strictly bounded: when maxKeys distinct keys are live it sweeps
+// expired ones, and if still full it denies (fails closed) rather than grow.
 type rateLimiter struct {
-	mu   sync.Mutex
-	hits map[string][]time.Time
+	mu      sync.Mutex
+	hits    map[string][]time.Time
+	maxKeys int
+	window  time.Duration
 }
 
-func newRateLimiter() *rateLimiter { return &rateLimiter{hits: map[string][]time.Time{}} }
+func newRateLimiter() *rateLimiter {
+	return &rateLimiter{hits: map[string][]time.Time{}, maxKeys: 5000, window: 15 * time.Minute}
+}
 
-func (l *rateLimiter) allow(key string, limit int, window time.Duration, now time.Time) bool {
+func (l *rateLimiter) allow(key string, limit int, now time.Time) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	cutoff := now.Add(-window)
+	cutoff := now.Add(-l.window)
 	kept := l.hits[key][:0]
 	for _, t := range l.hits[key] {
 		if t.After(cutoff) {
@@ -40,16 +46,31 @@ func (l *rateLimiter) allow(key string, limit int, window time.Duration, now tim
 		l.hits[key] = kept
 		return false
 	}
-	l.hits[key] = append(kept, now)
-	// Drop empty keys occasionally so the map cannot grow without bound.
-	if len(l.hits) > 10000 {
-		for k, v := range l.hits {
-			if len(v) == 0 || !v[len(v)-1].After(cutoff) {
-				delete(l.hits, k)
-			}
+	if _, known := l.hits[key]; !known && len(l.hits) >= l.maxKeys {
+		l.sweep(cutoff)
+		if len(l.hits) >= l.maxKeys {
+			return false
 		}
 	}
+	l.hits[key] = append(kept, now)
 	return true
+}
+
+// sweep drops keys with no hits inside the window. Called with the lock held
+// only when the table is full, so it is not on every request's path.
+func (l *rateLimiter) sweep(cutoff time.Time) {
+	for k, v := range l.hits {
+		if len(v) == 0 || !v[len(v)-1].After(cutoff) {
+			delete(l.hits, k)
+		}
+	}
+}
+
+// purge is the housekeeping entry point.
+func (l *rateLimiter) purge(now time.Time) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.sweep(now.Add(-l.window))
 }
 
 func (s *server) clientIP(r *http.Request) string {
@@ -130,19 +151,16 @@ func (s *server) handleMagic(w http.ResponseWriter, r *http.Request) {
 	}
 	now := s.now()
 	sent := sentData{Email: email}
-	if !s.limiter.allow("email:"+email, 3, 15*time.Minute, now) ||
-		!s.limiter.allow("ip:"+s.clientIP(r), 10, 15*time.Minute, now) {
+	// IP first: an exhausted IP must not be able to add email keys.
+	if !s.limiter.allow("ip:"+s.clientIP(r), 10, now) ||
+		!s.limiter.allow("email:"+email, 3, now) {
 		s.render(w, "sent.html", sent)
 		return
 	}
 
-	acct, err := s.accounts.EnsureAccount(r.Context(), email, r.PostFormValue("tz"), now)
-	if err != nil {
-		log.Printf("ensure account: %v", err)
-		s.render(w, "login.html", loginData{Error: "Something went wrong on our side. Please try again."})
-		return
-	}
-	token, err := s.accounts.CreateLoginToken(r.Context(), acct.ID, now)
+	// No account exists until the link is redeemed; the token carries the
+	// address and timezone until then.
+	token, err := s.accounts.CreateLoginToken(r.Context(), email, r.PostFormValue("tz"), now)
 	if err != nil {
 		log.Printf("create login token: %v", err)
 		s.render(w, "login.html", loginData{Error: "Something went wrong on our side. Please try again."})
@@ -169,25 +187,54 @@ func (s *server) handleMagic(w http.ResponseWriter, r *http.Request) {
 	s.render(w, "sent.html", sent)
 }
 
-func (s *server) handleVerify(w http.ResponseWriter, r *http.Request) {
-	now := s.now()
-	accountID, err := s.accounts.ConsumeLoginToken(r.Context(), r.URL.Query().Get("t"), now)
+type verifyData struct {
+	Email string
+	Token string
+}
+
+const expiredLinkMessage = "That sign-in link has expired or was already used. Request a new one."
+
+// handleVerifyPage is the GET target of the emailed link. It only shows a
+// confirmation naming the address: a GET must not consume the token, or an
+// email security scanner that prefetches links would burn it, and a link
+// an attacker sends could silently switch the browser to their account.
+func (s *server) handleVerifyPage(w http.ResponseWriter, r *http.Request) {
+	token := r.URL.Query().Get("t")
+	email, err := s.accounts.PeekLoginToken(r.Context(), token, s.now())
 	if err != nil {
 		if !errors.Is(err, account.ErrInvalidToken) {
-			log.Printf("consume login token: %v", err)
+			log.Printf("peek login token: %v", err)
 		}
 		w.WriteHeader(http.StatusBadRequest)
-		s.render(w, "login.html", loginData{Error: "That sign-in link has expired or was already used. Request a new one."})
+		s.render(w, "login.html", loginData{Error: expiredLinkMessage})
 		return
 	}
-	token, err := s.accounts.CreateSession(r.Context(), accountID, now)
+	w.Header().Set("Cache-Control", "no-store")
+	s.render(w, "verify.html", verifyData{Email: email, Token: token})
+}
+
+// handleVerify redeems the token from the confirmation form. Being a POST it
+// sits behind the cross-origin check like every other state change.
+func (s *server) handleVerify(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, formBodyLimit)
+	if err := r.ParseForm(); err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		s.render(w, "login.html", loginData{Error: expiredLinkMessage})
+		return
+	}
+	session, _, err := s.accounts.RedeemLoginToken(r.Context(), r.PostFormValue("t"), s.now())
 	if err != nil {
-		log.Printf("create session: %v", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		s.render(w, "login.html", loginData{Error: "Something went wrong on our side. Please try again."})
+		if !errors.Is(err, account.ErrInvalidToken) {
+			log.Printf("redeem login token: %v", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			s.render(w, "login.html", loginData{Error: "Something went wrong on our side. Please try again."})
+			return
+		}
+		w.WriteHeader(http.StatusBadRequest)
+		s.render(w, "login.html", loginData{Error: expiredLinkMessage})
 		return
 	}
-	s.setSessionCookie(w, token)
+	s.setSessionCookie(w, session)
 	http.Redirect(w, r, "/family", http.StatusSeeOther)
 }
 

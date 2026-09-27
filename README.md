@@ -113,7 +113,10 @@ fly deploy
 ```
 
 Outside `-dev` the server refuses to start unless `BASE_URL` is https,
-`RESEND_API_KEY` looks like a Resend key, and `MAIL_FROM` is set.
+`RESEND_API_KEY` looks like a Resend key, and `MAIL_FROM` is set. The
+container refuses to start without the four Litestream secrets unless
+`LITESTREAM_DISABLED=1` is set explicitly (local Docker only). It runs as an
+unprivileged user after taking ownership of the volume.
 
 ## License
 

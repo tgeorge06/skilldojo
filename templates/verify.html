@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Confirm sign-in · SkillDojo</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body class="min-h-full bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 antialiased">
+<div class="mx-auto max-w-md px-4 py-8 sm:py-12">
+  <main id="main-content" tabindex="-1" class="rounded-2xl bg-white dark:bg-slate-900 p-6 sm:p-8 shadow-sm border border-slate-200 dark:border-slate-800 space-y-4">
+    <h1 class="text-2xl font-bold tracking-tight">Sign in to SkillDojo</h1>
+    <p>You are about to sign in as <strong>{{.Email}}</strong>. If that is not you, close this page.</p>
+    <form method="post" action="/auth/verify">
+      <input type="hidden" name="t" value="{{.Token}}">
+      <button type="submit" class="w-full rounded-xl bg-emerald-600 px-6 py-3 text-lg font-bold text-white shadow-sm transition hover:bg-emerald-700">Sign in as {{.Email}}</button>
+    </form>
+  </main>
+</div>
+</body>
+</html>
