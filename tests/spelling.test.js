@@ -234,6 +234,26 @@ test("the browser round rules match the shared replay fixtures", () => {
   }
 });
 
+test("times-table mode keeps the count on a valid list", () => {
+  const { game } = loadGame();
+  assert.equal(game.count, 10);
+  game.toggleOp("tables");
+  assert.equal(JSON.stringify([...game.ops]), JSON.stringify(["tables"]));
+  assert.equal(game.count, 12, "entering table mode picks a table count");
+  game.count = 24;
+  game.toggleOp("tables");
+  assert.equal(game.ops.length, 0);
+  assert.equal(game.count, 10, "leaving table mode returns to a sheet count");
+  game.toggleOp("tables");
+  game.toggleOp("mul");
+  assert.equal(JSON.stringify([...game.ops]), JSON.stringify(["mul"]), "another operation replaces table mode");
+  assert.equal(game.count, 10);
+  game.table = 9;
+  game.toggleOp("tables");
+  assert.equal(game.sheetRequest().table, 9);
+  assert.equal(game.sheetRequest().ordered, true);
+});
+
 test("a signed-in child starts at their own grade", () => {
   const { context } = loadGame();
   context.document.querySelector = (sel) => sel === "[data-child-id]" ? { dataset: { childId: "7", childNickname: "Nova", childGrade: "3" } } : null;

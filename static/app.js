@@ -7,6 +7,10 @@ function dojo() {
     // root element (never interpolated into x-data). Null when anonymous.
     child: readChild(),
     ...defaultGrades(),
+    // Times-table practice: which table, and whether facts come in order.
+    table: 7,
+    tableOrdered: true,
+    tables: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
     roundId: "",
     guessLog: [],
     reward: null,
@@ -25,6 +29,7 @@ function dojo() {
       { id: "mul", label: "Multiplication", emoji: "✖️", hint: "times tables" },
       { id: "div", label: "Division", emoji: "➗", hint: "no remainders" },
       { id: "frac", label: "Fractions", emoji: "🍕", hint: "answer like 3/4" },
+      { id: "tables", label: "Times tables", emoji: "✖️", hint: "One table, 1 to 12, in order or mixed" },
     ],
     gradeHints: {
       1: "numbers up to 20",
@@ -76,7 +81,33 @@ function dojo() {
 
     // Math dojo methods.
     toggleOp(id) {
-      this.ops = this.ops.includes(id) ? this.ops.filter((o) => o !== id) : [...this.ops, id];
+      // Times tables is a mode of its own: it cannot mix with other operations.
+      if (id === "tables") {
+        this.ops = this.ops.includes("tables") ? [] : ["tables"];
+      } else {
+        const without = this.ops.filter((o) => o !== id && o !== "tables");
+        this.ops = this.ops.includes(id) ? without : [...without, id];
+      }
+      this.normalizeCount();
+    },
+    // Keep the count on the current mode's list after any mode change.
+    normalizeCount() {
+      if (!this.countChoices().includes(this.count)) this.count = this.countChoices()[0];
+    },
+    tablesMode() {
+      return this.ops.length === 1 && this.ops[0] === "tables";
+    },
+    countChoices() {
+      return this.tablesMode() ? [12, 24] : [10, 20, 30];
+    },
+    // The request body for a math sheet, shared by the free and signed-in paths.
+    sheetRequest() {
+      const body = { ops: this.ops, grade: this.grade, count: this.count };
+      if (this.tablesMode()) {
+        body.table = this.table;
+        body.ordered = this.tableOrdered;
+      }
+      return body;
     },
     gradeHint() {
       return this.gradeHints[this.grade] || "";
@@ -114,13 +145,11 @@ function dojo() {
         let data;
         if (this.child) {
           this.roundId = newRoundId();
-          data = await this.post("/api/round/start", {
-            round_id: this.roundId, kind: "math", ops: this.ops, grade: this.grade, count: this.count,
-          });
+          data = await this.post("/api/round/start", Object.assign({ round_id: this.roundId, kind: "math" }, this.sheetRequest()));
           data = { id: data.sheet_id, questions: data.questions };
         } else {
           this.roundId = "";
-          data = await this.post("/api/sheet", { ops: this.ops, grade: this.grade, count: this.count });
+          data = await this.post("/api/sheet", this.sheetRequest());
         }
         this.sheetId = data.id;
         this.questions = data.questions;

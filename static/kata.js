@@ -82,6 +82,7 @@ function kataMixin() {
         this.subject = "math";
         this.ops = [entry.focus];
         this.grade = entry.grade;
+        this.normalizeCount();
       } else {
         this.subject = "spelling";
         this.spellingFocus = entry.focus;

@@ -37,6 +37,9 @@ plain http. The SQLite database defaults to `./skilldojo.db` (`-db` or
 - **Division** — always divides evenly
 - **Fractions** — same-denominator add/subtract, answer like `3/4`
   (equivalent fractions are accepted: `2/4` = `1/2`)
+- **Times tables** — one table from 2 to 12, every fact from 1 to 12, in
+  order or mixed up, once (12) or twice (24). Counts as multiplication
+  practice for progress.
 
 Difficulty is a **Grade 1–5 slider**, loosely following the US Common Core
 progression: Grade 1 keeps addition/subtraction entirely within 20 with

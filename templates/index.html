@@ -65,6 +65,27 @@
           </div>
         </div>
 
+        <div x-show="tablesMode()" x-cloak class="space-y-4">
+          <div>
+            <h2 class="text-lg font-semibold mb-3">Which table?</h2>
+            <div class="grid grid-cols-6 gap-2 sm:grid-cols-11" role="group" aria-label="Times table">
+              <template x-for="t in tables" :key="t">
+                <button type="button" @click="table = t" :aria-pressed="table === t" class="min-h-11 rounded-xl border-2 text-lg font-bold transition" :class="table === t ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-200 dark:border-slate-800 hover:border-slate-300'" x-text="t + 's'"></button>
+              </template>
+            </div>
+          </div>
+          <div class="grid grid-cols-2 gap-3" role="group" aria-label="Order">
+            <button type="button" @click="tableOrdered = true" :aria-pressed="tableOrdered" class="rounded-xl border-2 p-4 text-left transition" :class="tableOrdered ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-950 dark:border-emerald-400' : 'border-slate-200 dark:border-slate-800'">
+              <span class="block font-semibold">In order</span>
+              <span class="block text-sm text-slate-500 dark:text-slate-400" x-text="`1 × ${table} up to 12 × ${table}`"></span>
+            </button>
+            <button type="button" @click="tableOrdered = false" :aria-pressed="!tableOrdered" class="rounded-xl border-2 p-4 text-left transition" :class="!tableOrdered ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-950 dark:border-emerald-400' : 'border-slate-200 dark:border-slate-800'">
+              <span class="block font-semibold">Mixed up</span>
+              <span class="block text-sm text-slate-500 dark:text-slate-400">Shuffled, both ways round</span>
+            </button>
+          </div>
+        </div>
+
         <div>
           <h2 class="text-lg font-semibold mb-3">Pick your grade</h2>
           <div class="rounded-xl border-2 border-slate-200 dark:border-slate-800 p-5">
@@ -82,7 +103,7 @@
         <div>
           <h2 class="text-lg font-semibold mb-3">How many questions?</h2>
           <div class="flex gap-3">
-            <template x-for="n in [10, 20, 30]" :key="n">
+            <template x-for="n in countChoices()" :key="n">
               <button type="button" @click="count = n" :aria-pressed="count === n" class="flex-1 rounded-xl border-2 p-3 text-xl font-bold transition"
                       :class="count === n ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-950 dark:border-emerald-400' : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'" x-text="n"></button>
             </template>
@@ -140,7 +161,7 @@
       </div>
 
       <p x-show="error" x-cloak role="alert" class="rounded-lg bg-rose-50 dark:bg-rose-950 px-4 py-3 text-sm font-medium text-rose-700 dark:text-rose-300" x-text="error"></p>
-      <button x-show="subject === 'math' && child" x-cloak type="button" @click="openPage" :disabled="pageBusy || ops.length === 0" class="mb-3 w-full rounded-xl border-2 border-emerald-300 bg-emerald-50 px-6 py-3 text-lg font-bold text-emerald-900 transition hover:bg-emerald-100 disabled:opacity-40 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-100">Color by number 🎨</button>
+      <button x-show="subject === 'math' && child && !tablesMode()" x-cloak type="button" @click="openPage" :disabled="pageBusy || ops.length === 0" class="mb-3 w-full rounded-xl border-2 border-emerald-300 bg-emerald-50 px-6 py-3 text-lg font-bold text-emerald-900 transition hover:bg-emerald-100 disabled:opacity-40 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-100">Color by number 🎨</button>
       <button type="button" @click="startTraining" :disabled="busy || (subject === 'math' && ops.length === 0)" class="w-full rounded-xl px-6 py-4 text-lg font-bold text-white shadow-sm transition disabled:opacity-40 disabled:cursor-not-allowed" :class="subject === 'spelling' ? 'bg-violet-700 hover:bg-violet-800' : 'bg-emerald-600 hover:bg-emerald-700'">
         <span x-text="busy ? 'Getting ready…' : subject === 'spelling' ? 'Start word rescue! 🏮' : 'Start math training! 🥷'"></span>
       </button>

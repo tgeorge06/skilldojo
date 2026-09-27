@@ -69,6 +69,20 @@ try {
   await page.locator("text=/out of/").first().waitFor({ timeout: 5000 });
   await page.getByRole("button", { name: /Choose new training/ }).click();
 
+  // Times tables: pick the 7s in order and check the first prompt.
+  await page.getByRole("button", { name: /Times tables/ }).click();
+  await page.getByRole("button", { name: "7s" }).click();
+  await page.getByRole("button", { name: /Start math training/ }).click();
+  const tableAnswers = page.locator("input[inputmode=numeric]:visible");
+  await tableAnswers.first().waitFor({ timeout: 5000 });
+  const tableInputs = await tableAnswers.count();
+  await expect(tableInputs === 12, `a table sheet should have 12 inputs, saw ${tableInputs}`);
+  await expect(await page.locator("form:visible", { hasText: "1 × 7" }).count() === 1, "the ordered 7s sheet should start at 1 × 7");
+  for (let i = 0; i < tableInputs; i += 1) await tableAnswers.nth(i).fill("7");
+  await page.getByRole("button", { name: /Grade my sheet/ }).click();
+  await page.locator("text=/out of/").first().waitFor({ timeout: 5000 });
+  await page.getByRole("button", { name: /Choose new training/ }).click();
+
   await page.getByRole("button", { name: /Spelling/ }).click();
   await page.getByRole("button", { name: /Start word rescue/ }).click();
   await page.locator("#spelling-word-heading").waitFor({ timeout: 5000 });
