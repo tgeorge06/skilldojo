@@ -175,8 +175,8 @@ function paintMixin() {
       const list = this.rewardCreatures();
       const t = list[0];
       this.cooldown = t
-        ? { seed: t.seed, palette: t.palette, regions: t.regions, colors: Array(t.regions).fill("") }
-        : { seed: 11, palette: "meadow", regions: 20, colors: Array(20).fill("") };
+        ? { seed: t.seed, id: t.id, regions: t.regions, colors: Array(t.regions).fill("") }
+        : { seed: 11, id: "", regions: 16, colors: Array(16).fill("") };
       this.cooldownColor = 0;
       this.view = "cooldown";
       this.moveToTop("#cooldown-heading");
@@ -187,7 +187,7 @@ function paintMixin() {
     cooldownSVG() {
       if (!this.cooldown || typeof KataSVG === "undefined") return "";
       return KataSVG.creature(this.cooldown.seed, {
-        palette: this.cooldown.palette, regions: this.cooldown.regions, fills: 0, name: "Your painting", size: 240,
+        design: kataDesign(this.cooldown.id), grade: kataGrade(this.cooldown.id), regions: this.cooldown.regions, fills: 0, name: "Your painting", size: 240,
         regionColors: this.cooldown.colors,
       });
     },

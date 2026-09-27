@@ -1,6 +1,15 @@
 // Kata collection: the index of creatures and the reveal on results. Mixed
 // into dojo() by app.js. Everything here needs a signed-in child; the index
 // endpoint refuses anonymous callers and the UI hides the entry points.
+// The authored design for a creature id, when kata-designs.js is loaded.
+function kataDesign(id) {
+  return typeof KATA_DESIGNS !== "undefined" && KATA_DESIGNS[id] ? KATA_DESIGNS[id] : undefined;
+}
+function kataGrade(id) {
+  const d = kataDesign(id);
+  return d && d.grade ? d.grade : 1;
+}
+
 function kataMixin() {
   return {
     kata: null,
@@ -58,8 +67,9 @@ function kataMixin() {
     kataSVG(entry, size) {
       if (typeof KataSVG === "undefined") return "";
       return KataSVG.creature(entry.seed, {
-        palette: entry.palette, regions: entry.regions, fills: entry.fills,
+        design: kataDesign(entry.id), grade: entry.grade, regions: entry.regions, fills: entry.fills,
         evolved: entry.state === "evolved", name: this.kataName(entry), size: size || 120,
+        silhouette: entry.state === "unknown",
       });
     },
     kataAboveGrade(entry) {
@@ -101,7 +111,7 @@ function kataMixin() {
     revealSVG(t) {
       if (typeof KataSVG === "undefined") return "";
       return KataSVG.creature(t.seed, {
-        palette: t.palette, regions: t.regions, fills: t.fills, evolved: t.state === "evolved", name: t.name, size: 96,
+        design: kataDesign(t.id), grade: kataGrade(t.id), regions: t.regions, fills: t.fills, evolved: t.state === "evolved", name: t.name, size: 96,
       });
     },
     revealLabel(t) {

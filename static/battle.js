@@ -123,7 +123,7 @@ function battleMixin() {
     },
     fighterSVG(f, size) {
       if (!f || typeof KataSVG === "undefined") return "";
-      return KataSVG.creature(f.seed, { palette: f.palette, regions: f.regions, fills: f.fills, evolved: f.evolved, name: f.name, size: size || 120 });
+      return KataSVG.creature(f.seed, { design: kataDesign(f.id), grade: kataGrade(f.id), regions: f.regions, fills: f.fills, evolved: f.evolved, name: f.name, size: size || 120 });
     },
     leaveBattle() {
       // Invalidate any in-flight request and hand the buttons back.

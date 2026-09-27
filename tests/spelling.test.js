@@ -277,7 +277,7 @@ test("the paint mixin draws the mosaic and lays out pages deterministically", ()
   game.page = { seed: 5, total: 3, regions: [{ idx: 0, prompt: "3 + 4", filled: true, answer: "7" }, { idx: 1, prompt: "<b>", filled: false }, { idx: 2, prompt: "9 - 2", filled: false }] };
   const svg = game.pageSVG();
   assert.match(svg, /role="group" aria-label="Color by number page"/);
-  assert.equal((svg.match(/data-region=/g) || []).length, 3);
+  assert.equal(new Set([...svg.matchAll(/data-region="(\d+)"/g)].map((m) => m[1])).size, 3);
   assert.match(svg, /aria-pressed="true"/);
   assert.ok(svg.includes("&lt;b&gt;") && !svg.includes("<b>"), "prompts are escaped");
   // Cooldown painting only honours strict hex colors.

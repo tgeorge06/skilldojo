@@ -168,9 +168,10 @@ try {
   await parent.locator("#spelling-results-heading").waitFor({ timeout: 5000 });
   await parent.getByRole("button", { name: /Paint to relax/ }).click();
   await parent.locator("#cooldown-heading").waitFor({ timeout: 5000 });
-  const spot = parent.locator("[x-html='cooldownSVG()'] [data-region='0']");
+  const spot = parent.locator("[x-html='cooldownSVG()'] [data-region='0']").first();
   await spot.dispatchEvent("click");
-  const painted = await spot.getAttribute("fill");
+  // Painted parts are cel-shaded; the lit layer carries the chosen color.
+  const painted = await parent.locator("[x-html='cooldownSVG()'] [data-region='0'][data-lit]").getAttribute("fill");
   await expect(painted === "#ef476f", `first spot should take the first color, got ${painted}`);
 } catch (err) {
   problems.push(`harness: ${err.message}`);
