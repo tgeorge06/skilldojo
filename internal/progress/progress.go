@@ -447,11 +447,14 @@ func (s *Store) startMath(ctx context.Context, child Child, req StartRequest, no
 			return StartResponse{}, err
 		}
 	}
-	if err := tx.Commit(); err != nil {
+	// The sheet must exist before the round is visible, or a concurrent
+	// replay of the same id could see the row and find no sheet. Store it
+	// first; if the commit fails, take it back out.
+	if err := s.sheets.Put(sh); err != nil {
 		return StartResponse{}, err
 	}
-	// Only a committed round owns a sheet; a failed insert leaves nothing in memory.
-	if err := s.sheets.Put(sh); err != nil {
+	if err := tx.Commit(); err != nil {
+		s.sheets.Remove(sh.ID)
 		return StartResponse{}, err
 	}
 	return StartResponse{RoundID: req.RoundID, Kind: KindMath, SheetID: sh.ID, Questions: sh.Questions}, nil
