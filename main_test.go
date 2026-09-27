@@ -691,6 +691,43 @@ func TestBattleEndpoints(t *testing.T) {
 	}
 }
 
+func TestTimesTablesSheetsAndRounds(t *testing.T) {
+	e := newTestEnv(t)
+	anon := e.client(t)
+	res, page := e.postJSON(t, anon, "/api/sheet", `{"ops":["tables"],"grade":3,"count":12,"table":8,"ordered":true}`)
+	if res.StatusCode != http.StatusOK || !strings.Contains(page, `"prompt":"1 × 8"`) || !strings.Contains(page, `"prompt":"12 × 8"`) {
+		t.Fatalf("tables sheet: %d %s", res.StatusCode, snippet(page))
+	}
+	res, _ = e.postJSON(t, anon, "/api/sheet", `{"ops":["tables","addsub"],"grade":3,"count":12,"table":8}`)
+	if res.StatusCode != http.StatusBadRequest {
+		t.Fatalf("tables mixed with another op accepted: %d", res.StatusCode)
+	}
+	res, _ = e.postJSON(t, anon, "/api/sheet", `{"ops":["tables"],"grade":3,"count":12,"table":1}`)
+	if res.StatusCode != http.StatusBadRequest {
+		t.Fatalf("table 1 accepted: %d", res.StatusCode)
+	}
+
+	c := e.signIn(t, "p@example.com")
+	e.postForm(t, c, "/family/children", url.Values{"nickname": {"Nova"}, "grade": {"3"}}).Body.Close()
+	res, page = e.postJSON(t, c, "/api/round/start", `{"round_id":"tables-round-1","kind":"math","ops":["tables"],"grade":3,"count":12,"table":6,"ordered":false}`)
+	if res.StatusCode != http.StatusOK || !strings.Contains(page, `"questions"`) {
+		t.Fatalf("tables round: %d %s", res.StatusCode, snippet(page))
+	}
+	answers := make([]string, 12)
+	for i := range answers {
+		answers[i] = "1"
+	}
+	res, page = e.postJSON(t, c, "/api/round/finish", `{"round_id":"tables-round-1","answers":["1","1","1","1","1","1","1","1","1","1","1","1"]}`)
+	if res.StatusCode != http.StatusOK || !strings.Contains(page, `"total":12`) {
+		t.Fatalf("tables finish: %d %s", res.StatusCode, snippet(page))
+	}
+	// The round trains the multiplication skill and its creature.
+	res, _ = c.Get(e.srv.URL + "/api/kata/index")
+	if page = body(t, res); !strings.Contains(page, `"id":"math-mul-g3","name":"Gridcat"`) || !strings.Contains(page, `"state":"seen"`) {
+		t.Fatalf("tables round should touch the multiplication creature: %s", snippet(page))
+	}
+}
+
 func TestConfigValidation(t *testing.T) {
 	if err := (config{dev: true}).validate(); err != nil {
 		t.Fatalf("dev config should validate: %v", err)

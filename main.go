@@ -287,10 +287,15 @@ func (s *server) render(w http.ResponseWriter, name string, data any) {
 }
 
 type newSheetRequest struct {
-	Ops   []string `json:"ops"`
-	Grade int      `json:"grade"`
-	Count int      `json:"count"`
+	Ops     []string `json:"ops"`
+	Grade   int      `json:"grade"`
+	Count   int      `json:"count"`
+	Table   int      `json:"table,omitempty"`   // times-table practice: ops must be ["tables"]
+	Ordered bool     `json:"ordered,omitempty"` // 1×t .. 12×t in order, else mixed
 }
+
+// isTables reports whether a request asks for times-table practice.
+func isTables(ops []string) bool { return len(ops) == 1 && ops[0] == "tables" }
 
 type newSheetResponse struct {
 	ID        string           `json:"id"`
@@ -302,7 +307,13 @@ func (s *server) handleNewSheet(w http.ResponseWriter, r *http.Request) {
 	if err := decodeJSON(w, r, &req); err != nil {
 		return
 	}
-	sh, err := sheet.Generate(req.Ops, req.Grade, req.Count)
+	var sh *sheet.Sheet
+	var err error
+	if isTables(req.Ops) {
+		sh, err = sheet.GenerateTable(req.Table, req.Count, req.Ordered, req.Grade)
+	} else {
+		sh, err = sheet.Generate(req.Ops, req.Grade, req.Count)
+	}
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err)
 		return

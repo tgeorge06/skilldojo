@@ -1,6 +1,7 @@
 package sheet
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"testing"
@@ -226,5 +227,39 @@ func TestGradeAcceptsEquivalentFractions(t *testing.T) {
 	}
 	if !results[0].Right {
 		t.Error("2/4 should grade equal to 1/2")
+	}
+}
+
+func TestGenerateTable(t *testing.T) {
+	ordered, err := GenerateTable(7, 12, true, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, q := range ordered.Questions {
+		want := fmt.Sprintf("%d × 7", i+1)
+		if q.Prompt != want || q.Op != OpMul || q.answer.String() != fmt.Sprint((i+1)*7) {
+			t.Fatalf("question %d = %+v, want %s", i, q, want)
+		}
+	}
+	mixed, err := GenerateTable(9, 24, false, 4)
+	if err != nil || len(mixed.Questions) != 24 {
+		t.Fatalf("mixed: %v, %d", err, len(mixed.Questions))
+	}
+	seen := map[string]int{}
+	for _, q := range mixed.Questions {
+		seen[q.answer.String()]++
+		if q.Op != OpMul || !strings.Contains(q.Prompt, "9") {
+			t.Fatalf("mixed question %+v", q)
+		}
+	}
+	for a := 1; a <= 12; a++ {
+		if seen[fmt.Sprint(a*9)] != 2 {
+			t.Fatalf("fact %d×9 appears %d times, want 2", a, seen[fmt.Sprint(a*9)])
+		}
+	}
+	for _, bad := range []struct{ table, count, grade int }{{1, 12, 3}, {13, 12, 3}, {7, 10, 3}, {7, 12, 0}} {
+		if _, err := GenerateTable(bad.table, bad.count, true, bad.grade); err == nil {
+			t.Fatalf("accepted %+v", bad)
+		}
 	}
 }

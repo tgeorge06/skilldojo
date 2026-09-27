@@ -87,6 +87,48 @@ func Generate(ops []string, grade, count int) (*Sheet, error) {
 	return generate(ops, grade, count)
 }
 
+// Times-table practice: one table, every fact from 1 to 12, in order or
+// mixed, once (12) or twice (24). Questions are ordinary multiplication so
+// they count toward the same skill and creature as the rest of the table.
+const (
+	MinTable = 2
+	MaxTable = 12
+)
+
+var validTableCounts = map[int]bool{12: true, 24: true}
+
+// GenerateTable builds a times-table sheet. Ordered sheets go 1×t .. 12×t
+// (then again for 24); mixed sheets shuffle and alternate the factor order.
+func GenerateTable(table, count int, ordered bool, grade int) (*Sheet, error) {
+	if table < MinTable || table > MaxTable {
+		return nil, fmt.Errorf("table must be between %d and %d", MinTable, MaxTable)
+	}
+	if !validTableCounts[count] {
+		return nil, fmt.Errorf("count must be 12 or 24")
+	}
+	if grade < MinGrade || grade > MaxGrade {
+		return nil, fmt.Errorf("grade must be between %d and %d", MinGrade, MaxGrade)
+	}
+	qs := make([]Question, 0, count)
+	for pass := 0; pass < count/12; pass++ {
+		for a := 1; a <= 12; a++ {
+			x, y := a, table
+			if !ordered && (a+pass)%2 == 1 {
+				x, y = table, a
+			}
+			qs = append(qs, Question{Prompt: fmt.Sprintf("%d × %d", x, y), Op: OpMul, answer: whole(x * y)})
+		}
+	}
+	if !ordered {
+		mrand.Shuffle(len(qs), func(i, j int) { qs[i], qs[j] = qs[j], qs[i] })
+	}
+	id, err := newID()
+	if err != nil {
+		return nil, err
+	}
+	return &Sheet{ID: id, Questions: qs, Grade: grade, CreatedAt: time.Now()}, nil
+}
+
 // MaxPageCount bounds GenerateCount, used by color-by-number pages.
 const MaxPageCount = 40
 
