@@ -82,6 +82,7 @@ func TestParseRejectsBadData(t *testing.T) {
 		"uppercase word":       `{"skills":{"1":[{"id":"a"}]},"words":{"1":[{"word":"Cat","skill":"a"}]},"sightWordSkill":{"id":"sight-words"},"sightWords":{"1":[]}}`,
 		"empty word":           `{"skills":{"1":[{"id":"a"}]},"words":{"1":[{"word":"","skill":"a"}]},"sightWordSkill":{"id":"sight-words"},"sightWords":{"1":[]}}`,
 		"sight word with dash": `{"skills":{"1":[]},"words":{"1":[]},"sightWordSkill":{"id":"sight-words"},"sightWords":{"1":[{"word":"don't","rank":1}]}}`,
+		"sight word no rank":   `{"skills":{"1":[]},"words":{"1":[]},"sightWordSkill":{"id":"sight-words"},"sightWords":{"1":[{"word":"the"}]}}`,
 	}
 	for name, raw := range cases {
 		if _, err := parse([]byte(raw)); err == nil {
@@ -127,11 +128,21 @@ func TestReplayIsNeverKinderThanTheBrowser(t *testing.T) {
 			t.Errorf("word guess %q: %+v, want one mistake and no win", v, got)
 		}
 	}
-	for _, v := range []string{"k", "kk", "", "1", "\u212A"} {
-		got := Replay("kite", []Guess{{GuessLetter, v}})
-		if got.Won || got.Mistakes != 0 {
-			t.Errorf("letter guess %q: %+v, want ignored", v, got)
+	// Malformed letter events are charged like any wrong letter, and a
+	// repeated malformed value is charged once, exactly as guessLetter does.
+	for _, v := range []string{"k", "kk", "1", "\u212A", "K "} {
+		got := Replay("kite", []Guess{{GuessLetter, v}, {GuessLetter, v}})
+		if got.Won || got.Mistakes != 1 {
+			t.Errorf("letter guess %q: %+v, want one mistake and no win", v, got)
 		}
+	}
+	if got := Replay("kite", []Guess{{GuessLetter, ""}}); got.Mistakes != 0 {
+		t.Errorf("empty letter event should be ignored: %+v", got)
+	}
+	// Relabelling wrong guesses to lowercase must not turn a loss into a win.
+	relabelled := []Guess{{GuessLetter, "b"}, {GuessLetter, "d"}, {GuessLetter, "e"}, {GuessLetter, "f"}, {GuessLetter, "g"}, {GuessLetter, "h"}, {GuessLetter, "C"}, {GuessLetter, "A"}, {GuessLetter, "T"}}
+	if got := Replay("cat", relabelled); got.Won || !got.Done || got.Mistakes != 6 {
+		t.Errorf("relabelled loss replayed as %+v", got)
 	}
 	if got := Replay(" cat ", []Guess{{GuessWord, "cat"}}); got.Won {
 		t.Error("malformed target must never be winnable")

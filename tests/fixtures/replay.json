@@ -1,46 +1,516 @@
 [
-  {"name": "all letters win", "word": "cat",
-   "guesses": [{"kind":"letter","value":"C"},{"kind":"letter","value":"A"},{"kind":"letter","value":"T"}],
-   "want": {"won": true, "done": true, "mistakes": 0}},
-  {"name": "six wrong letters lose", "word": "cat",
-   "guesses": [{"kind":"letter","value":"B"},{"kind":"letter","value":"D"},{"kind":"letter","value":"E"},{"kind":"letter","value":"F"},{"kind":"letter","value":"G"},{"kind":"letter","value":"H"}],
-   "want": {"won": false, "done": true, "mistakes": 6}},
-  {"name": "five wrong letters is still open", "word": "cat",
-   "guesses": [{"kind":"letter","value":"B"},{"kind":"letter","value":"D"},{"kind":"letter","value":"E"},{"kind":"letter","value":"F"},{"kind":"letter","value":"G"}],
-   "want": {"won": false, "done": false, "mistakes": 5}},
-  {"name": "repeated wrong letter is ignored", "word": "cat",
-   "guesses": [{"kind":"letter","value":"B"},{"kind":"letter","value":"B"},{"kind":"letter","value":"B"},{"kind":"letter","value":"B"},{"kind":"letter","value":"B"},{"kind":"letter","value":"B"},{"kind":"letter","value":"B"}],
-   "want": {"won": false, "done": false, "mistakes": 1}},
-  {"name": "repeated right letter is ignored", "word": "cat",
-   "guesses": [{"kind":"letter","value":"C"},{"kind":"letter","value":"C"},{"kind":"letter","value":"A"}],
-   "want": {"won": false, "done": false, "mistakes": 0}},
-  {"name": "whole word rescues after a miss", "word": "cat",
-   "guesses": [{"kind":"letter","value":"B"},{"kind":"word","value":"cat"}],
-   "want": {"won": true, "done": true, "mistakes": 1}},
-  {"name": "whole word is case and space tolerant", "word": "cat",
-   "guesses": [{"kind":"word","value":"  cat "}],
-   "want": {"won": true, "done": true, "mistakes": 0}},
-  {"name": "wrong whole words cost a try each", "word": "cat",
-   "guesses": [{"kind":"word","value":"cot"},{"kind":"word","value":"cut"},{"kind":"word","value":"cap"},{"kind":"word","value":"can"},{"kind":"word","value":"car"},{"kind":"word","value":"cab"}],
-   "want": {"won": false, "done": true, "mistakes": 6}},
-  {"name": "one-letter whole-word guesses are charged every time", "word": "a",
-   "guesses": [{"kind":"word","value":"b"},{"kind":"word","value":"b"},{"kind":"word","value":"b"},{"kind":"word","value":"b"},{"kind":"word","value":"b"},{"kind":"word","value":"b"},{"kind":"word","value":"a"}],
-   "want": {"won": false, "done": true, "mistakes": 6}},
-  {"name": "one-letter word won by its letter", "word": "a",
-   "guesses": [{"kind":"letter","value":"B"},{"kind":"letter","value":"A"}],
-   "want": {"won": true, "done": true, "mistakes": 1}},
-  {"name": "blank whole-word submission is ignored", "word": "cat",
-   "guesses": [{"kind":"word","value":"   "},{"kind":"word","value":""},{"kind":"letter","value":"C"},{"kind":"letter","value":"A"},{"kind":"letter","value":"T"}],
-   "want": {"won": true, "done": true, "mistakes": 0}},
-  {"name": "guesses after a win are ignored", "word": "cat",
-   "guesses": [{"kind":"letter","value":"C"},{"kind":"letter","value":"A"},{"kind":"letter","value":"T"},{"kind":"letter","value":"Z"},{"kind":"letter","value":"Y"},{"kind":"letter","value":"X"},{"kind":"letter","value":"W"},{"kind":"letter","value":"V"},{"kind":"letter","value":"U"}],
-   "want": {"won": true, "done": true, "mistakes": 0}},
-  {"name": "guesses after a loss are ignored", "word": "cat",
-   "guesses": [{"kind":"letter","value":"B"},{"kind":"letter","value":"D"},{"kind":"letter","value":"E"},{"kind":"letter","value":"F"},{"kind":"letter","value":"G"},{"kind":"letter","value":"H"},{"kind":"word","value":"cat"}],
-   "want": {"won": false, "done": true, "mistakes": 6}},
-  {"name": "letters with repeats in the word need one guess each", "word": "cries",
-   "guesses": [{"kind":"letter","value":"C"},{"kind":"letter","value":"R"},{"kind":"letter","value":"I"},{"kind":"letter","value":"E"},{"kind":"letter","value":"S"}],
-   "want": {"won": true, "done": true, "mistakes": 0}},
-  {"name": "no guesses", "word": "cat", "guesses": [],
-   "want": {"won": false, "done": false, "mistakes": 0}}
+ {
+  "name": "all letters win",
+  "word": "cat",
+  "guesses": [
+   {
+    "kind": "letter",
+    "value": "C"
+   },
+   {
+    "kind": "letter",
+    "value": "A"
+   },
+   {
+    "kind": "letter",
+    "value": "T"
+   }
+  ],
+  "want": {
+   "won": true,
+   "done": true,
+   "mistakes": 0
+  }
+ },
+ {
+  "name": "six wrong letters lose",
+  "word": "cat",
+  "guesses": [
+   {
+    "kind": "letter",
+    "value": "B"
+   },
+   {
+    "kind": "letter",
+    "value": "D"
+   },
+   {
+    "kind": "letter",
+    "value": "E"
+   },
+   {
+    "kind": "letter",
+    "value": "F"
+   },
+   {
+    "kind": "letter",
+    "value": "G"
+   },
+   {
+    "kind": "letter",
+    "value": "H"
+   }
+  ],
+  "want": {
+   "won": false,
+   "done": true,
+   "mistakes": 6
+  }
+ },
+ {
+  "name": "five wrong letters is still open",
+  "word": "cat",
+  "guesses": [
+   {
+    "kind": "letter",
+    "value": "B"
+   },
+   {
+    "kind": "letter",
+    "value": "D"
+   },
+   {
+    "kind": "letter",
+    "value": "E"
+   },
+   {
+    "kind": "letter",
+    "value": "F"
+   },
+   {
+    "kind": "letter",
+    "value": "G"
+   }
+  ],
+  "want": {
+   "won": false,
+   "done": false,
+   "mistakes": 5
+  }
+ },
+ {
+  "name": "repeated wrong letter is ignored",
+  "word": "cat",
+  "guesses": [
+   {
+    "kind": "letter",
+    "value": "B"
+   },
+   {
+    "kind": "letter",
+    "value": "B"
+   },
+   {
+    "kind": "letter",
+    "value": "B"
+   },
+   {
+    "kind": "letter",
+    "value": "B"
+   },
+   {
+    "kind": "letter",
+    "value": "B"
+   },
+   {
+    "kind": "letter",
+    "value": "B"
+   },
+   {
+    "kind": "letter",
+    "value": "B"
+   }
+  ],
+  "want": {
+   "won": false,
+   "done": false,
+   "mistakes": 1
+  }
+ },
+ {
+  "name": "repeated right letter is ignored",
+  "word": "cat",
+  "guesses": [
+   {
+    "kind": "letter",
+    "value": "C"
+   },
+   {
+    "kind": "letter",
+    "value": "C"
+   },
+   {
+    "kind": "letter",
+    "value": "A"
+   }
+  ],
+  "want": {
+   "won": false,
+   "done": false,
+   "mistakes": 0
+  }
+ },
+ {
+  "name": "whole word rescues after a miss",
+  "word": "cat",
+  "guesses": [
+   {
+    "kind": "letter",
+    "value": "B"
+   },
+   {
+    "kind": "word",
+    "value": "cat"
+   }
+  ],
+  "want": {
+   "won": true,
+   "done": true,
+   "mistakes": 1
+  }
+ },
+ {
+  "name": "whole word is case and space tolerant",
+  "word": "cat",
+  "guesses": [
+   {
+    "kind": "word",
+    "value": "  cat "
+   }
+  ],
+  "want": {
+   "won": true,
+   "done": true,
+   "mistakes": 0
+  }
+ },
+ {
+  "name": "wrong whole words cost a try each",
+  "word": "cat",
+  "guesses": [
+   {
+    "kind": "word",
+    "value": "cot"
+   },
+   {
+    "kind": "word",
+    "value": "cut"
+   },
+   {
+    "kind": "word",
+    "value": "cap"
+   },
+   {
+    "kind": "word",
+    "value": "can"
+   },
+   {
+    "kind": "word",
+    "value": "car"
+   },
+   {
+    "kind": "word",
+    "value": "cab"
+   }
+  ],
+  "want": {
+   "won": false,
+   "done": true,
+   "mistakes": 6
+  }
+ },
+ {
+  "name": "one-letter whole-word guesses are charged every time",
+  "word": "a",
+  "guesses": [
+   {
+    "kind": "word",
+    "value": "b"
+   },
+   {
+    "kind": "word",
+    "value": "b"
+   },
+   {
+    "kind": "word",
+    "value": "b"
+   },
+   {
+    "kind": "word",
+    "value": "b"
+   },
+   {
+    "kind": "word",
+    "value": "b"
+   },
+   {
+    "kind": "word",
+    "value": "b"
+   },
+   {
+    "kind": "word",
+    "value": "a"
+   }
+  ],
+  "want": {
+   "won": false,
+   "done": true,
+   "mistakes": 6
+  }
+ },
+ {
+  "name": "one-letter word won by its letter",
+  "word": "a",
+  "guesses": [
+   {
+    "kind": "letter",
+    "value": "B"
+   },
+   {
+    "kind": "letter",
+    "value": "A"
+   }
+  ],
+  "want": {
+   "won": true,
+   "done": true,
+   "mistakes": 1
+  }
+ },
+ {
+  "name": "blank whole-word submission is ignored",
+  "word": "cat",
+  "guesses": [
+   {
+    "kind": "word",
+    "value": "   "
+   },
+   {
+    "kind": "word",
+    "value": ""
+   },
+   {
+    "kind": "letter",
+    "value": "C"
+   },
+   {
+    "kind": "letter",
+    "value": "A"
+   },
+   {
+    "kind": "letter",
+    "value": "T"
+   }
+  ],
+  "want": {
+   "won": true,
+   "done": true,
+   "mistakes": 0
+  }
+ },
+ {
+  "name": "guesses after a win are ignored",
+  "word": "cat",
+  "guesses": [
+   {
+    "kind": "letter",
+    "value": "C"
+   },
+   {
+    "kind": "letter",
+    "value": "A"
+   },
+   {
+    "kind": "letter",
+    "value": "T"
+   },
+   {
+    "kind": "letter",
+    "value": "Z"
+   },
+   {
+    "kind": "letter",
+    "value": "Y"
+   },
+   {
+    "kind": "letter",
+    "value": "X"
+   },
+   {
+    "kind": "letter",
+    "value": "W"
+   },
+   {
+    "kind": "letter",
+    "value": "V"
+   },
+   {
+    "kind": "letter",
+    "value": "U"
+   }
+  ],
+  "want": {
+   "won": true,
+   "done": true,
+   "mistakes": 0
+  }
+ },
+ {
+  "name": "guesses after a loss are ignored",
+  "word": "cat",
+  "guesses": [
+   {
+    "kind": "letter",
+    "value": "B"
+   },
+   {
+    "kind": "letter",
+    "value": "D"
+   },
+   {
+    "kind": "letter",
+    "value": "E"
+   },
+   {
+    "kind": "letter",
+    "value": "F"
+   },
+   {
+    "kind": "letter",
+    "value": "G"
+   },
+   {
+    "kind": "letter",
+    "value": "H"
+   },
+   {
+    "kind": "word",
+    "value": "cat"
+   }
+  ],
+  "want": {
+   "won": false,
+   "done": true,
+   "mistakes": 6
+  }
+ },
+ {
+  "name": "letters with repeats in the word need one guess each",
+  "word": "cries",
+  "guesses": [
+   {
+    "kind": "letter",
+    "value": "C"
+   },
+   {
+    "kind": "letter",
+    "value": "R"
+   },
+   {
+    "kind": "letter",
+    "value": "I"
+   },
+   {
+    "kind": "letter",
+    "value": "E"
+   },
+   {
+    "kind": "letter",
+    "value": "S"
+   }
+  ],
+  "want": {
+   "won": true,
+   "done": true,
+   "mistakes": 0
+  }
+ },
+ {
+  "name": "lowercase letter events are charged, not ignored",
+  "word": "cat",
+  "guesses": [
+   {
+    "kind": "letter",
+    "value": "b"
+   },
+   {
+    "kind": "letter",
+    "value": "d"
+   },
+   {
+    "kind": "letter",
+    "value": "e"
+   },
+   {
+    "kind": "letter",
+    "value": "f"
+   },
+   {
+    "kind": "letter",
+    "value": "g"
+   },
+   {
+    "kind": "letter",
+    "value": "h"
+   },
+   {
+    "kind": "letter",
+    "value": "C"
+   },
+   {
+    "kind": "letter",
+    "value": "A"
+   },
+   {
+    "kind": "letter",
+    "value": "T"
+   }
+  ],
+  "want": {
+   "won": false,
+   "done": true,
+   "mistakes": 6
+  }
+ },
+ {
+  "name": "a repeated lowercase letter is charged once",
+  "word": "cat",
+  "guesses": [
+   {
+    "kind": "letter",
+    "value": "b"
+   },
+   {
+    "kind": "letter",
+    "value": "b"
+   },
+   {
+    "kind": "letter",
+    "value": "C"
+   },
+   {
+    "kind": "letter",
+    "value": "A"
+   },
+   {
+    "kind": "letter",
+    "value": "T"
+   }
+  ],
+  "want": {
+   "won": true,
+   "done": true,
+   "mistakes": 1
+  }
+ },
+ {
+  "name": "no guesses",
+  "word": "cat",
+  "guesses": [],
+  "want": {
+   "won": false,
+   "done": false,
+   "mistakes": 0
+  }
+ }
 ]

@@ -28,7 +28,7 @@ for (const [name, bank] of [["words", data.words], ["sightWords", data.sightWord
   const grades = validateGrades(name, bank);
   if (grades.join() !== skillGrades.join()) throw new Error(`${name} grades ${grades} differ from skills grades ${skillGrades}`);
   for (const entry of Object.values(bank).flat()) {
-    if (!/^[a-z]+$/.test(entry.word)) throw new Error(`${name}: word ${js(entry.word)} must be lowercase a-z`);
+    if (typeof entry.word !== "string" || !/^[a-z]+$/.test(entry.word)) throw new Error(`${name}: word ${js(entry.word)} must be lowercase a-z`);
     if (name === "sightWords" && !Number.isInteger(entry.rank)) throw new Error(`sightWords: ${entry.word} needs an integer rank`);
   }
 }

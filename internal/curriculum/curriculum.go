@@ -153,6 +153,9 @@ func parse(raw []byte) (*Curriculum, error) {
 				if !wordShape.MatchString(w.Word) {
 					return fmt.Errorf("curriculum: word %q must be lowercase a-z with no spaces", w.Word)
 				}
+				if wantSkill == SightWordSkill && w.Rank <= 0 {
+					return fmt.Errorf("curriculum: sight word %q needs a positive rank", w.Word)
+				}
 				if wantSkill != "" {
 					w.Skill = wantSkill
 					words[i].Skill = wantSkill
@@ -256,6 +259,7 @@ func Replay(word string, guesses []Guess) Outcome {
 	}
 	target := strings.ToUpper(word)
 	revealed := map[byte]bool{}
+	seen := map[string]bool{}
 	allRevealed := func() bool {
 		for i := 0; i < len(target); i++ {
 			if !revealed[target[i]] {
@@ -270,15 +274,16 @@ func Replay(word string, guesses []Guess) Outcome {
 		}
 		switch g.Kind {
 		case GuessLetter:
-			if len(g.Value) != 1 || g.Value[0] < 'A' || g.Value[0] > 'Z' {
-				continue // the board and keyboard filter only produce A-Z
-			}
-			letter := g.Value[0]
-			if revealed[letter] {
+			// guessLetter ignores a value it has already seen and charges any
+			// value not in the word. A malformed value (lowercase, multi-char)
+			// can never match, so it is charged too: ignoring it would let a
+			// client relabel its wrong guesses and replay to a win.
+			if g.Value == "" || seen[g.Value] {
 				continue
 			}
-			revealed[letter] = true
-			if strings.IndexByte(target, letter) >= 0 {
+			seen[g.Value] = true
+			if len(g.Value) == 1 && g.Value[0] >= 'A' && g.Value[0] <= 'Z' && strings.IndexByte(target, g.Value[0]) >= 0 {
+				revealed[g.Value[0]] = true
 				if allRevealed() {
 					out.Won, out.Done = true, true
 				}
