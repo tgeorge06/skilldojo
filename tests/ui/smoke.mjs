@@ -117,6 +117,16 @@ try {
   await parent.locator("#spelling-results-heading").waitFor({ timeout: 5000 });
   await parent.getByText(/\+\d+ mosaic tiles/).locator("visible=true").waitFor({ timeout: 5000 });
   await expect(await parent.locator("text=You rescued 5 of 5").count() === 1, "server should agree all five were rescued");
+  await expect(await parent.locator("[aria-label='Kata touched by this round'] svg").count() >= 1, "results should reveal a creature");
+
+  // The index renders every creature and Train here starts a round.
+  await parent.getByRole("button", { name: /My kata/ }).click();
+  await parent.locator("#kata-heading").waitFor({ timeout: 5000 });
+  await parent.locator("ul[role=list] li svg").first().waitFor({ timeout: 5000 });
+  const cards = await parent.locator("ul[role=list] li").count();
+  await expect(cards === 10 || cards === 11, `grade tab should list its creatures, saw ${cards}`);
+  await parent.locator("ul[role=list] li").first().getByRole("button", { name: /Train here/ }).click();
+  await parent.locator("#spelling-word-heading, input[inputmode=numeric]").first().waitFor({ timeout: 5000 });
 } catch (err) {
   problems.push(`harness: ${err.message}`);
 } finally {

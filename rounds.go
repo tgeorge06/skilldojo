@@ -84,3 +84,29 @@ func writeProgressError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusInternalServerError, errors.New("something went wrong"))
 	}
 }
+
+// handleKataIndex returns the roster merged with the active child's state.
+func (s *server) handleKataIndex(w http.ResponseWriter, r *http.Request) {
+	child, ok := s.activeChild(w, r)
+	if !ok {
+		return
+	}
+	now := s.now()
+	prog, err := s.progress.Progress(r.Context(), child, now)
+	if err != nil {
+		writeProgressError(w, err)
+		return
+	}
+	missed, err := s.progress.MissedWords(r.Context(), child, now)
+	if err != nil {
+		writeProgressError(w, err)
+		return
+	}
+	idx, err := s.kata.Index(r.Context(), child, prog, len(missed), s.cur)
+	if err != nil {
+		writeProgressError(w, err)
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, idx)
+}

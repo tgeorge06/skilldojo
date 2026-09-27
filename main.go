@@ -23,6 +23,7 @@ import (
 	"github.com/tgeorge06/skilldojo/internal/account"
 	"github.com/tgeorge06/skilldojo/internal/curriculum"
 	"github.com/tgeorge06/skilldojo/internal/db"
+	"github.com/tgeorge06/skilldojo/internal/kata"
 	"github.com/tgeorge06/skilldojo/internal/mail"
 	"github.com/tgeorge06/skilldojo/internal/progress"
 	"github.com/tgeorge06/skilldojo/internal/sheet"
@@ -70,6 +71,8 @@ type server struct {
 	store    *sheet.Store
 	accounts *account.Store
 	progress *progress.Store
+	kata     *kata.Store
+	cur      *curriculum.Curriculum
 	mailer   mail.Mailer
 	tmpl     *template.Template
 	limiter  *rateLimiter
@@ -149,12 +152,21 @@ func newServer(cfg config, database *sql.DB, mailer mail.Mailer) (*server, error
 	if err != nil {
 		return nil, err
 	}
+	roster, err := kata.Load(cur)
+	if err != nil {
+		return nil, err
+	}
 	sheets := sheet.NewStore()
+	prog := progress.New(database, cur, sheets)
+	creatures := kata.New(database, roster)
+	prog.SetSink(creatures)
 	return &server{
 		cfg:      cfg,
 		store:    sheets,
 		accounts: account.New(database),
-		progress: progress.New(database, cur, sheets),
+		progress: prog,
+		kata:     creatures,
+		cur:      cur,
 		mailer:   mailer,
 		tmpl:     tmpl,
 		limiter:  newRateLimiter(),
@@ -184,6 +196,7 @@ func (s *server) handler() http.Handler {
 	mux.HandleFunc("POST /api/grade", s.handleGrade)
 	mux.HandleFunc("POST /api/round/start", s.handleRoundStart)
 	mux.HandleFunc("POST /api/round/finish", s.handleRoundFinish)
+	mux.HandleFunc("GET /api/kata/index", s.handleKataIndex)
 
 	mux.HandleFunc("GET /login", s.handleLoginPage)
 	mux.HandleFunc("POST /auth/magic", s.handleMagic)

@@ -53,6 +53,7 @@ type Store struct {
 	db     *sql.DB
 	cur    *curriculum.Curriculum
 	sheets *sheet.Store
+	sink   Sink
 }
 
 // New wraps the database, curriculum, and the in-memory sheet store the
@@ -95,16 +96,26 @@ type WordResult struct {
 	Mistakes int    `json:"mistakes"`
 }
 
-// Reward is everything a finished round earned. Creature and mosaic
-// bookkeeping consume it in later steps; this is the arithmetic.
+// Reward is everything a finished round earned. This is the arithmetic;
+// a Sink (the creature collection) records what it did in Creatures.
 type Reward struct {
-	Fills        int            `json:"fills"`          // creature energy
-	FillsBySkill map[string]int `json:"fills_by_skill"` // per skill id, for the creature bound to each
-	MosaicCells  int            `json:"mosaic_cells"`
-	BattleCredit bool           `json:"battle_credit"`
-	ReviewDue    int            `json:"review_due"` // words the child keeps missing
-	Evolved      []string       `json:"evolved"`    // skill ids that reached mastery in this round
+	Fills        int             `json:"fills"`          // creature energy
+	FillsBySkill map[string]int  `json:"fills_by_skill"` // per skill id, for the creature bound to each
+	MosaicCells  int             `json:"mosaic_cells"`
+	BattleCredit bool            `json:"battle_credit"`
+	ReviewDue    int             `json:"review_due"` // words the child keeps missing
+	Evolved      []string        `json:"evolved"`    // skill ids that reached mastery in this round
+	Creatures    json.RawMessage `json:"creatures,omitempty"`
 }
+
+// Sink is applied inside the finishing transaction, once per round, with
+// the ordered list of skills the round touched. It may annotate the reward.
+type Sink interface {
+	Apply(ctx context.Context, tx *sql.Tx, child Child, skills []string, reward *Reward, now time.Time) error
+}
+
+// SetSink registers the reward consumer.
+func (s *Store) SetSink(sink Sink) { s.sink = sink }
 
 // FinishResponse is returned to the client and stored verbatim so a retry
 // returns the identical payload.
@@ -586,6 +597,15 @@ func (s *Store) Finish(ctx context.Context, child Child, req FinishRequest, now 
 	resp.Reward.Evolved = evolved
 	if resp.Reward.ReviewDue, err = countMissed(ctx, tx, child, now); err != nil {
 		return FinishResponse{}, err
+	}
+	if s.sink != nil {
+		var skills []string
+		for _, it := range items {
+			skills = append(skills, it.skill)
+		}
+		if err := s.sink.Apply(ctx, tx, child, skills, &resp.Reward, now); err != nil {
+			return FinishResponse{}, err
+		}
 	}
 
 	encoded, err := json.Marshal(resp)
