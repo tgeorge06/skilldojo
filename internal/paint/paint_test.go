@@ -203,8 +203,22 @@ func TestKeyPageFillsEveryRegionSharingTheAnswer(t *testing.T) {
 	if err != nil || !res.Right || len(res.Filled) != want || res.Page.Filled != want {
 		t.Fatalf("right fill: %+v %v (want %d)", res, err, want)
 	}
-	if !res.Page.Regions[0].Filled || res.Page.Regions[0].Answer != answers[0] {
-		t.Fatalf("filled region should show its answer: %+v", res.Page.Regions[0])
+	if !res.Page.Regions[0].Filled || res.Page.Regions[0].Answer != answers[0] || res.Page.Regions[0].Color < 0 {
+		t.Fatalf("filled region should show its answer and color: %+v", res.Page.Regions[0])
+	}
+	// Distinct answers never share a color index; unfilled regions carry none.
+	seen := map[int]string{}
+	for _, r := range res.Page.Regions {
+		if !r.Filled {
+			if r.Color != -1 {
+				t.Fatalf("unfilled region leaks a color: %+v", r)
+			}
+			continue
+		}
+		if prev, ok := seen[r.Color]; ok && prev != r.Answer {
+			t.Fatalf("color %d shared by %q and %q", r.Color, prev, r.Answer)
+		}
+		seen[r.Color] = r.Answer
 	}
 	// Bad region index and cross-child access.
 	if _, err := e.paint.Fill(ctx, e.child, FillRequest{PageID: "page-0001", Idx: 99, Answer: "1"}, day0); !errors.Is(err, ErrBadRequest) {

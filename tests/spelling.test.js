@@ -261,15 +261,15 @@ test("the paint mixin draws the mosaic and lays out pages deterministically", ()
   const b = game.regionShape(3, 14, 123);
   assert.equal(a.path, b.path, "layout is a pure function of the seed");
   assert.notEqual(a.path, game.regionShape(3, 14, 124).path);
-  game.page = { regions: [{ idx: 0, filled: true, answer: "7" }, { idx: 1, filled: true, answer: "7" }, { idx: 2, filled: false }] };
+  game.page = { regions: [{ idx: 0, filled: true, answer: "7", color: 1 }, { idx: 1, filled: true, answer: "7", color: 1 }, { idx: 2, filled: false, color: -1 }] };
   assert.equal(JSON.stringify(game.pageLegend().map((l) => l.answer)), JSON.stringify(["7"]));
   assert.equal(game.regionColor(game.page.regions[1]), game.pageLegend()[0].color);
   assert.equal(game.regionColor(game.page.regions[2]), "");
-  // Colors are a pure function of the answer, so solving more never recolors.
+  // Colors come from the server's per-answer index, so solving more never recolors.
   const before = game.regionColor(game.page.regions[0]);
-  game.page.regions[2] = { idx: 2, filled: true, answer: "12" };
+  game.page.regions[2] = { idx: 2, filled: true, answer: "12", color: 0 };
   assert.equal(game.regionColor(game.page.regions[0]), before);
-  assert.notEqual(game.answerColor("7"), game.answerColor("8"));
+  assert.notEqual(game.regionColor(game.page.regions[2]), before);
   game.child = null;
   game.startCooldown();
   assert.notEqual(game.view, "cooldown", "anonymous play never enters cooldown");

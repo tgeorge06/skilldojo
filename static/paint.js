@@ -103,29 +103,25 @@ function paintMixin() {
         this.pageBusy = false;
       }
     },
-    // Each answer owns a stable color derived from the answer itself, so a
-    // region never changes color when another answer is solved later.
     pagePalette() {
       return ["#ef476f", "#ffd166", "#06d6a0", "#3a86ff", "#7b5cff", "#f4a261", "#8ecae6", "#8fd694",
         "#ffb4a2", "#c7b8ff", "#a0f0e0", "#f2e94e", "#e76f51", "#2a9d8f", "#e9c46a", "#264653",
         "#b5179e", "#4cc9f0", "#90be6d", "#f8961e", "#577590", "#f9c74f", "#43aa8b", "#9d4edd"];
     },
-    answerColor(answer) {
-      let h = 0;
-      for (const ch of String(answer)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    // The server assigns each distinct answer on the page its own palette
+    // index (by sorted answer), so colors are stable and never collide.
+    regionColor(r) {
+      if (!r.filled || r.color === undefined || r.color < 0) return "";
       const palette = this.pagePalette();
-      return palette[h % palette.length];
+      return palette[r.color % palette.length];
     },
     pageLegend() {
       if (!this.page) return [];
-      const seen = [];
+      const seen = new Map();
       for (const r of this.page.regions) {
-        if (r.filled && r.answer && !seen.includes(r.answer)) seen.push(r.answer);
+        if (r.filled && r.answer && !seen.has(r.answer)) seen.set(r.answer, this.regionColor(r));
       }
-      return seen.map((answer) => ({ answer, color: this.answerColor(answer) }));
-    },
-    regionColor(r) {
-      return r.filled && r.answer ? this.answerColor(r.answer) : "";
+      return [...seen.entries()].map(([answer, color]) => ({ answer, color }));
     },
     // Regions are laid out as a mandala of wedges around a center, seeded
     // by the page so every page looks a little different.

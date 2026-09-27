@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"math/rand/v2"
+	"sort"
 	"strings"
 	"time"
 
@@ -197,6 +198,7 @@ type Region struct {
 	Op     string `json:"op"`
 	Filled bool   `json:"filled"`
 	Answer string `json:"answer,omitempty"` // only once filled
+	Color  int    `json:"color"`            // stable palette index per distinct answer; -1 until filled
 }
 
 // Page is a key page as the client renders it.
@@ -313,16 +315,39 @@ func (s *Store) page(ctx context.Context, child progress.Child, pageID string) (
 		return Page{}, fmt.Errorf("%w: this page has expired, start a new one", ErrBadRequest)
 	}
 	key := sh.Answers()
+	colors := colorIndex(key)
 	for i, q := range sh.Questions {
-		r := Region{Idx: i, Prompt: q.Prompt, Op: q.Op, Filled: mask&(1<<i) != 0}
+		r := Region{Idx: i, Prompt: q.Prompt, Op: q.Op, Filled: mask&(1<<i) != 0, Color: -1}
 		if r.Filled {
 			r.Answer = key[i]
+			r.Color = colors[key[i]]
 			p.Filled++
 		}
 		p.Regions = append(p.Regions, r)
 	}
 	p.Done = p.Filled == p.Total
 	return p, nil
+}
+
+// colorIndex gives every distinct answer on the page its own palette index,
+// assigned by sorted answer so it is stable for the life of the page and
+// two different answers never share a color (a page has at most 24
+// regions, so at most 24 distinct answers).
+func colorIndex(answers []string) map[string]int {
+	distinct := map[string]bool{}
+	for _, a := range answers {
+		distinct[a] = true
+	}
+	sorted := make([]string, 0, len(distinct))
+	for a := range distinct {
+		sorted = append(sorted, a)
+	}
+	sort.Strings(sorted)
+	out := map[string]int{}
+	for i, a := range sorted {
+		out[a] = i
+	}
+	return out
 }
 
 // FillRequest is one attempt at one region.
@@ -368,6 +393,8 @@ func (s *Store) Fill(ctx context.Context, child progress.Child, req FillRequest,
 		return FillResponse{}, err
 	}
 	if done.Valid {
+		// Release the transaction's connection before reading through the pool.
+		tx.Rollback()
 		p, err := s.page(ctx, child, req.PageID)
 		return FillResponse{Filled: []int{}, Page: p}, err
 	}
@@ -413,8 +440,9 @@ func (s *Store) Fill(ctx context.Context, child progress.Child, req FillRequest,
 	if finished {
 		var c completed
 		key := sh.Answers()
+		colors := colorIndex(key)
 		for i, q := range sh.Questions {
-			c.Regions = append(c.Regions, Region{Idx: i, Prompt: q.Prompt, Op: q.Op, Filled: true, Answer: key[i]})
+			c.Regions = append(c.Regions, Region{Idx: i, Prompt: q.Prompt, Op: q.Op, Filled: true, Answer: key[i], Color: colors[key[i]]})
 		}
 		encoded, err := json.Marshal(c)
 		if err != nil {
