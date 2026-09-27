@@ -78,6 +78,9 @@ run `make serve` on a trusted network (home Wi-Fi behind your router). Use
   covered by automated tests.
 - After changing templates or Tailwind classes: `npm install` once, then
   `make css` to rebuild `static/app.css`.
+- The spelling curriculum lives in `internal/curriculum/spelling.json`.
+  `static/words.js` is generated from it: edit the JSON, then `make words`.
+  CI fails if the generated file is stale.
 - On macOS, `make audio` regenerates the spelling audio set with the local
   Samantha voice. This development-only task also requires `ffmpeg`; the app
   itself has no audio dependency or runtime speech-processing cost.

@@ -22,5 +22,7 @@ jobs:
           node-version: "22"
       - run: npm ci
       - run: npm test
+      # Verify the committed words.js matches the curriculum JSON.
+      - run: node scripts/generate-words.js --check
       - run: ./node_modules/.bin/tailwindcss -i input.css -o static/app.css --minify
       - run: git diff --exit-code static/app.css

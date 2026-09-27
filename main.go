@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/tgeorge06/skilldojo/internal/curriculum"
 	"github.com/tgeorge06/skilldojo/internal/sheet"
 )
 
@@ -40,6 +41,12 @@ func main() {
 
 	staticFiles, err := fs.Sub(staticFS, "static")
 	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Fail fast if the embedded curriculum is malformed; the server will grade
+	// spelling rounds against it once accounts land.
+	if _, err := curriculum.Load(); err != nil {
 		log.Fatal(err)
 	}
 

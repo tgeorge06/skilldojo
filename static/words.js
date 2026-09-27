@@ -1,3 +1,6 @@
+// GENERATED FILE — do not edit. Source: internal/curriculum/spelling.json.
+// Regenerate with `make words`.
+//
 // SkillDojo's spelling curriculum is organized by teachable patterns instead
 // of word length alone. Each focus contains at least five words so it can power
 // a complete focused session; ten-word sessions add mixed review words.
