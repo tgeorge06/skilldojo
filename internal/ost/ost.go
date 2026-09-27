@@ -255,7 +255,9 @@ func pick[T any](r *rand.Rand, xs []T) T   { return xs[r.IntN(len(xs))] }
 func between(r *rand.Rand, lo, hi int) int { return lo + r.IntN(hi-lo+1) }
 
 // choices builds a choice item with the correct answer placed at a random
-// index and distractors deduplicated against it.
+// index. Distractors are deduplicated against the answer and each other
+// and the first three distinct ones are used, so a template whose
+// distractors can collide at edge values may pass extra candidates.
 func choices(r *rand.Rand, prompt, correct string, distractors []string, explanation string) Item {
 	seen := map[string]bool{correct: true}
 	var ds []string
@@ -265,8 +267,10 @@ func choices(r *rand.Rand, prompt, correct string, distractors []string, explana
 			ds = append(ds, d)
 		}
 	}
-	for len(ds) < 3 {
-		ds = append(ds, fmt.Sprintf("%s ", ds[len(ds)-1])) // pathological; templates supply 3 distinct distractors
+	if len(ds) < 3 {
+		// Templates must supply three distinct distractors; the tests
+		// build many seeds per grade to prove they do.
+		panic(fmt.Sprintf("ost: item %q has only %d distinct distractors", prompt, len(ds)))
 	}
 	ds = ds[:3]
 	pos := r.IntN(4)

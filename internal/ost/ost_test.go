@@ -71,7 +71,7 @@ func TestBuildCoversBlueprintAndIsDeterministic(t *testing.T) {
 
 func TestManySeedsProduceValidItems(t *testing.T) {
 	for grade := 3; grade <= 5; grade++ {
-		for seed := uint64(1); seed <= 60; seed++ {
+		for seed := uint64(1); seed <= 300; seed++ {
 			items, err := Build(grade, seed)
 			if err != nil {
 				t.Fatal(err)
@@ -83,6 +83,7 @@ func TestManySeedsProduceValidItems(t *testing.T) {
 				if it.Type != TypeNumber {
 					seen := map[string]bool{}
 					for _, c := range it.Choices {
+						c = strings.TrimSpace(c)
 						if seen[c] {
 							t.Fatalf("grade %d seed %d %s duplicate choice %q", grade, seed, it.Standard, c)
 						}

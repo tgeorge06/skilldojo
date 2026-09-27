@@ -836,7 +836,8 @@ func TestPracticeTestEndpoints(t *testing.T) {
 		t.Fatalf("in-progress row: %s", snippet(page))
 	}
 
-	res, page = e.postJSON(t, c, "/api/ost/submit", fmt.Sprintf(`{"attempt_id":%q}`, a.ID))
+	res, graded := e.postJSON(t, c, "/api/ost/submit", fmt.Sprintf(`{"attempt_id":%q}`, a.ID))
+	page = graded
 	if res.StatusCode != http.StatusOK || !strings.Contains(page, `"report":{`) || !strings.Contains(page, `"level":"`) || !strings.Contains(page, `"categories":[`) {
 		t.Fatalf("submit: %d %s", res.StatusCode, snippet(page))
 	}
@@ -846,8 +847,8 @@ func TestPracticeTestEndpoints(t *testing.T) {
 		t.Fatalf("answer after submit: %d %s", res.StatusCode, page)
 	}
 	res, page2 := e.postJSON(t, c, "/api/ost/submit", fmt.Sprintf(`{"attempt_id":%q}`, a.ID))
-	if res.StatusCode != http.StatusOK || page2 != page[:0]+page2 && !strings.Contains(page2, `"finished_at"`) {
-		t.Fatalf("second submit: %d", res.StatusCode)
+	if res.StatusCode != http.StatusOK || page2 != graded {
+		t.Fatalf("second submit should return the stored report unchanged: %d\n%s\n%s", res.StatusCode, snippet(graded), snippet(page2))
 	}
 
 	// Parent report: history row, focus areas, and the item review page.

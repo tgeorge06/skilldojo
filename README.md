@@ -66,6 +66,18 @@ play. The 176 deduplicated recordings keep playback fast on low-end devices.
 The research basis, content criteria, data roadmap, and educator-review status
 are documented in [docs/spelling-curriculum.md](docs/spelling-curriculum.md).
 
+### Practice tests (parents)
+
+Signed-in parents can start a full-length **Ohio State Test style math
+practice test** (40 original questions, grades 3–5) for a child from
+`/family/tests`. Answers save as the child goes, so a closed tab resumes;
+attempts are unlimited. Each attempt is graded with a percent, per-category
+and per-standard tallies, and an estimated Ohio performance level (Limited to
+Advanced) that is a rough guide only. The parent report shows every attempt,
+a score trend, and areas needing improvement that link straight to the
+matching dojo drill. Items follow the published blueprint category weights
+and are original, not released test questions.
+
 ## Play from a tablet on the same Wi-Fi
 
 ```sh

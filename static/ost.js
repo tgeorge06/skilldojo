@@ -13,7 +13,9 @@ function ostTest() {
     saveState: "",
     busy: false,
     error: "",
-    saveTimer: null,
+    // One debounce timer per item, so moving on to the next question
+    // never cancels the previous answer's save.
+    saveTimers: {},
 
     async start() {
       try {
@@ -75,20 +77,30 @@ function ostTest() {
       this.queueSave(id);
     },
     queueSave(id) {
-      clearTimeout(this.saveTimer);
+      clearTimeout(this.saveTimers[id]);
       this.saveState = "Saving…";
-      this.saveTimer = setTimeout(() => this.save(id), 400);
+      this.saveTimers[id] = setTimeout(() => this.save(id), 400);
     },
     async save(id) {
+      clearTimeout(this.saveTimers[id]);
+      delete this.saveTimers[id];
       const a = this.answers[id] || {};
       try {
         await this.post("/api/ost/answer", { attempt_id: this.attemptId, item_id: id, choices: a.choices || [], text: a.text || "" });
-        this.saveState = "Saved";
+        if (Object.keys(this.saveTimers).length === 0) this.saveState = "Saved";
         this.error = "";
+        return true;
       } catch (err) {
         this.saveState = "";
         this.error = "Could not save that answer: " + err.message;
+        return false;
       }
+    },
+    // flush sends every answer still waiting on its debounce.
+    async flush() {
+      const pending = Object.keys(this.saveTimers);
+      const results = await Promise.all(pending.map((id) => this.save(id)));
+      return results.every(Boolean);
     },
     prev() {
       if (this.index > 0) this.index -= 1;
@@ -101,8 +113,8 @@ function ostTest() {
     async submit() {
       if (this.busy) return;
       this.busy = true;
-      clearTimeout(this.saveTimer);
       try {
+        if (!(await this.flush())) return; // the error is already on screen
         const a = await this.post("/api/ost/submit", { attempt_id: this.attemptId });
         this.load(a);
         window.scrollTo({ top: 0 });

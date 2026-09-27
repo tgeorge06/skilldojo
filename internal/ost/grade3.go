@@ -40,6 +40,9 @@ func init() {
 		}},
 		Template{md, "3.OA.6", 2, func(r *rand.Rand) Item {
 			a, b := between(r, 2, 9), between(r, 2, 9)
+			for b == a { // a × a would duplicate the correct fact
+				b = between(r, 2, 9)
+			}
 			return choices(r, fmt.Sprintf("Which multiplication fact can be used to solve %d ÷ %d?", a*b, a),
 				fmt.Sprintf("%d × %d = %d", a, b, a*b), []string{fmt.Sprintf("%d × %d = %d", a, a, a*a), fmt.Sprintf("%d + %d = %d", a, b, a+b), fmt.Sprintf("%d × %d = %d", a*b, a, a*b*a)},
 				"Division is the unknown-factor problem: a × ? = the dividend.")
@@ -73,7 +76,7 @@ func init() {
 			n := between(r, 150, 949)
 			rounded := ((n + 50) / 100) * 100
 			return choices(r, fmt.Sprintf("Which number is %d rounded to the nearest hundred?", n),
-				itoa(rounded), []string{itoa(((n + 5) / 10) * 10), itoa(rounded + 100), itoa(rounded - 100)},
+				itoa(rounded), []string{itoa(((n + 5) / 10) * 10), itoa(rounded + 100), itoa(rounded - 100), itoa(rounded + 50)},
 				fmt.Sprintf("Look at the tens digit of %d to decide whether to round up or down.", n))
 		}},
 		Template{no, "3.NBT.2", 1, func(r *rand.Rand) Item {
@@ -108,7 +111,7 @@ func init() {
 			d := pick(r, []int{2, 3, 4, 6, 8})
 			n := between(r, 1, d-1)
 			return choices(r, fmt.Sprintf("A pizza is cut into %d equal slices. %s eats %d of them. What fraction of the pizza is that?", d, pick(r, names), n),
-				frac(n, d), []string{frac(d, n), frac(n, d+1), frac(d-n, d)}, fmt.Sprintf("%d of %d equal parts is %s.", n, d, frac(n, d)))
+				frac(n, d), []string{frac(d, n), frac(n, d+1), frac(n, d-1)}, fmt.Sprintf("%d of %d equal parts is %s.", n, d, frac(n, d)))
 		}},
 		Template{fr, "3.NF.2", 2, func(r *rand.Rand) Item {
 			d := pick(r, []int{2, 3, 4, 6, 8})
@@ -135,7 +138,7 @@ func init() {
 				"With the same denominator, the fraction with more parts is greater.")
 		}},
 		Template{fr, "3.NF.3", 1, func(r *rand.Rand) Item {
-			d := pick(r, []int{2, 3, 4, 5, 6, 8})
+			d := pick(r, []int{3, 4, 5, 6, 8})
 			return choices(r, "Which fraction is equal to 1 whole?", frac(d, d), []string{frac(1, d), frac(d, 1), frac(d-1, d)}, "A fraction with the same numerator and denominator equals 1.")
 		}},
 		Template{fr, "3.NF.3", 2, func(r *rand.Rand) Item {

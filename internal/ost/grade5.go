@@ -20,7 +20,7 @@ func init() {
 		}},
 		Template{fr, "5.NF.1", 2, func(r *rand.Rand) Item {
 			d1, d2 := 2, pick(r, []int{3, 5, 8})
-			n2 := between(r, 1, d2/2)
+			n2 := between(r, 1, (d2-1)/2) // strictly less than one half, so the difference is positive
 			return numeric(fmt.Sprintf("%s − %s = ?  (Give your answer as a fraction.)", frac(1, d1), frac(n2, d2)), simplify(d2-2*n2, 2*d2), "Use a common denominator, then subtract the numerators.")
 		}},
 		Template{fr, "5.NF.2", 3, func(r *rand.Rand) Item {
@@ -85,8 +85,11 @@ func init() {
 			return choices(r, "Which comparison is true?", fmt.Sprintf("%s < %s", dec(a, 2), dec(b, 3)), []string{fmt.Sprintf("%s > %s", dec(a, 2), dec(b, 3)), fmt.Sprintf("%s = %s", dec(a, 2), dec(b, 3)), fmt.Sprintf("%s < %s", dec(b, 3), dec(a, 2))}, "Line up the decimal points and compare place by place.")
 		}},
 		Template{de, "5.NBT.4", 1, func(r *rand.Rand) Item {
-			v := float64(between(r, 1005, 9995)) / 1000
-			return numeric(fmt.Sprintf("Round %s to the nearest hundredth.", dec(v, 3)), dec(roundTo(v, 2), 2), "Look at the thousandths digit.")
+			// Work in thousandths as integers so the key never suffers from
+			// binary rounding (1.005 must round to 1.01).
+			th := between(r, 1005, 9995)
+			hund := (th + 5) / 10
+			return numeric(fmt.Sprintf("Round %d.%03d to the nearest hundredth.", th/1000, th%1000), fmt.Sprintf("%d.%02d", hund/100, hund%100), "Look at the thousandths digit.")
 		}},
 		Template{de, "5.NBT.5", 2, func(r *rand.Rand) Item {
 			a, b := between(r, 123, 987), between(r, 12, 49)
@@ -125,6 +128,9 @@ func init() {
 		}},
 		Template{ge, "5.G.1", 1, func(r *rand.Rand) Item {
 			x, y := between(r, 1, 9), between(r, 1, 9)
+			for y == x { // (x, y) and (y, x) must differ
+				y = between(r, 1, 9)
+			}
 			return choices(r, fmt.Sprintf("A point is %d units to the right of the origin and %d units up. What are its coordinates?", x, y), fmt.Sprintf("(%d, %d)", x, y), []string{fmt.Sprintf("(%d, %d)", y, x), fmt.Sprintf("(%d, %d)", x, y+1), fmt.Sprintf("(%d, %d)", x+y, 0)}, "Coordinates are written (x, y): right first, then up.")
 		}},
 		Template{ge, "5.G.2", 2, func(r *rand.Rand) Item {
@@ -155,7 +161,8 @@ func init() {
 			return numeric(fmt.Sprintf("A solid is made of two rectangular prisms: one %d × %d × %d and one %d × %d × %d. What is its total volume in cubic units?", a, b, c, a, b, c+1), itoa(a*b*c+a*b*(c+1)), "Add the volumes of the two prisms.")
 		}},
 		Template{ge, "5.OA.3", 2, func(r *rand.Rand) Item {
-			s1, s2 := between(r, 2, 5), between(r, 2, 5)*2
+			s1 := between(r, 2, 5)
+			s2 := s1 * between(r, 2, 4) // always a whole-number multiple, so the ratio is exact
 			return choices(r, fmt.Sprintf("Pattern A adds %d each time starting at 0. Pattern B adds %d each time starting at 0. How does each term of B compare with A?", s1, s2), fmt.Sprintf("B is %d times A", s2/s1), []string{fmt.Sprintf("B is %d more than A", s2-s1), "B is half of A", "They are equal"}, fmt.Sprintf("%d is %d times %d, so every term of B is %d times the matching term of A.", s2, s2/s1, s1, s2/s1))
 		}},
 	)
@@ -188,12 +195,4 @@ func expandedWrong(v float64, kind int) string {
 	default:
 		return whole + " + 0." + t + " + 0." + h
 	}
-}
-
-func roundTo(v float64, places int) float64 {
-	p := 1.0
-	for i := 0; i < places; i++ {
-		p *= 10
-	}
-	return float64(int64(v*p+0.5)) / p
 }

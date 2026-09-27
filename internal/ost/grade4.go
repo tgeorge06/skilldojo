@@ -45,7 +45,7 @@ func init() {
 					wrong = append(wrong, itoa(d))
 				}
 			}
-			return choices(r, fmt.Sprintf("Which number is a factor of %d?", n), correct, wrong, fmt.Sprintf("%d divides %d with no remainder.", 1, n))
+			return choices(r, fmt.Sprintf("Which number is a factor of %d?", n), correct, wrong, fmt.Sprintf("%s divides %d with no remainder.", correct, n))
 		}},
 		Template{md, "4.OA.4", 1, func(r *rand.Rand) Item {
 			return multi("Which numbers are prime?", []string{"7", "9", "13", "15", "2"}, []int{0, 2, 4}, "A prime number has exactly two factors: 1 and itself.")
