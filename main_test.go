@@ -706,6 +706,10 @@ func TestTimesTablesSheetsAndRounds(t *testing.T) {
 	if res.StatusCode != http.StatusBadRequest {
 		t.Fatalf("table 1 accepted: %d", res.StatusCode)
 	}
+	res, _ = e.postJSON(t, anon, "/api/sheet", `{"ops":["addsub"],"grade":3,"count":10,"table":7}`)
+	if res.StatusCode != http.StatusBadRequest {
+		t.Fatalf("table field outside table mode accepted: %d", res.StatusCode)
+	}
 
 	c := e.signIn(t, "p@example.com")
 	e.postForm(t, c, "/family/children", url.Values{"nickname": {"Nova"}, "grade": {"3"}}).Body.Close()

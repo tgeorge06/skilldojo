@@ -311,6 +311,8 @@ func (s *server) handleNewSheet(w http.ResponseWriter, r *http.Request) {
 	var err error
 	if isTables(req.Ops) {
 		sh, err = sheet.GenerateTable(req.Table, req.Count, req.Ordered, req.Grade)
+	} else if req.Table != 0 || req.Ordered {
+		err = errors.New(`table and ordered apply only when ops is ["tables"]`)
 	} else {
 		sh, err = sheet.Generate(req.Ops, req.Grade, req.Count)
 	}

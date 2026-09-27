@@ -84,12 +84,15 @@ function dojo() {
       // Times tables is a mode of its own: it cannot mix with other operations.
       if (id === "tables") {
         this.ops = this.ops.includes("tables") ? [] : ["tables"];
-        if (this.ops.length && ![12, 24].includes(this.count)) this.count = 12;
-        return;
+      } else {
+        const without = this.ops.filter((o) => o !== id && o !== "tables");
+        this.ops = this.ops.includes(id) ? without : [...without, id];
       }
-      const without = this.ops.filter((o) => o !== id && o !== "tables");
-      this.ops = this.ops.includes(id) ? without : [...without, id];
-      if (this.ops.length && ![10, 20, 30].includes(this.count)) this.count = 10;
+      this.normalizeCount();
+    },
+    // Keep the count on the current mode's list after any mode change.
+    normalizeCount() {
+      if (!this.countChoices().includes(this.count)) this.count = this.countChoices()[0];
     },
     tablesMode() {
       return this.ops.length === 1 && this.ops[0] === "tables";

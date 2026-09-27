@@ -201,6 +201,9 @@ func (s *Store) Start(ctx context.Context, child Child, req StartRequest, now ti
 	}
 	var resp StartResponse
 	var err error
+	if req.Kind == KindSpelling && (req.Table != 0 || req.Ordered || len(req.Ops) > 0) {
+		return StartResponse{}, fmt.Errorf("%w: ops, table, and ordered apply to math rounds only", ErrBadRequest)
+	}
 	switch req.Kind {
 	case KindSpelling:
 		resp, err = s.startSpelling(ctx, child, req, now)
@@ -450,6 +453,8 @@ func (s *Store) startMath(ctx context.Context, child Child, req StartRequest, no
 	if len(req.Ops) == 1 && req.Ops[0] == "tables" {
 		sh, err = sheet.GenerateTable(req.Table, req.Count, req.Ordered, req.Grade)
 		focus = fmt.Sprintf("tables:%d", req.Table)
+	} else if req.Table != 0 || req.Ordered {
+		err = errors.New(`table and ordered apply only when ops is ["tables"]`)
 	} else {
 		sh, err = sheet.Generate(req.Ops, req.Grade, req.Count)
 	}
@@ -714,7 +719,7 @@ func missedBefore(ctx context.Context, tx *sql.Tx, child Child, items []itemRow,
 	rows, err := tx.QueryContext(ctx,
 		`SELECT item_key FROM (
 		   SELECT item_key, correct,
-		          ROW_NUMBER() OVER (PARTITION BY item_key ORDER BY answered_at DESC) AS rn
+		          ROW_NUMBER() OVER (PARTITION BY item_key ORDER BY answered_at DESC, round_id DESC, idx DESC) AS rn
 		   FROM round_items
 		   WHERE child_id = ? AND account_id = ? AND answered_at > ? AND correct IS NOT NULL
 		     AND item_key IN (`+strings.Join(placeholders, ",")+`)
@@ -750,7 +755,7 @@ func missedWords(ctx context.Context, q queryer, child Child, now time.Time) ([]
 	rows, err := q.QueryContext(ctx,
 		`SELECT item_key, skill_id FROM (
 		   SELECT item_key, skill_id, correct,
-		          ROW_NUMBER() OVER (PARTITION BY item_key ORDER BY answered_at DESC) AS rn,
+		          ROW_NUMBER() OVER (PARTITION BY item_key ORDER BY answered_at DESC, round_id DESC, idx DESC) AS rn,
 		          SUM(CASE WHEN correct = 0 THEN 1 ELSE 0 END) OVER (PARTITION BY item_key) AS misses
 		   FROM round_items
 		   WHERE child_id = ? AND account_id = ? AND answered_at > ? AND correct IS NOT NULL
@@ -785,7 +790,7 @@ func (s *Store) MissedCount(ctx context.Context, child Child, now time.Time) (in
 	err := s.db.QueryRowContext(ctx,
 		`SELECT COUNT(*) FROM (
 		   SELECT item_key, correct,
-		          ROW_NUMBER() OVER (PARTITION BY item_key ORDER BY answered_at DESC) AS rn,
+		          ROW_NUMBER() OVER (PARTITION BY item_key ORDER BY answered_at DESC, round_id DESC, idx DESC) AS rn,
 		          SUM(CASE WHEN correct = 0 THEN 1 ELSE 0 END) OVER (PARTITION BY item_key) AS misses
 		   FROM round_items
 		   WHERE child_id = ? AND account_id = ? AND answered_at > ? AND correct IS NOT NULL
