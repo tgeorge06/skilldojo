@@ -60,7 +60,7 @@ try {
   await expect(await page.locator("text=Parents").count() === 1, "anonymous header should link to /login");
   await page.getByRole("button", { name: /Math/ }).click();
   await page.getByRole("button", { name: /Start math training/ }).click();
-  const answers = page.locator("input[inputmode=numeric]");
+  const answers = page.locator("input[inputmode=numeric]:visible");
   await answers.first().waitFor({ timeout: 5000 });
   const answerCount = await answers.count();
   await expect(answerCount === 10, `math sheet should show 10 inputs, saw ${answerCount}`);
@@ -125,8 +125,41 @@ try {
   await parent.locator("ul[role=list] li svg").first().waitFor({ timeout: 5000 });
   const cards = await parent.locator("ul[role=list] li").count();
   await expect(cards === 10 || cards === 11, `grade tab should list its creatures, saw ${cards}`);
+  await expect(await parent.locator("[aria-label^='This week']").count() === 1, "the index should show this week's mosaic");
   await parent.locator("ul[role=list] li").first().getByRole("button", { name: /Train here/ }).click();
   await parent.locator("#spelling-word-heading, input[inputmode=numeric]").first().waitFor({ timeout: 5000 });
+
+  // Color by number: open a page, pick a region, answer wrong, see it wait.
+  await parent.goto(base + "/");
+  await parent.getByRole("button", { name: /Math/ }).click();
+  await parent.getByRole("button", { name: /Color by number/ }).click();
+  await parent.locator("#paint-heading").waitFor({ timeout: 5000 });
+  const regions = await parent.locator("svg[aria-label='Color by number page'] g[role=button]").count();
+  await expect(regions === 14, `grade-2 page should have 14 regions, saw ${regions}`);
+  await parent.locator("svg[aria-label='Color by number page'] g[role=button]").first().click();
+  await parent.fill("#paint-answer", "999999");
+  await parent.getByRole("button", { name: /Color it/ }).click();
+  await parent.locator("text=Not yet").waitFor({ timeout: 5000 });
+
+  // Cooldown painting after a lost round needs no server.
+  await parent.goto(base + "/");
+  await parent.getByRole("button", { name: /Spelling/ }).click();
+  await parent.getByRole("button", { name: /Start word rescue/ }).click();
+  await parent.locator("#spelling-word-heading").waitFor({ timeout: 5000 });
+  for (let i = 0; i < 5; i += 1) {
+    for (let k = 0; k < 6; k += 1) {
+      await parent.fill("#whole-word", "zzzz");
+      await parent.getByRole("button", { name: /Rescue word/ }).click();
+    }
+    await parent.locator("#next-spelling-button").click();
+  }
+  await parent.locator("#spelling-results-heading").waitFor({ timeout: 5000 });
+  await parent.getByRole("button", { name: /Paint to relax/ }).click();
+  await parent.locator("#cooldown-heading").waitFor({ timeout: 5000 });
+  const spot = parent.locator("[x-html='cooldownSVG()'] [data-region='0']");
+  await spot.dispatchEvent("click");
+  const painted = await spot.getAttribute("fill");
+  await expect(painted === "#ef476f", `first spot should take the first color, got ${painted}`);
 } catch (err) {
   problems.push(`harness: ${err.message}`);
 } finally {

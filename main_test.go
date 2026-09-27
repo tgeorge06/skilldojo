@@ -554,6 +554,65 @@ func TestKataIndexEndpoint(t *testing.T) {
 	}
 }
 
+func TestPaintEndpoints(t *testing.T) {
+	e := newTestEnv(t)
+	anon := e.client(t)
+	res, _ := anon.Get(e.srv.URL + "/api/mosaic/week")
+	if body(t, res); res.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("anonymous mosaic: %d", res.StatusCode)
+	}
+	c := e.signIn(t, "p@example.com")
+	e.postForm(t, c, "/family/children", url.Values{"nickname": {"Nova"}, "grade": {"2"}}).Body.Close()
+
+	res, _ = c.Get(e.srv.URL + "/api/mosaic/week")
+	page := body(t, res)
+	if res.StatusCode != http.StatusOK || !strings.Contains(page, `"revealed":0`) || !strings.Contains(page, `"total":400`) {
+		t.Fatalf("mosaic week: %d %s", res.StatusCode, page[:200])
+	}
+
+	res, page = e.postJSON(t, c, "/api/paint/page", `{"page_id":"paint-page-1","ops":["addsub"],"grade":2}`)
+	if res.StatusCode != http.StatusOK || !strings.Contains(page, `"total":14`) || strings.Contains(page, `"answer"`) {
+		t.Fatalf("page start: %d %s", res.StatusCode, page)
+	}
+	res, page = e.postJSON(t, c, "/api/paint/fill", `{"page_id":"paint-page-1","idx":0,"answer":"nope"}`)
+	if res.StatusCode != http.StatusOK || !strings.Contains(page, `"right":false`) || !strings.Contains(page, `"attempts":1`) {
+		t.Fatalf("wrong fill: %d %s", res.StatusCode, page[:200])
+	}
+	res, page = e.postJSON(t, c, "/api/paint/fill", `{"page_id":"paint-page-1","idx":99,"answer":"1"}`)
+	if res.StatusCode != http.StatusBadRequest {
+		t.Fatalf("bad region: %d", res.StatusCode)
+	}
+	res, page = e.postJSON(t, c, "/api/paint/fill", `{"page_id":"paint-page-1","idx":0,"answer":"1","extra":true}`)
+	if res.StatusCode != http.StatusBadRequest {
+		t.Fatalf("unknown field: %d", res.StatusCode)
+	}
+	other := e.signIn(t, "q@example.com")
+	e.postForm(t, other, "/family/children", url.Values{"nickname": {"Max"}, "grade": {"2"}}).Body.Close()
+	res, _ = e.postJSON(t, other, "/api/paint/fill", `{"page_id":"paint-page-1","idx":0,"answer":"1"}`)
+	if res.StatusCode != http.StatusNotFound {
+		t.Fatalf("cross-account fill: %d", res.StatusCode)
+	}
+
+	// A spelling round through the API reveals mosaic tiles.
+	res, page = e.postJSON(t, c, "/api/round/start", `{"round_id":"mosaic-api-1","kind":"spelling","focus":"g2-endings","grade":2,"count":5}`)
+	var start struct {
+		Words []struct{ Word string } `json:"words"`
+	}
+	json.Unmarshal([]byte(page), &start)
+	var guesses []string
+	for _, w := range start.Words {
+		guesses = append(guesses, fmt.Sprintf(`[{"kind":"word","value":%q}]`, w.Word))
+	}
+	res, page = e.postJSON(t, c, "/api/round/finish", `{"round_id":"mosaic-api-1","guesses":[`+strings.Join(guesses, ",")+`]}`)
+	if res.StatusCode != http.StatusOK || !strings.Contains(page, `"mosaic":{`) || !strings.Contains(page, `"added":5`) {
+		t.Fatalf("finish mosaic: %d %s", res.StatusCode, page)
+	}
+	res, _ = c.Get(e.srv.URL + "/api/mosaic/week")
+	if page = body(t, res); !strings.Contains(page, `"revealed":5`) {
+		t.Fatalf("mosaic after round: %s", page[:200])
+	}
+}
+
 func TestConfigValidation(t *testing.T) {
 	if err := (config{dev: true}).validate(); err != nil {
 		t.Fatalf("dev config should validate: %v", err)

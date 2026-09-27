@@ -72,7 +72,9 @@
 
   /**
    * creature(seed, opts) -> SVG string.
-   * opts: { palette, regions, fills, evolved, name, label, size }
+   * opts: { palette, regions, fills, evolved, name, label, size, regionColors }
+   * regionColors: optional per-region hex colors for free painting; only
+   * strict #rrggbb values are honoured so nothing else can reach the markup.
    */
   function creature(seed, opts) {
     const o = Object.assign({ palette: "meadow", regions: 20, fills: 0, evolved: false, name: "", label: "", size: 120 }, opts || {});
@@ -90,10 +92,12 @@
 
     const spots = regionLayout(o.regions, random);
     let regionsSVG = "";
+    const custom = Array.isArray(o.regionColors) ? o.regionColors : null;
     spots.forEach((p, i) => {
-      const filled = i < fills;
-      const color = colors[1 + ((i * 7 + seed) % 2)];
-      regionsSVG += `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5.5" fill="${filled ? color : UNFILLED}" stroke="${filled ? "none" : OUTLINE}" stroke-width="1" stroke-dasharray="${filled ? "0" : "2 1.5"}"/>`;
+      const painted = custom && /^#[0-9a-f]{6}$/i.test(custom[i] || "") ? custom[i] : "";
+      const filled = painted !== "" || i < fills;
+      const color = painted || colors[1 + ((i * 7 + seed) % 2)];
+      regionsSVG += `<circle data-region="${i}" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="5.5" fill="${filled ? color : UNFILLED}" stroke="${filled ? "none" : OUTLINE}" stroke-width="1" stroke-dasharray="${filled ? "0" : "2 1.5"}"/>`;
       if (!filled) regionsSVG += `<text x="${p.x.toFixed(1)}" y="${(p.y + 2).toFixed(1)}" font-size="5" text-anchor="middle" fill="${OUTLINE}" font-family="ui-sans-serif, system-ui, sans-serif">${i + 1}</text>`;
     });
 
