@@ -99,7 +99,11 @@ function dojo() {
         body: JSON.stringify(body),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "Something went wrong — try again.");
+      if (!res.ok) {
+        const err = new Error(data.error || "Something went wrong — try again.");
+        err.status = res.status; // callers distinguish a refusal from a dropped request
+        throw err;
+      }
       return data;
     },
     async startSheet() {

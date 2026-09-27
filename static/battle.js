@@ -88,6 +88,9 @@ function battleMixin() {
         await this.loadBattleCredits();
       } catch (e) {
         if (this.battleRequest !== token) return;
+        // A refusal (no credit, wrong kata, disabled) will not succeed on
+        // retry, so drop the pending id; a dropped request keeps it.
+        if (e.status >= 400 && e.status < 500) this.setPendingBattle(null);
         this.battleError = e.message;
         this.error = e.message;
       } finally {

@@ -321,7 +321,7 @@ test("starting a battle persists the pending id so a retry reuses it", async () 
   const game = context.dojo();
   game.child = { id: 1, nickname: "Nova", grade: 2 };
   const ids = [];
-  game.post = async (url, body) => { ids.push(body.battle_id); throw new Error("network"); };
+  game.post = async (url, body) => { ids.push(body.battle_id); throw new Error("network"); }; // no status: dropped
   game.loadBattleCredits = async () => {};
   await game.startBattle("g2-endings");
   assert.equal(game.battleBusy, false);
@@ -331,6 +331,9 @@ test("starting a battle persists the pending id so a retry reuses it", async () 
   game.post = async () => ({ done: true, won: true, turn: 1, child: {}, opponent: {}, log: [] });
   await game.startBattle();
   assert.equal(game.hasPendingBattle(), false, "a finished battle clears the pending id");
+  game.post = async () => { const e = new Error("no credit"); e.status = 409; throw e; };
+  await game.startBattle("g2-endings");
+  assert.equal(game.hasPendingBattle(), false, "a refusal clears the pending id so Resume cannot get stuck");
   // Pending battles are scoped per child.
   game.setPendingBattle({ id: "abc", creature: "g2-endings" });
   game.child = { id: 2, nickname: "Max", grade: 1 };
