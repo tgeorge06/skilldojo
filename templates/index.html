@@ -186,6 +186,10 @@
         <p class="font-bold" x-text="rewardMosaic() ? `+${rewardMosaic().added} tiles on this week's mosaic` : ''"></p>
         <p class="text-sm text-slate-500 dark:text-slate-400" x-text="rewardMosaic() ? `${rewardMosaic().revealed} of ${rewardMosaic().total} revealed. See it under My kata.` : ''"></p>
       </div>
+      <div x-show="canBattle()" x-cloak class="mt-4 text-center">
+        <button type="button" @click="startBattle()" :disabled="battleBusy" class="rounded-xl bg-rose-600 px-6 py-3 text-lg font-bold text-white shadow-sm transition hover:bg-rose-700 disabled:opacity-40">Battle! ⚔️ <span class="text-sm font-semibold opacity-80" x-text="battleCredits ? `(${battleCredits.credits} ready)` : ''"></span></button>
+        <p x-show="battleError" x-cloak role="alert" class="mt-2 text-sm text-rose-700" x-text="battleError"></p>
+      </div>
       </div>
       <div class="space-y-2">
         <template x-for="(r, i) in report.results" :key="i">
@@ -264,6 +268,10 @@
         <p class="font-bold" x-text="rewardMosaic() ? `+${rewardMosaic().added} tiles on this week's mosaic` : ''"></p>
         <p class="text-sm text-slate-500 dark:text-slate-400" x-text="rewardMosaic() ? `${rewardMosaic().revealed} of ${rewardMosaic().total} revealed. See it under My kata.` : ''"></p>
       </div>
+      <div x-show="canBattle()" x-cloak class="mt-4 text-center">
+        <button type="button" @click="startBattle()" :disabled="battleBusy" class="rounded-xl bg-rose-600 px-6 py-3 text-lg font-bold text-white shadow-sm transition hover:bg-rose-700 disabled:opacity-40">Battle! ⚔️ <span class="text-sm font-semibold opacity-80" x-text="battleCredits ? `(${battleCredits.credits} ready)` : ''"></span></button>
+        <p x-show="battleError" x-cloak role="alert" class="mt-2 text-sm text-rose-700" x-text="battleError"></p>
+      </div>
       </div>
       <div class="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 sm:p-6 shadow-sm">
         <h3 class="text-lg font-bold mb-4">Words you trained</h3>
@@ -300,6 +308,17 @@
           <button type="button" @click="trainReview" class="rounded-xl bg-amber-600 px-4 py-2 font-bold text-white transition hover:bg-amber-700">Train here</button>
         </div>
       </div>
+      <div x-show="hasPendingBattle()" x-cloak class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-rose-300 bg-rose-50 p-4 dark:border-rose-800 dark:bg-rose-950">
+        <p class="font-bold">A battle is waiting for you.</p>
+        <button type="button" @click="startBattle()" :disabled="battleBusy" class="rounded-xl bg-rose-600 px-4 py-2 font-bold text-white transition hover:bg-rose-700 disabled:opacity-40">Resume battle ⚔️</button>
+      </div>
+      <div x-show="canBattle() && !hasPendingBattle()" x-cloak class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-rose-300 bg-rose-50 p-4 dark:border-rose-800 dark:bg-rose-950">
+        <div>
+          <p class="font-bold">A battle is ready.</p>
+          <p class="text-sm text-slate-600 dark:text-slate-300">Your strongest kata takes on a challenger. Answer to strike; three in a row is a special move.</p>
+        </div>
+        <button type="button" @click="startBattle()" :disabled="battleBusy" class="rounded-xl bg-rose-600 px-4 py-2 font-bold text-white transition hover:bg-rose-700 disabled:opacity-40">Battle! ⚔️</button>
+      </div>
       <section x-show="mosaic" x-cloak class="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
         <h3 class="text-lg font-bold">This week's mosaic</h3>
         <p class="text-sm text-slate-600 dark:text-slate-300" x-text="mosaic ? `${mosaic.revealed} of ${mosaic.total} tiles. Every correct answer reveals one.` : ''"></p>
@@ -311,7 +330,7 @@
         <p x-show="mosaicError" x-cloak role="alert" class="mt-2 text-sm text-rose-700" x-text="mosaicError"></p>
       </section>
       <p x-show="kataLoading" class="text-center text-slate-500">Loading your kata…</p>
-      <ul class="grid gap-4 sm:grid-cols-2" role="list">
+      <ul class="grid gap-4 sm:grid-cols-2" role="list" aria-label="Kata">
         <template x-for="entry in kataEntries(kataGrade)" :key="entry.id">
           <li class="flex gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900" :class="kataAboveGrade(entry) ? 'opacity-90' : ''">
             <div class="shrink-0" x-html="kataSVG(entry, 96)"></div>
@@ -372,6 +391,52 @@
       </div>
       <button type="button" @click="reset" class="w-full rounded-xl border-2 border-slate-300 dark:border-slate-700 px-6 py-4 text-lg font-bold transition hover:bg-white dark:hover:bg-slate-900">Back to training</button>
     </section>
+
+    <section x-show="view === 'battle'" x-cloak class="space-y-5">
+      <div class="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-sm">
+        <h2 id="battle-heading" tabindex="-1" class="text-2xl font-black" x-text="battle ? battle.label : 'Battle'"></h2>
+        <p class="mt-1 text-slate-600 dark:text-slate-300">No clock. Answer to strike. Three in a row charges a special move.</p>
+        <div class="mt-5 grid grid-cols-2 gap-4" role="group" aria-label="Fighters">
+          <template x-for="side in (battle ? [battle.child, battle.opponent] : [])" :key="side.id">
+            <div class="text-center">
+              <div class="mx-auto inline-block" x-html="fighterSVG(side, 120)"></div>
+              <p class="mt-1 font-bold" x-text="side.name"></p>
+              <p class="text-lg" role="img" :aria-label="`${side.hp} of 5 hearts`">
+                <template x-for="(full, i) in hearts(side.hp)" :key="i"><span aria-hidden="true" x-text="full ? '❤️' : '🖤'"></span></template>
+              </p>
+            </div>
+          </template>
+        </div>
+        <p role="status" aria-live="polite" class="mt-4 text-center text-lg font-semibold" x-text="battle ? battle.message : ''"></p>
+      </div>
+      <div x-show="battle && !battle.done" x-cloak class="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
+        <p class="text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400" x-text="battle && battle.item ? (battle.item.kind === 'math' ? 'Solve to strike' : 'Spell to strike') : ''"></p>
+        <p class="mt-2 text-3xl font-black tabular-nums" x-text="battle && battle.item ? battle.item.prompt : ''"></p>
+        <p x-show="battle && battle.item && battle.item.clue" class="mt-2 text-slate-600 dark:text-slate-300"><span class="font-semibold">Clue:</span> <span x-text="battle && battle.item ? battle.item.clue : ''"></span></p>
+        <p x-show="battle && battle.item && battle.item.sentence" class="mt-1 text-slate-600 dark:text-slate-300" x-text="battle && battle.item ? battle.item.sentence : ''"></p>
+        <form @submit.prevent="submitBattleAnswer" class="mt-4 flex flex-wrap items-end gap-3">
+          <div class="flex-1">
+            <label for="battle-answer" class="sr-only">Your answer</label>
+            <input id="battle-answer" type="text" x-model="battleAnswer" autocomplete="off" autocapitalize="none" spellcheck="false" class="w-full rounded-xl border-2 border-slate-300 bg-white px-4 py-3 text-lg font-bold dark:border-slate-700 dark:bg-slate-800" placeholder="Your answer">
+          </div>
+          <button type="submit" :disabled="battleBusy || !battleAnswer.trim()" class="min-h-11 rounded-xl bg-rose-600 px-6 py-3 font-bold text-white transition hover:bg-rose-700 disabled:opacity-40">Strike!</button>
+        </form>
+        <p x-show="battleError" x-cloak role="alert" class="mt-2 text-sm text-rose-700" x-text="battleError"></p>
+        <p class="mt-2 text-sm text-slate-500 dark:text-slate-400" x-text="battle ? `Streak: ${battle.streak} of 3` : ''"></p>
+      </div>
+      <div x-show="battle && battle.log && battle.log.length" x-cloak class="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 shadow-sm">
+        <h3 class="text-lg font-bold mb-3">Battle log</h3>
+        <ul class="space-y-1 text-sm" role="list">
+          <template x-for="t in (battle ? battle.log : [])" :key="t.n">
+            <li class="flex items-center gap-2"><span aria-hidden="true" x-text="t.right ? (t.special ? '💥' : '⚔️') : '💔'"></span><span x-text="`${t.prompt} → ${t.given}`"></span><span class="sr-only" x-text="t.right ? 'hit' : 'miss'"></span></li>
+          </template>
+        </ul>
+      </div>
+      <div class="grid sm:grid-cols-2 gap-3">
+        <button x-show="battle && battle.done" x-cloak type="button" @click="startBattle(battle.child.id)" :disabled="!canBattle() || battleBusy" class="rounded-xl bg-rose-600 px-6 py-4 text-lg font-bold text-white shadow-sm transition hover:bg-rose-700 disabled:opacity-40">Battle again ⚔️</button>
+        <button type="button" @click="leaveBattle" class="rounded-xl border-2 border-slate-300 dark:border-slate-700 px-6 py-4 text-lg font-bold transition hover:bg-white dark:hover:bg-slate-900">Back to training</button>
+      </div>
+    </section>
   </main>
 </div>
 <script src="/static/words.js"></script>
@@ -379,6 +444,7 @@
 <script src="/static/kata-svg.js"></script>
 <script src="/static/kata.js"></script>
 <script src="/static/paint.js"></script>
+<script src="/static/battle.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>

@@ -12,7 +12,11 @@ function kataMixin() {
       this.error = "";
       this.view = "kata-index";
       this.moveToTop("#kata-heading");
-      await Promise.all([this.loadKata(), typeof this.loadMosaic === "function" ? this.loadMosaic() : null]);
+      await Promise.all([
+        this.loadKata(),
+        typeof this.loadMosaic === "function" ? this.loadMosaic() : null,
+        typeof this.loadBattleCredits === "function" ? this.loadBattleCredits() : null,
+      ]);
     },
     async loadKata() {
       this.kataLoading = true;

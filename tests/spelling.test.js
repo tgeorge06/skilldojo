@@ -286,6 +286,69 @@ test("the paint mixin draws the mosaic and lays out pages deterministically", ()
   assert.match(game.cooldownSVG(), /#ef476f/);
 });
 
+test("the battle mixin ignores responses for a battle that is no longer on screen", async () => {
+  const { context } = loadGame();
+  vm.runInContext(fs.readFileSync(path.join(root, "static", "kata-svg.js"), "utf8"), context);
+  vm.runInContext(fs.readFileSync(path.join(root, "static", "kata.js"), "utf8"), context);
+  vm.runInContext(fs.readFileSync(path.join(root, "static", "battle.js"), "utf8"), context);
+  const game = context.dojo();
+  assert.equal(game.canBattle(), false, "anonymous children never battle");
+  assert.equal(JSON.stringify(game.hearts(3)), JSON.stringify([true, true, true, false, false]));
+  game.battleId = "battle-a";
+  game.battle = { turn: 2, done: false, child: {}, opponent: {} };
+  game.battleAnswer = "cat";
+  let resolve;
+  game.post = () => new Promise((r) => { resolve = r; });
+  const pending = game.submitBattleAnswer();
+  // The child leaves before the answer comes back.
+  game.battleId = "";
+  game.battle = null;
+  resolve({ turn: 3, done: true, won: true, child: {}, opponent: {}, log: [] });
+  await pending;
+  assert.equal(game.battle, null, "a stale response must not resurrect the battle");
+  assert.equal(game.battleBusy, true, "busy flag belongs to the abandoned battle and is left alone");
+  game.leaveBattle();
+  assert.equal(game.battleBusy, false, "leaving hands the buttons back");
+});
+
+test("starting a battle persists the pending id so a retry reuses it", async () => {
+  const { context } = loadGame();
+  const store = {};
+  context.sessionStorage = { getItem: (k) => store[k] ?? null, setItem: (k, v) => { store[k] = v; }, removeItem: (k) => { delete store[k]; } };
+  vm.runInContext(fs.readFileSync(path.join(root, "static", "kata-svg.js"), "utf8"), context);
+  vm.runInContext(fs.readFileSync(path.join(root, "static", "kata.js"), "utf8"), context);
+  vm.runInContext(fs.readFileSync(path.join(root, "static", "battle.js"), "utf8"), context);
+  const game = context.dojo();
+  game.child = { id: 1, nickname: "Nova", grade: 2 };
+  const ids = [];
+  game.post = async (url, body) => { ids.push(body.battle_id); throw new Error("network"); }; // no status: dropped
+  game.loadBattleCredits = async () => {};
+  await game.startBattle("g2-endings");
+  assert.equal(game.battleBusy, false);
+  assert.ok(game.hasPendingBattle(), "a failed start leaves the pending id in place");
+  await game.startBattle("g2-vowel-teams");
+  assert.equal(ids[0], ids[1], "the retry reuses the same battle id");
+  game.post = async () => ({ done: true, won: true, turn: 1, child: {}, opponent: {}, log: [] });
+  await game.startBattle();
+  assert.equal(game.hasPendingBattle(), false, "a finished battle clears the pending id");
+  game.post = async () => { const e = new Error("no credit"); e.status = 409; throw e; };
+  await game.startBattle("g2-endings");
+  assert.equal(game.hasPendingBattle(), false, "a refusal clears the pending id so Resume cannot get stuck");
+  // Pending battles are scoped per child.
+  game.setPendingBattle({ id: "abc", creature: "g2-endings" });
+  game.child = { id: 2, nickname: "Max", grade: 1 };
+  assert.equal(game.hasPendingBattle(), false, "another child does not inherit a pending battle");
+  game.child = { id: 1, nickname: "Nova", grade: 2 };
+  assert.equal(game.hasPendingBattle(), true);
+  game.setPendingBattle(null);
+  // Overlapping starts: the second call is rejected while busy.
+  let calls = 0;
+  game.post = () => { calls += 1; return new Promise(() => {}); };
+  game.startBattle("g2-endings");
+  game.startBattle("g2-endings");
+  assert.equal(calls, 1, "a start while busy spends nothing");
+});
+
 test("the kata mixin is merged and renders deterministic creatures", () => {
   const { context } = loadGame();
   vm.runInContext(fs.readFileSync(path.join(root, "static", "kata-svg.js"), "utf8"), context);

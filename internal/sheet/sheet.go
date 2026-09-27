@@ -216,6 +216,20 @@ func (sh *Sheet) Answers() []string {
 // Check scores answers against this sheet without touching the store.
 func (sh *Sheet) Check(answers []string) ([]Result, error) { return score(sh, answers) }
 
+// SameAnswer reports whether a typed answer equals an answer-key string
+// under the sheet's rules (equivalent fractions count).
+func SameAnswer(given, key string) bool {
+	g, err := parseFraction(strings.TrimSpace(given))
+	if err != nil {
+		return false
+	}
+	k, err := parseFraction(key)
+	if err != nil {
+		return false
+	}
+	return g.equals(k)
+}
+
 func score(sh *Sheet, answers []string) ([]Result, error) {
 	if len(answers) != len(sh.Questions) {
 		return nil, fmt.Errorf("expected %d answers, got %d", len(sh.Questions), len(answers))

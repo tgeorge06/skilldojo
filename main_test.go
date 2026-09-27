@@ -622,6 +622,75 @@ func TestPaintEndpoints(t *testing.T) {
 	}
 }
 
+func TestBattleEndpoints(t *testing.T) {
+	e := newTestEnv(t)
+	c := e.signIn(t, "p@example.com")
+	e.postForm(t, c, "/family/children", url.Values{"nickname": {"Nova"}, "grade": {"2"}}).Body.Close()
+
+	res, _ := c.Get(e.srv.URL + "/api/battle/credits")
+	page := body(t, res)
+	if res.StatusCode != http.StatusOK || !strings.Contains(page, `"credits":0`) || !strings.Contains(page, `"enabled":true`) {
+		t.Fatalf("credits: %d %s", res.StatusCode, page)
+	}
+	res, page = e.postJSON(t, c, "/api/battle/start", `{"battle_id":"battle-api-1","creature_id":"g2-endings"}`)
+	if res.StatusCode != http.StatusBadRequest { // creature not found yet
+		t.Fatalf("start before finding: %d %s", res.StatusCode, page)
+	}
+
+	// Earn a credit with a full round.
+	res, page = e.postJSON(t, c, "/api/round/start", `{"round_id":"battle-round-1","kind":"spelling","focus":"g2-endings","grade":2,"count":5}`)
+	var start struct {
+		Words []struct{ Word string } `json:"words"`
+	}
+	json.Unmarshal([]byte(page), &start)
+	var guesses []string
+	for _, w := range start.Words {
+		guesses = append(guesses, fmt.Sprintf(`[{"kind":"word","value":%q}]`, w.Word))
+	}
+	res, page = e.postJSON(t, c, "/api/round/finish", `{"round_id":"battle-round-1","guesses":[`+strings.Join(guesses, ",")+`]}`)
+	if res.StatusCode != http.StatusOK || !strings.Contains(page, `"battle_credit":true`) {
+		t.Fatalf("finish: %d %s", res.StatusCode, page)
+	}
+	res, _ = c.Get(e.srv.URL + "/api/battle/credits")
+	if page = body(t, res); !strings.Contains(page, `"credits":1`) {
+		t.Fatalf("credits after round: %s", page)
+	}
+
+	res, page = e.postJSON(t, c, "/api/battle/start", `{"battle_id":"battle-api-1","creature_id":"g2-endings"}`)
+	if res.StatusCode != http.StatusOK || strings.Contains(page, `"item_answer"`) || !strings.Contains(page, `"hp":5`) {
+		t.Fatalf("start: %d %s", res.StatusCode, page)
+	}
+	res, page = e.postJSON(t, c, "/api/battle/turn", `{"battle_id":"battle-api-1","turn":0,"answer":"zzzz"}`)
+	if res.StatusCode != http.StatusOK || !strings.Contains(page, `"turn":1`) || strings.Contains(page, `"item_answer"`) {
+		t.Fatalf("turn: %d %s", res.StatusCode, page)
+	}
+	res, page = e.postJSON(t, c, "/api/battle/start", `{"battle_id":"battle-api-2","creature_id":"g2-endings"}`)
+	if res.StatusCode != http.StatusConflict {
+		t.Fatalf("second battle without credit: %d %s", res.StatusCode, page)
+	}
+	other := e.signIn(t, "q@example.com")
+	e.postForm(t, other, "/family/children", url.Values{"nickname": {"Max"}, "grade": {"2"}}).Body.Close()
+	res, _ = e.postJSON(t, other, "/api/battle/turn", `{"battle_id":"battle-api-1","turn":1,"answer":"x"}`)
+	if res.StatusCode != http.StatusNotFound {
+		t.Fatalf("cross-account turn: %d", res.StatusCode)
+	}
+
+	// The pilot switch hides battles without touching anything else.
+	e.s.cfg.battlesDisabled = true
+	res, page = e.postJSON(t, c, "/api/battle/turn", `{"battle_id":"battle-api-1","turn":1,"answer":"x"}`)
+	if res.StatusCode != http.StatusNotFound {
+		t.Fatalf("disabled battles: %d", res.StatusCode)
+	}
+	res, _ = c.Get(e.srv.URL + "/api/battle/credits")
+	if page = body(t, res); !strings.Contains(page, `"enabled":false`) {
+		t.Fatalf("credits should report disabled: %s", page)
+	}
+	res, _ = c.Get(e.srv.URL + "/")
+	if page = body(t, res); res.StatusCode != http.StatusOK {
+		t.Fatal("index broke with battles disabled")
+	}
+}
+
 func TestConfigValidation(t *testing.T) {
 	if err := (config{dev: true}).validate(); err != nil {
 		t.Fatalf("dev config should validate: %v", err)
