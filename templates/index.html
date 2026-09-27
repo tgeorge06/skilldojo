@@ -10,161 +10,126 @@
 </head>
 <body class="min-h-full bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 antialiased">
 <a href="#main-content" class="skip-link">Skip to practice</a>
-<div x-data="dojo()" @keydown.window="handleKey($event)" class="mx-auto max-w-3xl px-4 py-8 sm:py-12"
-     {{if .ActiveChild}}data-child-id="{{.ActiveChild.ID}}" data-child-nickname="{{.ActiveChild.Nickname}}" data-child-grade="{{.ActiveChild.Grade}}"{{end}}>
-  <header class="mb-8 flex flex-wrap items-center justify-between gap-3">
-    <div class="flex items-center gap-3">
-      <span class="text-4xl" aria-hidden="true">🥋</span>
-      <div>
-        <h1 class="text-2xl font-bold tracking-tight">SkillDojo</h1>
-        <p class="text-sm text-slate-500 dark:text-slate-400" x-text="headerSubtitle()"></p>
-      </div>
+<div x-data="dojo()" @keydown.window="handleKey($event)" class="mx-auto max-w-3xl px-4 pt-6 pb-28 sm:pt-8"
+     {{if .ActiveChild}}data-child-id="{{.ActiveChild.ID}}" data-child-nickname="{{.ActiveChild.Nickname}}" data-child-grade="{{.ActiveChild.Grade}}" data-child-round="{{.ActiveChild.RoundLen}}"{{end}}>
+  <header class="mb-5 flex items-center gap-3">
+    <span class="text-4xl" aria-hidden="true">🥋</span>
+    <div>
+      <h1 class="text-2xl font-bold tracking-tight">SkillDojo</h1>
+      <p class="text-sm text-slate-500 dark:text-slate-400" x-text="headerSubtitle()"></p>
     </div>
-    {{if .ActiveChild}}
-      <div class="flex items-center gap-2">
-        <button type="button" @click="openKata" :aria-pressed="view === 'kata-index'" class="rounded-full border border-violet-300 bg-violet-50 px-3 py-1 text-sm font-semibold text-violet-800 transition hover:bg-violet-100 dark:border-violet-800 dark:bg-violet-950 dark:text-violet-100">My kata 🐾</button>
-        <a href="/family" class="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-100">Training: {{.ActiveChild.Nickname}}</a>
-      </div>
-    {{else if .SignedIn}}
-      <a href="/family" class="text-sm text-slate-500 underline dark:text-slate-400">Choose who's training</a>
-    {{else}}
-      <a href="/login" class="text-sm text-slate-500 underline dark:text-slate-400">Parents</a>
-    {{end}}
   </header>
 
   <main id="main-content" tabindex="-1">
-    <section x-show="view === 'setup'" x-cloak class="rounded-2xl bg-white dark:bg-slate-900 p-6 sm:p-8 shadow-sm border border-slate-200 dark:border-slate-800 space-y-8">
-      <div>
-        <h2 class="text-lg font-semibold mb-3">Choose your dojo</h2>
-        <div class="grid grid-cols-2 gap-3" role="group" aria-label="Subject">
-          <button type="button" @click="chooseSubject('math')" :aria-pressed="subject === 'math'" class="subject-card" :class="subject === 'math' ? 'subject-card-math-active' : 'subject-card-idle'">
-            <span class="text-3xl" aria-hidden="true">🧮</span>
-            <span class="font-bold">Math</span>
-            <span class="subject-card-hint">Solve & sharpen</span>
-          </button>
-          <button type="button" @click="chooseSubject('spelling')" :aria-pressed="subject === 'spelling'" class="subject-card" :class="subject === 'spelling' ? 'subject-card-spelling-active' : 'subject-card-idle'">
-            <span class="text-3xl" aria-hidden="true">🔤</span>
-            <span class="font-bold">Spelling</span>
-            <span class="subject-card-hint">Listen & rescue words</span>
-          </button>
-        </div>
-      </div>
-
-      <div x-show="subject === 'math'" class="space-y-8">
-        <div>
-          <h2 class="text-lg font-semibold mb-3">What do you want to practice?</h2>
-          <div class="grid grid-cols-2 gap-3">
-            <template x-for="op in opChoices" :key="op.id">
-              <button type="button" @click="toggleOp(op.id)" :aria-pressed="ops.includes(op.id)" class="rounded-xl border-2 p-4 text-left transition"
-                      :class="ops.includes(op.id) ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-950 dark:border-emerald-400' : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'">
-                <span class="block text-2xl mb-1" aria-hidden="true" x-text="op.emoji"></span>
-                <span class="block font-semibold" x-text="op.label"></span>
-                <span class="block text-sm text-slate-500 dark:text-slate-400" x-text="op.hint"></span>
-              </button>
-            </template>
+    <!-- Home Base: the child's room. Creature on top, three tiles, nothing to configure. -->
+    <section x-show="view === 'home'" x-cloak class="space-y-4">
+      <div class="kid-hero">
+        <template x-if="child && heroKata()">
+          <div class="flex items-center gap-3">
+            <div class="shrink-0" x-html="kataSVG(heroKata(), 92)"></div>
+            <div>
+              <p class="kid-hero-title" x-text="kataName(heroKata())"></p>
+              <p class="kid-hero-hint" x-text="heroHint()"></p>
+            </div>
           </div>
-        </div>
-
-        <div x-show="tablesMode()" x-cloak class="space-y-4">
+        </template>
+        <template x-if="child && !heroKata()">
+          <div class="flex items-center gap-3">
+            <span class="text-5xl" aria-hidden="true">🐾</span>
+            <div>
+              <p class="kid-hero-title">Someone is hiding in every skill</p>
+              <p class="kid-hero-hint">Train to find your first kata.</p>
+            </div>
+          </div>
+        </template>
+        <template x-if="!child">
           <div>
-            <h2 class="text-lg font-semibold mb-3">Which table?</h2>
-            <div class="grid grid-cols-6 gap-2 sm:grid-cols-11" role="group" aria-label="Times table">
-              <template x-for="t in tables" :key="t">
-                <button type="button" @click="table = t" :aria-pressed="table === t" class="min-h-11 rounded-xl border-2 text-lg font-bold transition" :class="table === t ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-200 dark:border-slate-800 hover:border-slate-300'" x-text="t + 's'"></button>
+            <p class="kid-hero-title">What grade are you in?</p>
+            <div class="mt-2 flex gap-2" role="group" aria-label="Grade">
+              <template x-for="g in [1, 2, 3, 4, 5]" :key="g">
+                <button type="button" @click="setGrade(g)" :aria-pressed="grade === g" class="kid-chip" :class="grade === g ? 'kid-chip-on' : ''" x-text="g"></button>
               </template>
             </div>
           </div>
-          <div class="grid grid-cols-2 gap-3" role="group" aria-label="Order">
-            <button type="button" @click="tableOrdered = true" :aria-pressed="tableOrdered" class="rounded-xl border-2 p-4 text-left transition" :class="tableOrdered ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-950 dark:border-emerald-400' : 'border-slate-200 dark:border-slate-800'">
-              <span class="block font-semibold">In order</span>
-              <span class="block text-sm text-slate-500 dark:text-slate-400" x-text="`1 × ${table} up to 12 × ${table}`"></span>
-            </button>
-            <button type="button" @click="tableOrdered = false" :aria-pressed="!tableOrdered" class="rounded-xl border-2 p-4 text-left transition" :class="!tableOrdered ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-950 dark:border-emerald-400' : 'border-slate-200 dark:border-slate-800'">
-              <span class="block font-semibold">Mixed up</span>
-              <span class="block text-sm text-slate-500 dark:text-slate-400">Shuffled, both ways round</span>
-            </button>
-          </div>
-        </div>
-
-        <div>
-          <h2 class="text-lg font-semibold mb-3">Pick your grade</h2>
-          <div class="rounded-xl border-2 border-slate-200 dark:border-slate-800 p-5">
-            <div class="flex items-baseline justify-between gap-4 mb-4">
-              <span class="text-2xl font-bold text-emerald-600 dark:text-emerald-400">Grade <span x-text="grade"></span></span>
-              <span class="text-sm text-right text-slate-500 dark:text-slate-400" x-text="gradeHint()"></span>
-            </div>
-            <input type="range" min="1" max="5" step="1" x-model.number="grade" aria-label="Math grade level" class="w-full accent-emerald-600 dark:accent-emerald-400">
-            <div class="mt-2 flex justify-between text-sm font-semibold text-slate-400" aria-hidden="true">
-              <template x-for="g in [1, 2, 3, 4, 5]" :key="g"><span :class="grade === g && 'text-emerald-600 dark:text-emerald-400'" x-text="g"></span></template>
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <h2 class="text-lg font-semibold mb-3">How many questions?</h2>
-          <div class="flex gap-3">
-            <template x-for="n in countChoices()" :key="n">
-              <button type="button" @click="count = n" :aria-pressed="count === n" class="flex-1 rounded-xl border-2 p-3 text-xl font-bold transition"
-                      :class="count === n ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-950 dark:border-emerald-400' : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'" x-text="n"></button>
-            </template>
-          </div>
-        </div>
+        </template>
       </div>
-
-      <div x-show="subject === 'spelling'" class="space-y-8">
-        <div class="rounded-xl bg-violet-50 dark:bg-violet-950 border border-violet-200 dark:border-violet-900 p-5">
-          <div class="flex gap-3">
-            <span class="text-3xl" aria-hidden="true">🏮</span>
-            <div>
-              <h2 class="font-bold text-violet-900 dark:text-violet-100">Word Rescue</h2>
-              <p class="mt-1 text-sm text-violet-800 dark:text-violet-200">Listen, use the clue, and uncover each word before your six lanterns go out.</p>
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <h2 class="text-lg font-semibold mb-3">Pick your grade</h2>
-          <div class="rounded-xl border-2 border-slate-200 dark:border-slate-800 p-5">
-            <div class="flex items-baseline justify-between gap-4 mb-4">
-              <span class="text-2xl font-bold text-violet-700 dark:text-violet-300">Grade <span x-text="spellingGrade"></span></span>
-              <span class="text-sm text-right text-slate-500 dark:text-slate-400" x-text="spellingGradeHint()"></span>
-            </div>
-            <input type="range" min="1" max="5" step="1" x-model.number="spellingGrade" @input="spellingFocus = 'mixed'" aria-label="Spelling grade level" class="w-full accent-violet-700 dark:accent-violet-400">
-            <div class="mt-2 flex justify-between text-sm font-semibold text-slate-400" aria-hidden="true">
-              <template x-for="g in [1, 2, 3, 4, 5]" :key="g"><span :class="spellingGrade === g && 'text-violet-700 dark:text-violet-300'" x-text="g"></span></template>
-            </div>
-          </div>
-        </div>
-
-        <div>
-          <label for="spelling-focus" class="block text-lg font-semibold mb-3">Choose a practice focus</label>
-          <select id="spelling-focus" x-model="spellingFocus" class="w-full min-h-11 rounded-xl border-2 border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 py-3 font-semibold">
-            <option value="mixed">Smart mix — several spelling patterns</option>
-            <template x-for="skill in spellingSkillChoices()" :key="skill.id">
-              <option :value="skill.id" x-text="skill.label"></option>
-            </template>
-          </select>
-          <p class="mt-2 text-sm text-slate-500 dark:text-slate-400" x-text="spellingFocusDescription()"></p>
-        </div>
-
-        <div>
-          <h2 class="text-lg font-semibold mb-3">How many words?</h2>
-          <div class="flex gap-3">
-            <template x-for="n in [5, 10]" :key="n">
-              <button type="button" @click="spellingCount = n" :aria-pressed="spellingCount === n" class="flex-1 rounded-xl border-2 p-3 text-lg font-bold transition"
-                      :class="spellingCount === n ? 'border-violet-700 bg-violet-50 dark:bg-violet-950 dark:border-violet-400' : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'">
-                <span x-text="n"></span> words
-              </button>
-            </template>
-          </div>
-        </div>
-      </div>
-
       <p x-show="error" x-cloak role="alert" class="rounded-lg bg-rose-50 dark:bg-rose-950 px-4 py-3 text-sm font-medium text-rose-700 dark:text-rose-300" x-text="error"></p>
-      <button x-show="subject === 'math' && child && !tablesMode()" x-cloak type="button" @click="openPage" :disabled="pageBusy || ops.length === 0" class="mb-3 w-full rounded-xl border-2 border-emerald-300 bg-emerald-50 px-6 py-3 text-lg font-bold text-emerald-900 transition hover:bg-emerald-100 disabled:opacity-40 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-100">Color by number 🎨</button>
-      <button type="button" @click="startTraining" :disabled="busy || (subject === 'math' && ops.length === 0)" class="w-full rounded-xl px-6 py-4 text-lg font-bold text-white shadow-sm transition disabled:opacity-40 disabled:cursor-not-allowed" :class="subject === 'spelling' ? 'bg-violet-700 hover:bg-violet-800' : 'bg-emerald-600 hover:bg-emerald-700'">
-        <span x-text="busy ? 'Getting ready…' : subject === 'spelling' ? 'Start word rescue! 🏮' : 'Start math training! 🥷'"></span>
-      </button>
+      <button type="button" @click="openMath" class="kid-tile kid-tile-math"><span class="kid-tile-emoji" aria-hidden="true">🧮</span><span>Math<small>Add, times, divide, fractions</small></span></button>
+      <button type="button" @click="openSpelling" class="kid-tile kid-tile-spell"><span class="kid-tile-emoji" aria-hidden="true">🔤</span><span>Spelling<small>Rescue words</small></span></button>
+      <button x-show="child" x-cloak type="button" @click="openPlay" class="kid-tile kid-tile-play"><span class="kid-tile-emoji" aria-hidden="true">🎨</span><span>Play<small>Color by number · Battle</small></span></button>
+    </section>
+
+    <!-- Math picker: picture cards. Grade and length come from the profile. -->
+    <section x-show="view === 'math-pick'" x-cloak class="space-y-4">
+      <div class="flex items-center justify-between">
+        <button type="button" @click="goHome" class="kid-back">‹ Home</button>
+        <span class="kid-pill" x-text="`Grade ${grade}`"></span>
+      </div>
+      <h2 id="math-pick-heading" tabindex="-1" class="kid-heading">What today?</h2>
+      <div class="grid grid-cols-2 gap-3">
+        <button type="button" @click="pickMath('addsub')" class="kid-card kid-tile-math"><span class="kid-card-emoji" aria-hidden="true">➕</span>Add &amp; take away</button>
+        <button type="button" @click="openTables" class="kid-card kid-tile-math"><span class="kid-card-emoji" aria-hidden="true">✖️</span>Times tables</button>
+        <button type="button" @click="pickMath('mul')" class="kid-card kid-tile-math"><span class="kid-card-emoji" aria-hidden="true">🔢</span>Multiply mix</button>
+        <button type="button" @click="pickMath('div')" class="kid-card kid-tile-math"><span class="kid-card-emoji" aria-hidden="true">➗</span>Sharing</button>
+        <button type="button" @click="pickMath('frac')" class="kid-card kid-tile-math"><span class="kid-card-emoji" aria-hidden="true">🍕</span>Fractions</button>
+        <button type="button" @click="surpriseMath" class="kid-card kid-tile-play"><span class="kid-card-emoji" aria-hidden="true">🎲</span>Surprise me!</button>
+      </div>
+      <p x-show="error" x-cloak role="alert" class="rounded-lg bg-rose-50 dark:bg-rose-950 px-4 py-3 text-sm font-medium text-rose-700 dark:text-rose-300" x-text="error"></p>
+      <p x-show="busy" x-cloak class="text-center text-sm font-semibold text-slate-500">Getting ready…</p>
+    </section>
+
+    <!-- Times tables: which table? One tap starts it, in order. -->
+    <section x-show="view === 'tables-pick'" x-cloak class="space-y-4">
+      <div class="flex items-center justify-between">
+        <button type="button" @click="openMath" class="kid-back">‹ Math</button>
+        <button type="button" @click="tableOrdered = !tableOrdered" :aria-pressed="!tableOrdered" class="kid-pill">
+          <span x-text="tableOrdered ? 'In order ⇄' : 'Mixed up ⇄'"></span>
+        </button>
+      </div>
+      <h2 id="tables-pick-heading" tabindex="-1" class="kid-heading">Which table?</h2>
+      <div class="grid grid-cols-4 gap-3" role="group" aria-label="Times table">
+        <template x-for="n in tables" :key="n">
+          <button type="button" @click="pickTable(n)" class="kid-card kid-tile-math kid-card-num" :aria-label="`${n} times table`"><span x-text="n"></span><small>×</small></button>
+        </template>
+      </div>
+      <p x-show="error" x-cloak role="alert" class="rounded-lg bg-rose-50 dark:bg-rose-950 px-4 py-3 text-sm font-medium text-rose-700 dark:text-rose-300" x-text="error"></p>
+    </section>
+
+    <!-- Spelling picker. -->
+    <section x-show="view === 'spelling-pick'" x-cloak class="space-y-4">
+      <div class="flex items-center justify-between">
+        <button type="button" @click="goHome" class="kid-back">‹ Home</button>
+        <span class="kid-pill kid-pill-spell" x-text="`Grade ${spellingGrade}`"></span>
+      </div>
+      <h2 id="spelling-pick-heading" tabindex="-1" class="kid-heading">Rescue some words!</h2>
+      <div class="grid grid-cols-2 gap-3">
+        <button type="button" @click="pickSpelling('mixed')" class="kid-card kid-tile-spell"><span class="kid-card-emoji" aria-hidden="true">🏮</span>Smart mix</button>
+        <button type="button" @click="pickSpelling('sight-words')" class="kid-card kid-tile-spell"><span class="kid-card-emoji" aria-hidden="true">👀</span>Sight words</button>
+        <button x-show="child" x-cloak type="button" @click="pickSpelling('review')" class="kid-card kid-tile-spell"><span class="kid-card-emoji" aria-hidden="true">📖</span>Words I keep missing</button>
+        <button type="button" @click="showPatterns = !showPatterns" :aria-expanded="showPatterns" class="kid-card kid-tile-play"><span class="kid-card-emoji" aria-hidden="true">🔍</span>Pick a pattern</button>
+      </div>
+      <div x-show="showPatterns" x-cloak class="grid gap-2" role="group" aria-label="Spelling patterns">
+        <template x-for="skill in spellingPatterns()" :key="skill.id">
+          <button type="button" @click="pickSpelling(skill.id)" class="kid-row"><span class="font-bold" x-text="skill.label"></span><span class="block text-sm text-slate-500 dark:text-slate-400" x-text="skill.tip"></span></button>
+        </template>
+      </div>
+      <p x-show="error" x-cloak role="alert" class="rounded-lg bg-rose-50 dark:bg-rose-950 px-4 py-3 text-sm font-medium text-rose-700 dark:text-rose-300" x-text="error"></p>
+      <p x-show="busy" x-cloak class="text-center text-sm font-semibold text-slate-500">Getting ready…</p>
+    </section>
+
+    <!-- Play picker: the games that need a signed-in child. -->
+    <section x-show="view === 'play-pick'" x-cloak class="space-y-4">
+      <div class="flex items-center justify-between">
+        <button type="button" @click="goHome" class="kid-back">‹ Home</button>
+      </div>
+      <h2 id="play-pick-heading" tabindex="-1" class="kid-heading">Let's play!</h2>
+      <button type="button" @click="openPage" :disabled="pageBusy" class="kid-tile kid-tile-math"><span class="kid-tile-emoji" aria-hidden="true">🎨</span><span>Color by number<small>Solve to color a kata</small></span></button>
+      <button x-show="hasPendingBattle()" x-cloak type="button" @click="startBattle()" :disabled="battleBusy" class="kid-tile kid-tile-battle"><span class="kid-tile-emoji" aria-hidden="true">⚔️</span><span>Finish my battle<small>A battle is waiting</small></span></button>
+      <button x-show="canBattle() && !hasPendingBattle()" x-cloak type="button" @click="startBattle()" :disabled="battleBusy" class="kid-tile kid-tile-battle"><span class="kid-tile-emoji" aria-hidden="true">⚔️</span><span>Battle!<small x-text="battleCredits ? `${battleCredits.credits} ready` : ''"></small></span></button>
+      <button x-show="!canBattle() && !hasPendingBattle()" x-cloak type="button" disabled class="kid-tile kid-tile-battle opacity-60"><span class="kid-tile-emoji" aria-hidden="true">⚔️</span><span>Battle<small>Finish a round of 5 to earn one</small></span></button>
+      <button type="button" @click="startCooldown" class="kid-tile kid-tile-play"><span class="kid-tile-emoji" aria-hidden="true">🖌️</span><span>Just paint<small>No questions, just colors</small></span></button>
+      <p x-show="battleError" x-cloak role="alert" class="text-sm text-rose-700" x-text="battleError"></p>
+      <p x-show="pageError" x-cloak role="alert" class="text-sm text-rose-700" x-text="pageError"></p>
     </section>
 
     <section x-show="view === 'math-sheet'" x-cloak class="space-y-6">
@@ -221,7 +186,7 @@
           </div>
         </template>
       </div>
-      <button type="button" @click="reset" class="w-full rounded-xl bg-emerald-600 px-6 py-4 text-lg font-bold text-white shadow-sm transition hover:bg-emerald-700">Choose new training 🔁</button>
+      <button type="button" @click="reset" class="w-full rounded-xl bg-emerald-600 px-6 py-4 text-lg font-bold text-white shadow-sm transition hover:bg-emerald-700">Home 🏠</button>
     </section>
 
     <section x-show="view === 'spelling-game'" x-cloak class="space-y-5">
@@ -305,66 +270,55 @@
       </div>
       <div class="grid sm:grid-cols-2 gap-3">
         <button type="button" @click="startSpelling" :disabled="busy" class="rounded-xl bg-violet-700 px-6 py-4 text-lg font-bold text-white shadow-sm transition hover:bg-violet-800 disabled:opacity-40">Play again 🔁</button>
-        <button type="button" @click="reset" class="rounded-xl border-2 border-slate-300 dark:border-slate-700 px-6 py-4 text-lg font-bold transition hover:bg-white dark:hover:bg-slate-900">Choose another dojo</button>
+        <button type="button" @click="reset" class="rounded-xl border-2 border-slate-300 dark:border-slate-700 px-6 py-4 text-lg font-bold transition hover:bg-white dark:hover:bg-slate-900">Home 🏠</button>
       </div>
     </section>
 
-    <section x-show="view === 'kata-index'" x-cloak class="space-y-5">
-      <div class="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-sm">
-        <h2 id="kata-heading" tabindex="-1" class="text-2xl font-black">My kata</h2>
-        <p class="mt-1 text-slate-600 dark:text-slate-300">Every kata lives in a skill. Train the skill to find it, color it in, and let it evolve.</p>
-        <p x-show="kataError" x-cloak role="alert" class="mt-3 rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-200" x-text="kataError"></p>
-        <div class="mt-4 flex flex-wrap gap-2" role="group" aria-label="Grade">
-          <template x-for="g in kataGrades()" :key="g">
-            <button type="button" @click="kataGrade = g" :aria-pressed="kataGrade === g" class="rounded-full border px-3 py-1 text-sm font-semibold transition" :class="kataGrade === g ? 'border-violet-600 bg-violet-600 text-white' : 'border-slate-300 dark:border-slate-700'">
-              Grade <span x-text="g"></span> <span class="opacity-70" x-text="`${kataProgress(g).done}/${kataProgress(g).total}`"></span>
+    <section x-show="view === 'kata-index'" x-cloak class="space-y-4">
+      <div class="flex items-center justify-between">
+        <button type="button" @click="goHome" class="kid-back">‹ Home</button>
+        <span class="kid-pill kid-pill-spell" x-text="`${kataFound()} found`"></span>
+      </div>
+      <h2 id="kata-heading" tabindex="-1" class="kid-heading">My kata</h2>
+      <p x-show="kataError" x-cloak role="alert" class="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-200" x-text="kataError"></p>
+      <template x-if="heroKata()">
+        <div class="kid-hero flex flex-col items-center text-center">
+          <div x-html="kataSVG(heroKata(), 150)"></div>
+          <p class="kid-hero-title" x-text="kataName(heroKata())"></p>
+          <p class="kid-hero-hint" x-text="kataStateLabel(heroKata())"></p>
+        </div>
+      </template>
+      <div class="flex flex-wrap gap-2" role="group" aria-label="Grade">
+        <template x-for="g in kataGrades()" :key="g">
+          <button type="button" @click="kataGrade = g" :aria-pressed="kataGrade === g" class="kid-chip" :class="kataGrade === g ? 'kid-chip-on' : ''">
+            <span x-text="g"></span> <span class="opacity-70 text-xs" x-text="`${kataProgress(g).done}/${kataProgress(g).total}`"></span>
+          </button>
+        </template>
+      </div>
+      <div x-show="kata && kata.review_due > 0" x-cloak class="kid-row flex items-center justify-between gap-3">
+        <span><span class="font-bold">A rare one hides in the words you keep missing.</span><span class="block text-sm text-slate-500 dark:text-slate-400" x-text="kata ? `${kata.review_due} words waiting` : ''"></span></span>
+        <button type="button" @click="trainReview" class="kid-mini">Train</button>
+      </div>
+      <ul class="grid grid-cols-3 gap-3 sm:grid-cols-4" aria-label="Kata">
+        <template x-for="entry in kataEntries(kataGrade)" :key="entry.id">
+          <li>
+            <button type="button" @click="trainHere(entry)" class="kid-sticker" :aria-label="`${kataName(entry)}: ${kataStateLabel(entry)}. Train here`">
+              <span x-html="kataSVG(entry, 84)"></span>
+              <span class="kid-sticker-name" x-text="kataName(entry)"></span>
+              <span class="kid-sticker-hint" x-text="entry.state === 'unknown' ? entry.hint : kataStateLabel(entry)"></span>
             </button>
-          </template>
-        </div>
-        <div x-show="kata && kata.review_due > 0" x-cloak class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950">
-          <div>
-            <p class="font-bold">A rare one is hiding in the words you keep missing.</p>
-            <p class="text-sm text-slate-600 dark:text-slate-300"><span x-text="kata ? kata.review_due : 0"></span> words are waiting. Rescue them and they leave the list.</p>
-          </div>
-          <button type="button" @click="trainReview" class="rounded-xl bg-amber-600 px-4 py-2 font-bold text-white transition hover:bg-amber-700">Train here</button>
-        </div>
-      </div>
-      <div x-show="hasPendingBattle()" x-cloak class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-rose-300 bg-rose-50 p-4 dark:border-rose-800 dark:bg-rose-950">
-        <p class="font-bold">A battle is waiting for you.</p>
-        <button type="button" @click="startBattle()" :disabled="battleBusy" class="rounded-xl bg-rose-600 px-4 py-2 font-bold text-white transition hover:bg-rose-700 disabled:opacity-40">Resume battle ⚔️</button>
-      </div>
-      <div x-show="canBattle() && !hasPendingBattle()" x-cloak class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-rose-300 bg-rose-50 p-4 dark:border-rose-800 dark:bg-rose-950">
-        <div>
-          <p class="font-bold">A battle is ready.</p>
-          <p class="text-sm text-slate-600 dark:text-slate-300">Your strongest kata takes on a challenger. Answer to strike; three in a row is a special move.</p>
-        </div>
-        <button type="button" @click="startBattle()" :disabled="battleBusy" class="rounded-xl bg-rose-600 px-4 py-2 font-bold text-white transition hover:bg-rose-700 disabled:opacity-40">Battle! ⚔️</button>
-      </div>
-      <section x-show="mosaic" x-cloak class="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
-        <h3 class="text-lg font-bold">This week's mosaic</h3>
-        <p class="text-sm text-slate-600 dark:text-slate-300" x-text="mosaic ? `${mosaic.revealed} of ${mosaic.total} tiles. Every correct answer reveals one.` : ''"></p>
+          </li>
+        </template>
+      </ul>
+      <p class="text-center text-sm font-semibold text-slate-500 dark:text-slate-400">Tap a kata to train with it</p>
+      <details x-show="mosaic" x-cloak class="kid-row">
+        <summary class="cursor-pointer font-bold">This week's mosaic <span class="text-sm font-semibold text-slate-500" x-text="mosaic ? `· ${mosaic.revealed} of ${mosaic.total} tiles` : ''"></span></summary>
         <div class="mt-3 mx-auto grid gap-px bg-slate-300 p-px dark:bg-slate-700" :style="mosaic ? `grid-template-columns: repeat(${mosaic.size}, minmax(0, 1fr)); max-width: 320px` : ''" role="group" :aria-label="mosaicLabel(mosaic)">
           <template x-for="cell in mosaicCells(mosaic)" :key="cell.i">
             <div class="aspect-square" :class="cell.shown ? '' : 'bg-slate-100 dark:bg-slate-800'" :style="cell.shown ? `background:${cell.color}` : ''"></div>
           </template>
         </div>
-        <p x-show="mosaicError" x-cloak role="alert" class="mt-2 text-sm text-rose-700" x-text="mosaicError"></p>
-      </section>
-      <p x-show="kataLoading" class="text-center text-slate-500">Loading your kata…</p>
-      <ul class="grid gap-4 sm:grid-cols-2" role="list" aria-label="Kata">
-        <template x-for="entry in kataEntries(kataGrade)" :key="entry.id">
-          <li class="flex gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900" :class="kataAboveGrade(entry) ? 'opacity-90' : ''">
-            <div class="shrink-0" x-html="kataSVG(entry, 96)"></div>
-            <div class="min-w-0 flex-1">
-              <p class="text-lg font-bold" x-text="kataName(entry)"></p>
-              <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400" x-text="kataStateLabel(entry) + (kataAboveGrade(entry) ? ' · up the mountain' : '')"></p>
-              <p class="mt-1 text-sm text-slate-600 dark:text-slate-300" x-text="entry.hint"></p>
-              <button type="button" @click="trainHere(entry)" class="mt-2 rounded-lg border border-violet-300 px-3 py-1 text-sm font-semibold text-violet-800 transition hover:bg-violet-50 dark:border-violet-800 dark:text-violet-100 dark:hover:bg-violet-950">Train here</button>
-            </div>
-          </li>
-        </template>
-      </ul>
-      <button type="button" @click="reset" class="w-full rounded-xl border-2 border-slate-300 dark:border-slate-700 px-6 py-4 text-lg font-bold transition hover:bg-white dark:hover:bg-slate-900">Back to training</button>
+      </details>
     </section>
 
     <section x-show="view === 'paint-page'" x-cloak class="space-y-5">
@@ -395,7 +349,7 @@
       </div>
       <div class="grid sm:grid-cols-2 gap-3">
         <button type="button" @click="openPage" :disabled="pageBusy" class="rounded-xl bg-emerald-600 px-6 py-4 text-lg font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-40">New page 🔁</button>
-        <button type="button" @click="reset" class="rounded-xl border-2 border-slate-300 dark:border-slate-700 px-6 py-4 text-lg font-bold transition hover:bg-white dark:hover:bg-slate-900">Back to training</button>
+        <button type="button" @click="reset" class="rounded-xl border-2 border-slate-300 dark:border-slate-700 px-6 py-4 text-lg font-bold transition hover:bg-white dark:hover:bg-slate-900">Home 🏠</button>
       </div>
     </section>
 
@@ -410,7 +364,7 @@
         </div>
         <div class="mt-4 inline-block" @click="paintAt($event)" x-html="cooldownSVG()"></div>
       </div>
-      <button type="button" @click="reset" class="w-full rounded-xl border-2 border-slate-300 dark:border-slate-700 px-6 py-4 text-lg font-bold transition hover:bg-white dark:hover:bg-slate-900">Back to training</button>
+      <button type="button" @click="reset" class="w-full rounded-xl border-2 border-slate-300 dark:border-slate-700 px-6 py-4 text-lg font-bold transition hover:bg-white dark:hover:bg-slate-900">Home 🏠</button>
     </section>
 
     <section x-show="view === 'battle'" x-cloak class="space-y-5">
@@ -455,10 +409,21 @@
       </div>
       <div class="grid sm:grid-cols-2 gap-3">
         <button x-show="battle && battle.done" x-cloak type="button" @click="startBattle(battle.child.id)" :disabled="!canBattle() || battleBusy" class="rounded-xl bg-rose-600 px-6 py-4 text-lg font-bold text-white shadow-sm transition hover:bg-rose-700 disabled:opacity-40">Battle again ⚔️</button>
-        <button type="button" @click="leaveBattle" class="rounded-xl border-2 border-slate-300 dark:border-slate-700 px-6 py-4 text-lg font-bold transition hover:bg-white dark:hover:bg-slate-900">Back to training</button>
+        <button type="button" @click="leaveBattle" class="rounded-xl border-2 border-slate-300 dark:border-slate-700 px-6 py-4 text-lg font-bold transition hover:bg-white dark:hover:bg-slate-900">Home 🏠</button>
       </div>
     </section>
   </main>
+
+  <!-- Bottom nav: big targets. Parents is a hold-to-open gate so a small
+       child cannot wander into settings by tapping. -->
+  <nav class="kid-nav" aria-label="Main">
+    <button type="button" @click="goHome" :aria-current="view === 'home' ? 'page' : null" class="kid-nav-btn" :class="view === 'home' ? 'kid-nav-on' : ''"><span class="kid-nav-ic" aria-hidden="true">🏠</span>Home</button>
+    <button x-show="child" x-cloak type="button" @click="openKata" :aria-current="view === 'kata-index' ? 'page' : null" class="kid-nav-btn" :class="view === 'kata-index' ? 'kid-nav-on' : ''"><span class="kid-nav-ic" aria-hidden="true">🐾</span>My kata</button>
+    <button type="button" @pointerdown.prevent="holdStart" @pointerup="holdEnd" @pointercancel="holdEnd" @pointerleave="holdEnd" @keydown.enter.prevent="holdStart" @keyup.enter="holdEnd" @contextmenu.prevent
+            class="kid-nav-btn" :class="holdPct > 0 ? 'kid-nav-on' : ''" :aria-label="holdPct > 0 ? `Keep holding, ${Math.round(holdPct)} percent` : 'Parents: press and hold for three seconds'">
+      <span class="kid-nav-ic kid-hold" :style="{ '--pct': holdPct + '%' }" aria-hidden="true">🔒</span>Parents
+    </button>
+  </nav>
 </div>
 <script src="/static/words.js"></script>
 <script src="/static/audio/spelling/manifest.js"></script>

@@ -1,8 +1,12 @@
 // SkillDojo front-end state (Alpine component).
 function dojo() {
   const core = {
-    view: "setup",
+    view: "home",
     subject: "math",
+    showPatterns: false,
+    holdPct: 0,
+    holdTimer: null,
+    hashStart: false,
     // Signed-in child, read from data attributes the server renders on the
     // root element (never interpolated into x-data). Null when anonymous.
     child: readChild(),
@@ -17,9 +21,10 @@ function dojo() {
     busy: false,
     error: "",
 
-    // Math dojo state.
+    // Math dojo state. Round length is a parent setting on the profile;
+    // anonymous play uses 10.
     ops: ["addsub"],
-    count: 10,
+    count: defaultRoundLen(),
     sheetId: "",
     questions: [],
     answers: [],
@@ -40,7 +45,7 @@ function dojo() {
     },
 
     // Spelling dojo state.
-    spellingCount: 5,
+    spellingCount: defaultRoundLen() > 10 ? 10 : 5,
     spellingFocus: "mixed",
     spellingWords: [],
     spellingRound: 0,
@@ -66,13 +71,120 @@ function dojo() {
     },
 
     headerSubtitle() {
-      return this.subject === "spelling"
-        ? "Spelling Dojo — listen, guess, and rescue words"
-        : "Math Dojo — pick your grade, train your skills";
+      if (this.child) return `Hi ${this.child.nickname}!`;
+      return "Tap and go";
+    },
+    // init runs once Alpine mounts: a parent-portal link (#math/frac)
+    // starts the round straight away, and a signed-in child's kata load
+    // so the home screen can show their creature.
+    init() {
+      if (this.child && typeof this.loadKata === "function") this.loadKata();
+      if (this.hashStart) {
+        this.hashStart = false;
+        if (this.subject === "spelling") this.openSpelling();
+        else this.startSheet();
+      }
     },
     chooseSubject(subject) {
       this.subject = subject;
       this.error = "";
+    },
+    goHome() {
+      this.reset();
+    },
+    // Anonymous grade picker on the home screen; one grade for both dojos.
+    setGrade(g) {
+      this.grade = g;
+      this.spellingGrade = g;
+      this.spellingFocus = "mixed";
+    },
+    openMath() {
+      this.subject = "math";
+      this.error = "";
+      this.view = "math-pick";
+      this.moveToTop("#math-pick-heading");
+    },
+    openTables() {
+      this.error = "";
+      this.view = "tables-pick";
+      this.moveToTop("#tables-pick-heading");
+    },
+    openSpelling() {
+      this.subject = "spelling";
+      this.error = "";
+      this.showPatterns = false;
+      this.view = "spelling-pick";
+      this.moveToTop("#spelling-pick-heading");
+    },
+    openPlay() {
+      this.error = "";
+      this.view = "play-pick";
+      this.moveToTop("#play-pick-heading");
+      if (typeof this.loadBattleCredits === "function") this.loadBattleCredits();
+    },
+    // pickMath starts a round of one operation at the profile's length.
+    async pickMath(op) {
+      this.ops = [op];
+      this.count = defaultRoundLen();
+      this.normalizeCount();
+      await this.startSheet();
+    },
+    async surpriseMath() {
+      const ops = ["addsub", "mul", "div", "frac"];
+      await this.pickMath(ops[Math.floor(Math.random() * ops.length)]);
+    },
+    async pickTable(n) {
+      this.table = n;
+      this.ops = ["tables"];
+      this.count = 12;
+      await this.startSheet();
+    },
+    spellingPatterns() {
+      return SPELLING_SKILLS[this.spellingGrade] || [];
+    },
+    async pickSpelling(focus) {
+      this.spellingFocus = focus;
+      this.spellingCount = defaultRoundLen() > 10 ? 10 : 5;
+      await this.startSpelling();
+    },
+    // The most loved creature for the home screen: evolved beats caught
+    // beats seen, then the most colored.
+    heroKata() {
+      if (!this.kata || !this.kata.entries) return null;
+      const rank = { evolved: 3, caught: 2, seen: 1 };
+      let best = null;
+      for (const e of this.kata.entries) {
+        if (!rank[e.state]) continue;
+        if (!best || rank[e.state] > rank[best.state] || (rank[e.state] === rank[best.state] && e.fills > best.fills)) best = e;
+      }
+      return best;
+    },
+    heroHint() {
+      const k = this.heroKata();
+      if (!k) return "";
+      if (k.state === "evolved") return "Evolved! Find the next one.";
+      if (k.state === "caught") return "All colored. Keep training to evolve it!";
+      return `${k.fills} of ${k.regions} colors. Train ${k.kind === "math" ? "math" : "spelling"} to add more!`;
+    },
+    kataFound() {
+      return this.kata && this.kata.entries ? this.kata.entries.filter((e) => e.state !== "unknown").length : 0;
+    },
+    // Parent gate: hold the lock for three seconds. Letting go resets.
+    holdStart() {
+      if (this.holdTimer) return;
+      const started = Date.now();
+      this.holdTimer = setInterval(() => {
+        this.holdPct = Math.min(100, ((Date.now() - started) / 3000) * 100);
+        if (this.holdPct >= 100) {
+          this.holdEnd();
+          window.location.href = this.child ? "/family" : "/login";
+        }
+      }, 50);
+    },
+    holdEnd() {
+      clearInterval(this.holdTimer);
+      this.holdTimer = null;
+      this.holdPct = 0;
     },
     async startTraining() {
       if (this.subject === "spelling") await this.startSpelling();
@@ -503,7 +615,7 @@ function dojo() {
     reset() {
       this.stopWordAudio();
       window.speechSynthesis?.cancel();
-      this.view = "setup";
+      this.view = "home";
       this.error = "";
       this.questions = [];
       this.answers = [];
@@ -529,9 +641,21 @@ function applyHash(state) {
   state.subject = m[1];
   if (m[1] === "math" && m[2]) {
     const known = state.opChoices.map((o) => o.id);
-    const ops = m[2].split(",").filter((op) => known.includes(op));
-    if (ops.length) state.ops = ops;
+    const ops = m[2].split(",").filter((op) => known.includes(op) && op !== "tables");
+    if (ops.length) {
+      state.ops = ops;
+      state.hashStart = true; // init() starts the round
+    }
+  } else if (m[1] === "spelling") {
+    state.hashStart = true;
   }
+}
+
+// defaultRoundLen is the parent's setting from the profile, or 10 when
+// nobody is signed in.
+function defaultRoundLen() {
+  const child = readChild();
+  return child && [5, 10, 20].includes(child.round) ? child.round : 10;
 }
 
 // readChild pulls the signed-in child from the root element's data
@@ -554,6 +678,7 @@ function readChild() {
     id: Number(root.dataset.childId),
     nickname: root.dataset.childNickname || "",
     grade: Number(root.dataset.childGrade) || 1,
+    round: Number(root.dataset.childRound) || 10,
   };
 }
 
