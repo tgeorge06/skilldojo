@@ -10,7 +10,8 @@ function battleMixin() {
     battleBusy: false,
     battleError: "",
     battleCredits: null,
-    battleRequest: "",
+    battleRequest: 0,
+    battleSeq: 0,
 
     async loadBattleCredits() {
       try {
@@ -36,19 +37,27 @@ function battleMixin() {
     // The pending battle (id + creature) is persisted before the request so
     // a dropped response or a reload retries the same id: the server replays
     // it and the credit is spent once. Cleared when the battle ends.
+    pendingKey() {
+      return `sd_pending_battle:${this.child ? this.child.id : "anon"}`;
+    },
     pendingBattle() {
       try {
-        const raw = sessionStorage.getItem("sd_pending_battle");
+        const raw = sessionStorage.getItem(this.pendingKey());
         return raw ? JSON.parse(raw) : null;
       } catch {
         return null;
       }
     },
+    // Returns false when the browser refuses storage: without a durable id
+    // a retry could spend a second credit, so the start does not proceed.
     setPendingBattle(value) {
       try {
-        if (value) sessionStorage.setItem("sd_pending_battle", JSON.stringify(value));
-        else sessionStorage.removeItem("sd_pending_battle");
-      } catch {}
+        if (value) sessionStorage.setItem(this.pendingKey(), JSON.stringify(value));
+        else sessionStorage.removeItem(this.pendingKey());
+        return true;
+      } catch {
+        return !value;
+      }
     },
     async startBattle(creatureId) {
       if (this.battleBusy) return;
@@ -59,13 +68,17 @@ function battleMixin() {
         return;
       }
       const battleId = (pending && pending.id) || newRoundId();
-      this.setPendingBattle({ id: battleId, creature: id });
+      if (!this.setPendingBattle({ id: battleId, creature: id })) {
+        this.battleError = "This browser cannot remember a battle. Try again in a normal window.";
+        return;
+      }
       this.battleBusy = true;
       this.battleError = "";
-      this.battleRequest = battleId; // request token: only the latest start may apply
+      const token = (this.battleSeq = (this.battleSeq || 0) + 1); // unique per request
+      this.battleRequest = token;
       try {
         const st = await this.post("/api/battle/start", { battle_id: battleId, creature_id: id });
-        if (this.battleRequest !== battleId) return;
+        if (this.battleRequest !== token) return;
         this.battleId = battleId;
         this.battle = st;
         this.battleAnswer = "";
@@ -74,11 +87,11 @@ function battleMixin() {
         this.moveToTop("#battle-heading");
         await this.loadBattleCredits();
       } catch (e) {
-        if (this.battleRequest !== battleId) return;
+        if (this.battleRequest !== token) return;
         this.battleError = e.message;
         this.error = e.message;
       } finally {
-        if (this.battleRequest === battleId) this.battleBusy = false;
+        if (this.battleRequest === token) this.battleBusy = false;
       }
     },
     async submitBattleAnswer() {
@@ -112,7 +125,7 @@ function battleMixin() {
     leaveBattle() {
       // Invalidate any in-flight request and hand the buttons back.
       this.battleId = "";
-      this.battleRequest = "";
+      this.battleRequest = 0;
       this.battle = null;
       this.battleBusy = false;
       this.reset();

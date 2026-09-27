@@ -227,9 +227,20 @@ func (s *Store) Start(ctx context.Context, child progress.Child, req StartReques
 		req.BattleID, child.AccountID, child.ChildID, string(encoded), ts(now), ts(now)); err != nil {
 		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
 			// A concurrent start with the same id won; its credit spend
-			// stands and ours rolls back. Replay the winner.
+			// stands and ours rolls back. Replay the winner once. If the id
+			// is not visible to this child it belongs to someone else.
 			tx.Rollback()
-			return s.Start(ctx, child, req, now)
+			existing, loadErr := s.Load(ctx, child, req.BattleID)
+			if errors.Is(loadErr, ErrNotFound) {
+				return State{}, fmt.Errorf("%w: that battle id is already in use", ErrBadRequest)
+			}
+			if loadErr != nil {
+				return State{}, loadErr
+			}
+			if existing.Child.ID != req.CreatureID {
+				return State{}, fmt.Errorf("%w: that battle id belongs to a different kata", ErrBadRequest)
+			}
+			return existing, nil
 		}
 		return State{}, err
 	}
@@ -260,13 +271,15 @@ func (s *Store) pickOpponent(own kata.Creature) kata.Creature {
 	return pool[rand.IntN(len(pool))]
 }
 
-// nextItem poses a fresh question from the creature's skill whose answer
-// the client has not already been shown in this battle.
+// nextItem poses a question from the creature's skill whose answer the
+// client has not already been shown in this battle, for as long as unshown
+// items remain. A small answer space (grade-1 fractions, a five-word skill)
+// can be exhausted by a long battle, after which a repeat is unavoidable.
 func (s *Store) nextItem(st *stored, own kata.Creature) error {
 	if own.Kind == "math" {
 		op := strings.TrimSuffix(strings.TrimPrefix(own.SkillID, "math-"), fmt.Sprintf("-g%d", own.Grade))
 		var sh *sheet.Sheet
-		for attempt := 0; attempt < 12; attempt++ {
+		for attempt := 0; attempt < 40; attempt++ {
 			var err error
 			sh, err = sheet.GenerateCount([]string{op}, own.Grade, 1)
 			if err != nil {

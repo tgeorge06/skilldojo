@@ -250,6 +250,30 @@ func TestNextItemNeverRepeatsAnExposedAnswer(t *testing.T) {
 	}
 }
 
+func TestBattleIdOwnedByAnotherChildIsRefusedNotLooped(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	e.earnCredit(t, "credit-round-1", day0)
+	if _, err := e.battle.Start(ctx, e.child, StartRequest{BattleID: "shared-battle-1", CreatureID: "g2-endings"}, day0); err != nil {
+		t.Fatal(err)
+	}
+	other := e.child
+	other.ChildID = 999
+	done := make(chan error, 1)
+	go func() {
+		_, err := e.battle.Start(ctx, other, StartRequest{BattleID: "shared-battle-1", CreatureID: "g2-endings"}, day0)
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		if !errors.Is(err, ErrBadRequest) && !errors.Is(err, ErrNoCredit) {
+			t.Fatalf("expected a refusal, got %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("Start looped on a foreign battle id")
+	}
+}
+
 func TestBlankMasksOnlyWholeWords(t *testing.T) {
 	if got := blank("The cat sat on the catalog.", "cat"); got != "The _____ sat on the catalog." {
 		t.Fatal(got)

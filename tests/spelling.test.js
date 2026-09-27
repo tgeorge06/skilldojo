@@ -331,6 +331,13 @@ test("starting a battle persists the pending id so a retry reuses it", async () 
   game.post = async () => ({ done: true, won: true, turn: 1, child: {}, opponent: {}, log: [] });
   await game.startBattle();
   assert.equal(game.hasPendingBattle(), false, "a finished battle clears the pending id");
+  // Pending battles are scoped per child.
+  game.setPendingBattle({ id: "abc", creature: "g2-endings" });
+  game.child = { id: 2, nickname: "Max", grade: 1 };
+  assert.equal(game.hasPendingBattle(), false, "another child does not inherit a pending battle");
+  game.child = { id: 1, nickname: "Nova", grade: 2 };
+  assert.equal(game.hasPendingBattle(), true);
+  game.setPendingBattle(null);
   // Overlapping starts: the second call is rejected while busy.
   let calls = 0;
   game.post = () => { calls += 1; return new Promise(() => {}); };
