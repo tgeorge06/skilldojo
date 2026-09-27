@@ -26,6 +26,7 @@ import (
 	"github.com/tgeorge06/skilldojo/internal/db"
 	"github.com/tgeorge06/skilldojo/internal/kata"
 	"github.com/tgeorge06/skilldojo/internal/mail"
+	"github.com/tgeorge06/skilldojo/internal/ost"
 	"github.com/tgeorge06/skilldojo/internal/paint"
 	"github.com/tgeorge06/skilldojo/internal/progress"
 	"github.com/tgeorge06/skilldojo/internal/sheet"
@@ -79,6 +80,7 @@ type server struct {
 	kata     *kata.Store
 	paint    *paint.Store
 	battles  *battle.Store
+	tests    *ost.Store
 	cur      *curriculum.Curriculum
 	mailer   mail.Mailer
 	tmpl     *template.Template
@@ -157,7 +159,18 @@ func newServer(cfg config, database *sql.DB, mailer mail.Mailer) (*server, error
 	if err != nil {
 		return nil, err
 	}
-	tmpl, err := template.ParseFS(templateFS, "templates/*.html")
+	tmpl, err := template.New("").Funcs(template.FuncMap{
+		"add":           func(a, b int) int { return a + b },
+		"standardLabel": ost.StandardLabel,
+		"inList": func(n int, list []int) bool {
+			for _, v := range list {
+				if v == n {
+					return true
+				}
+			}
+			return false
+		},
+	}).ParseFS(templateFS, "templates/*.html")
 	if err != nil {
 		return nil, err
 	}
@@ -184,6 +197,7 @@ func newServer(cfg config, database *sql.DB, mailer mail.Mailer) (*server, error
 		kata:     creatures,
 		paint:    painter,
 		battles:  battles,
+		tests:    ost.New(database),
 		cur:      cur,
 		mailer:   mailer,
 		tmpl:     tmpl,
@@ -230,6 +244,12 @@ func (s *server) handler() http.Handler {
 	mux.HandleFunc("GET /family", s.handleFamily)
 	mux.HandleFunc("POST /family/children", s.handleCreateChild)
 	mux.HandleFunc("POST /family/children/{id}", s.handleChildAction)
+	mux.HandleFunc("GET /family/tests", s.handleFamilyTests)
+	mux.HandleFunc("GET /family/tests/{child}/{id}", s.handleFamilyAttempt)
+	mux.HandleFunc("GET /test", s.handleTestPage)
+	mux.HandleFunc("POST /api/ost/start", s.handleOSTStart)
+	mux.HandleFunc("POST /api/ost/answer", s.handleOSTAnswer)
+	mux.HandleFunc("POST /api/ost/submit", s.handleOSTSubmit)
 
 	// Reject cross-origin form posts (Sec-Fetch-Site / Origin based), which
 	// with SameSite=Lax cookies is the CSRF defence for every POST above.

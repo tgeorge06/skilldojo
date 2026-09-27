@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Practice test · SkillDojo</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🥋</text></svg>">
+  <script defer src="/static/alpine.min.js"></script>
+</head>
+<body class="min-h-full bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 antialiased">
+<a href="#main-content" class="skip-link">Skip to test</a>
+<div x-data="ostTest()" x-init="start()" data-test-grade="{{.Grade}}" data-child-nickname="{{.Child.Nickname}}" class="mx-auto max-w-2xl px-4 py-8 sm:py-12">
+  <header class="mb-6 flex flex-wrap items-center justify-between gap-3">
+    <div class="flex items-center gap-3">
+      <span class="text-4xl" aria-hidden="true">📝</span>
+      <div>
+        <h1 class="text-2xl font-bold tracking-tight">Math practice test</h1>
+        <p class="text-sm text-slate-500 dark:text-slate-400">Grade {{.Grade}} · {{.Child.Nickname}} · Ohio State Test style</p>
+      </div>
+    </div>
+    <a href="/" class="rounded-full border border-slate-300 px-3 py-1 text-sm dark:border-slate-700">Back to dojo</a>
+  </header>
+
+  <main id="main-content" tabindex="-1" class="space-y-5">
+    <p x-show="error" x-cloak role="alert" class="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-200" x-text="error"></p>
+
+    <section x-show="view === 'loading'" class="rounded-2xl bg-white p-6 shadow-sm border border-slate-200 dark:bg-slate-900 dark:border-slate-800">
+      <p class="text-slate-600 dark:text-slate-400">Getting your test ready…</p>
+    </section>
+
+    <section x-show="view === 'question'" x-cloak class="space-y-4">
+      <div class="rounded-2xl bg-white p-6 sm:p-8 shadow-sm border border-slate-200 dark:bg-slate-900 dark:border-slate-800 space-y-5">
+        <div class="flex items-center justify-between gap-3 text-sm text-slate-500 dark:text-slate-400">
+          <span>Question <span x-text="index + 1"></span> of <span x-text="items.length"></span></span>
+          <span x-text="answeredCount() + ' answered'"></span>
+        </div>
+        <div class="h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800" aria-hidden="true">
+          <div class="h-full bg-emerald-500 transition-all" :style="'width:' + (answeredCount() / Math.max(items.length, 1) * 100) + '%'"></div>
+        </div>
+        <template x-if="current()">
+          <div class="space-y-4">
+            <p id="test-prompt" class="text-lg font-semibold leading-relaxed" x-text="current().prompt"></p>
+
+            <template x-if="current().type === 'choice'">
+              <div class="space-y-2" role="radiogroup" aria-labelledby="test-prompt">
+                <template x-for="(c, i) in current().choices" :key="i">
+                  <label class="flex cursor-pointer items-center gap-3 rounded-xl border-2 p-3 transition"
+                         :class="isChosen(i) ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-950 dark:border-emerald-400' : 'border-slate-200 dark:border-slate-800'">
+                    <input type="radio" :name="'q-' + current().id" :value="i" :checked="isChosen(i)" @change="choose([i])" class="accent-emerald-600">
+                    <span x-text="c"></span>
+                  </label>
+                </template>
+              </div>
+            </template>
+
+            <template x-if="current().type === 'multi'">
+              <div class="space-y-2" role="group" aria-labelledby="test-prompt">
+                <template x-for="(c, i) in current().choices" :key="i">
+                  <label class="flex cursor-pointer items-center gap-3 rounded-xl border-2 p-3 transition"
+                         :class="isChosen(i) ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-950 dark:border-emerald-400' : 'border-slate-200 dark:border-slate-800'">
+                    <input type="checkbox" :value="i" :checked="isChosen(i)" @change="toggleChoice(i)" class="accent-emerald-600">
+                    <span x-text="c"></span>
+                  </label>
+                </template>
+              </div>
+            </template>
+
+            <template x-if="current().type === 'number'">
+              <div>
+                <label class="block text-sm font-medium" for="test-number">Your answer</label>
+                <input id="test-number" type="text" inputmode="decimal" autocomplete="off" maxlength="20"
+                       :value="numberText()" @input="typeNumber($event.target.value)"
+                       class="mt-1 w-48 rounded-lg border border-slate-300 bg-white px-3 py-2 text-lg dark:border-slate-700 dark:bg-slate-950">
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Numbers, decimals like 2.5, or fractions like 3/4 and 1 1/2.</p>
+              </div>
+            </template>
+          </div>
+        </template>
+
+        <div class="flex flex-wrap items-center justify-between gap-2 pt-2">
+          <button type="button" @click="prev()" :disabled="index === 0" class="rounded-xl border border-slate-300 px-4 py-2 font-semibold disabled:opacity-40 dark:border-slate-700">← Back</button>
+          <span class="text-xs text-slate-500 dark:text-slate-400" x-text="saveState"></span>
+          <button type="button" x-show="index < items.length - 1" @click="next()" class="rounded-xl bg-emerald-600 px-4 py-2 font-bold text-white shadow-sm hover:bg-emerald-700">Next →</button>
+          <button type="button" x-show="index === items.length - 1" @click="view = 'review'" class="rounded-xl bg-violet-600 px-4 py-2 font-bold text-white shadow-sm hover:bg-violet-700">Review my answers</button>
+        </div>
+      </div>
+      <p class="text-center text-xs text-slate-500 dark:text-slate-400">Your answers save as you go. You can close this and come back later.</p>
+    </section>
+
+    <section x-show="view === 'review'" x-cloak class="rounded-2xl bg-white p-6 sm:p-8 shadow-sm border border-slate-200 dark:bg-slate-900 dark:border-slate-800 space-y-5">
+      <h2 class="text-lg font-semibold">Ready to turn it in?</h2>
+      <p class="text-slate-600 dark:text-slate-400"><span x-text="answeredCount()"></span> of <span x-text="items.length"></span> answered. Tap a number to jump back to it.</p>
+      <div class="grid grid-cols-8 gap-2" aria-label="Questions">
+        <template x-for="(it, i) in items" :key="it.id">
+          <button type="button" @click="index = i; view = 'question'" class="rounded-lg border-2 py-2 text-sm font-semibold"
+                  :class="answers[it.id] ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950' : 'border-amber-400 bg-amber-50 dark:bg-amber-950'"
+                  :aria-label="'Question ' + (i + 1) + (answers[it.id] ? ', answered' : ', not answered')" x-text="i + 1"></button>
+        </template>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <button type="button" @click="view = 'question'" class="rounded-xl border border-slate-300 px-4 py-2 font-semibold dark:border-slate-700">Keep working</button>
+        <button type="button" @click="submit()" :disabled="busy" class="rounded-xl bg-emerald-600 px-4 py-2 font-bold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50">Turn in my test</button>
+      </div>
+    </section>
+
+    <section x-show="view === 'done'" x-cloak class="space-y-5">
+      <div class="rounded-2xl bg-white p-6 sm:p-8 shadow-sm border border-slate-200 dark:bg-slate-900 dark:border-slate-800 space-y-4">
+        <h2 id="test-results-heading" class="text-2xl font-bold">You scored <span x-text="report.percent + '%'"></span></h2>
+        <p class="text-slate-600 dark:text-slate-400"><span x-text="report.score"></span> of <span x-text="report.total"></span> right · estimated level: <strong x-text="report.level"></strong></p>
+        <ul class="space-y-2" aria-label="By category">
+          <template x-for="c in report.categories" :key="c.name">
+            <li>
+              <div class="flex justify-between text-sm"><span x-text="c.name"></span><span x-text="c.right + '/' + c.total"></span></div>
+              <div class="h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800" aria-hidden="true"><div class="h-full bg-violet-500" :style="'width:' + c.percent + '%'"></div></div>
+            </li>
+          </template>
+        </ul>
+        <p class="text-xs text-slate-500 dark:text-slate-400">The level is a rough guide from this practice test only. The real test uses scaled scores.</p>
+        <div class="flex flex-wrap gap-2">
+          <a href="/" class="rounded-xl bg-emerald-600 px-4 py-2 font-bold text-white shadow-sm hover:bg-emerald-700">Back to dojo</a>
+          <button type="button" @click="showReview = !showReview" class="rounded-xl border border-slate-300 px-4 py-2 font-semibold dark:border-slate-700" x-text="showReview ? 'Hide questions' : 'See every question'"></button>
+        </div>
+      </div>
+      <ol x-show="showReview" x-cloak class="space-y-3" aria-label="Question review">
+        <template x-for="(it, i) in report.items" :key="it.id">
+          <li class="rounded-xl border-2 p-4 space-y-1" :class="it.right ? 'border-emerald-300 dark:border-emerald-800' : 'border-rose-300 dark:border-rose-800'">
+            <p class="text-sm text-slate-500 dark:text-slate-400"><span x-text="i + 1"></span>. <span x-text="it.category"></span> · <span x-text="it.right ? 'Right' : (it.answered ? 'Missed' : 'Skipped')"></span></p>
+            <p class="font-medium" x-text="it.prompt"></p>
+            <p class="text-sm"><span class="text-slate-500 dark:text-slate-400">Correct:</span> <span x-text="correctText(it)"></span> <template x-if="it.answered && !it.right"><span class="text-slate-500 dark:text-slate-400"> · You said: <span x-text="givenText(it)"></span></span></template></p>
+            <p class="text-sm text-slate-600 dark:text-slate-400" x-text="it.explanation"></p>
+          </li>
+        </template>
+      </ol>
+    </section>
+  </main>
+</div>
+<script src="/static/ost.js"></script>
+</body>
+</html>

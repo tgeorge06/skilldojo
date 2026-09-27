@@ -13,7 +13,7 @@ function assertSingleOccurrence({ word, sentence }) {
   assert.equal(matches.length, 1, `"${sentence}" must contain "${word}" exactly once`);
 }
 
-function loadGame({ withAudio = false, rejectPlayback = false } = {}) {
+function loadGame({ withAudio = false, rejectPlayback = false, hash = "" } = {}) {
   const audioInstances = [];
   const spoken = [];
   class FakeAudio {
@@ -54,6 +54,7 @@ function loadGame({ withAudio = false, rejectPlayback = false } = {}) {
       querySelector: () => null,
     },
     requestAnimationFrame: (callback) => callback(),
+    location: { hash },
   });
   vm.runInContext(fs.readFileSync(path.join(root, "static", "words.js"), "utf8"), context);
   vm.runInContext(fs.readFileSync(path.join(root, "static", "audio", "spelling", "manifest.js"), "utf8"), context);
@@ -445,4 +446,16 @@ test("whole-word guesses cost one try or rescue the word", () => {
   assert.equal(game.roundWon, true);
   game.nextSpellingWord();
   assert.equal(game.view, "spelling-results");
+});
+
+test("a URL hash opens the dojo on the recommended math mode", () => {
+  const { game } = loadGame({ hash: "#math/frac" });
+  assert.equal(game.subject, "math");
+  assert.equal(game.ops.join(","), "frac");
+  const spelling = loadGame({ hash: "#spelling" }).game;
+  assert.equal(spelling.subject, "spelling");
+  const unknown = loadGame({ hash: "#math/geometry" }).game;
+  assert.equal(unknown.ops.join(","), "addsub", "unknown modes keep the default");
+  const junk = loadGame({ hash: "#<script>" }).game;
+  assert.equal(junk.subject, "math");
 });
