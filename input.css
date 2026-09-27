@@ -1,4 +1,6 @@
-@import "tailwindcss";
+/* source(none) turns off Tailwind's repo-wide scan so a word like "absolute"
+   in a shell script or a doc cannot add a utility; only these files count. */
+@import "tailwindcss" source(none);
 
 @source "./templates";
 @source "./static/app.js";
