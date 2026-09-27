@@ -475,7 +475,11 @@ function dojo() {
       this.moveToTop();
     },
   };
-  return Object.assign(core, typeof kataMixin === "function" ? kataMixin() : {});
+  return Object.assign(
+    core,
+    typeof kataMixin === "function" ? kataMixin() : {},
+    typeof paintMixin === "function" ? paintMixin() : {}
+  );
 }
 
 // readChild pulls the signed-in child from the root element's data

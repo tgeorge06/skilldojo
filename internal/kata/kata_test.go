@@ -146,7 +146,7 @@ func newEnv(t *testing.T) env {
 	}
 	prog := progress.New(d, cur, sheet.NewStore())
 	k := New(d, roster)
-	prog.SetSink(k)
+	prog.AddSink(k)
 	return env{prog: prog, kata: k, cur: cur, child: progress.Child{AccountID: acct.ID, ChildID: kid.ID, Grade: 2, Timezone: "UTC"}}
 }
 

@@ -53,7 +53,7 @@ type Store struct {
 	db     *sql.DB
 	cur    *curriculum.Curriculum
 	sheets *sheet.Store
-	sink   Sink
+	sinks  []Sink
 }
 
 // New wraps the database, curriculum, and the in-memory sheet store the
@@ -106,6 +106,7 @@ type Reward struct {
 	ReviewDue    int             `json:"review_due"` // words the child keeps missing
 	Evolved      []string        `json:"evolved"`    // skill ids that reached mastery in this round
 	Creatures    json.RawMessage `json:"creatures,omitempty"`
+	Mosaic       json.RawMessage `json:"mosaic,omitempty"`
 }
 
 // Sink is applied inside the finishing transaction, once per round, with
@@ -114,8 +115,9 @@ type Sink interface {
 	Apply(ctx context.Context, tx *sql.Tx, child Child, skills []string, reward *Reward, now time.Time) error
 }
 
-// SetSink registers the reward consumer.
-func (s *Store) SetSink(sink Sink) { s.sink = sink }
+// AddSink registers a reward consumer. Sinks run in registration order
+// inside the finishing transaction.
+func (s *Store) AddSink(sink Sink) { s.sinks = append(s.sinks, sink) }
 
 // FinishResponse is returned to the client and stored verbatim so a retry
 // returns the identical payload.
@@ -143,6 +145,10 @@ type Child struct {
 const tsLayout = "2006-01-02T15:04:05.000000000Z"
 
 func ts(t time.Time) string { return t.UTC().Format(tsLayout) }
+
+// LocalDate is the child's calendar date, which keys review scheduling and
+// the weekly mosaic.
+func LocalDate(now time.Time, tz string) string { return localDate(now, tz) }
 
 // localDate is the child's calendar date, which keys review scheduling.
 func localDate(now time.Time, tz string) string {
@@ -598,7 +604,7 @@ func (s *Store) Finish(ctx context.Context, child Child, req FinishRequest, now 
 	if resp.Reward.ReviewDue, err = countMissed(ctx, tx, child, now); err != nil {
 		return FinishResponse{}, err
 	}
-	if s.sink != nil {
+	if len(s.sinks) > 0 {
 		// Only skills the child actually attempted count as practiced; a
 		// blank submission must not mark creatures seen.
 		var skills []string
@@ -607,8 +613,10 @@ func (s *Store) Finish(ctx context.Context, child Child, req FinishRequest, now 
 				skills = append(skills, it.skill)
 			}
 		}
-		if err := s.sink.Apply(ctx, tx, child, skills, &resp.Reward, now); err != nil {
-			return FinishResponse{}, err
+		for _, sink := range s.sinks {
+			if err := sink.Apply(ctx, tx, child, skills, &resp.Reward, now); err != nil {
+				return FinishResponse{}, err
+			}
 		}
 	}
 

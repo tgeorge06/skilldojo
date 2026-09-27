@@ -84,6 +84,25 @@ func Generate(ops []string, grade, count int) (*Sheet, error) {
 	if !validCounts[count] {
 		return nil, fmt.Errorf("count must be 10, 20, or 30")
 	}
+	return generate(ops, grade, count)
+}
+
+// MaxPageCount bounds GenerateCount, used by color-by-number pages.
+const MaxPageCount = 40
+
+// GenerateCount is Generate for internal callers that need an arbitrary
+// small count (a page sized to one session) rather than a worksheet size.
+func GenerateCount(ops []string, grade, count int) (*Sheet, error) {
+	if count < 1 || count > MaxPageCount {
+		return nil, fmt.Errorf("count must be between 1 and %d", MaxPageCount)
+	}
+	if _, err := Generate(ops, grade, 10); err != nil { // reuse op/grade validation
+		return nil, err
+	}
+	return generate(ops, grade, count)
+}
+
+func generate(ops []string, grade, count int) (*Sheet, error) {
 
 	// Shuffle a copy so the remainder questions of an uneven split don't
 	// always favor the first-listed operations.
@@ -183,6 +202,19 @@ func (s *Store) Grade(id string, answers []string) ([]Result, error) {
 	}
 	return score(sh, answers)
 }
+
+// Answers returns the answer key as strings, in question order. Callers
+// that show them to a child must do so only for regions already solved.
+func (sh *Sheet) Answers() []string {
+	out := make([]string, len(sh.Questions))
+	for i, q := range sh.Questions {
+		out[i] = q.answer.String()
+	}
+	return out
+}
+
+// Check scores answers against this sheet without touching the store.
+func (sh *Sheet) Check(answers []string) ([]Result, error) { return score(sh, answers) }
 
 func score(sh *Sheet, answers []string) ([]Result, error) {
 	if len(answers) != len(sh.Questions) {

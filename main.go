@@ -25,6 +25,7 @@ import (
 	"github.com/tgeorge06/skilldojo/internal/db"
 	"github.com/tgeorge06/skilldojo/internal/kata"
 	"github.com/tgeorge06/skilldojo/internal/mail"
+	"github.com/tgeorge06/skilldojo/internal/paint"
 	"github.com/tgeorge06/skilldojo/internal/progress"
 	"github.com/tgeorge06/skilldojo/internal/sheet"
 )
@@ -72,6 +73,7 @@ type server struct {
 	accounts *account.Store
 	progress *progress.Store
 	kata     *kata.Store
+	paint    *paint.Store
 	cur      *curriculum.Curriculum
 	mailer   mail.Mailer
 	tmpl     *template.Template
@@ -159,13 +161,19 @@ func newServer(cfg config, database *sql.DB, mailer mail.Mailer) (*server, error
 	sheets := sheet.NewStore()
 	prog := progress.New(database, cur, sheets)
 	creatures := kata.New(database, roster)
-	prog.SetSink(creatures)
+	prog.AddSink(creatures)
+	painter, err := paint.New(database, sheets)
+	if err != nil {
+		return nil, err
+	}
+	prog.AddSink(painter)
 	return &server{
 		cfg:      cfg,
 		store:    sheets,
 		accounts: account.New(database),
 		progress: prog,
 		kata:     creatures,
+		paint:    painter,
 		cur:      cur,
 		mailer:   mailer,
 		tmpl:     tmpl,
@@ -197,6 +205,9 @@ func (s *server) handler() http.Handler {
 	mux.HandleFunc("POST /api/round/start", s.handleRoundStart)
 	mux.HandleFunc("POST /api/round/finish", s.handleRoundFinish)
 	mux.HandleFunc("GET /api/kata/index", s.handleKataIndex)
+	mux.HandleFunc("GET /api/mosaic/week", s.handleMosaicWeek)
+	mux.HandleFunc("POST /api/paint/page", s.handlePageStart)
+	mux.HandleFunc("POST /api/paint/fill", s.handlePageFill)
 
 	mux.HandleFunc("GET /login", s.handleLoginPage)
 	mux.HandleFunc("POST /auth/magic", s.handleMagic)

@@ -244,6 +244,48 @@ test("a signed-in child starts at their own grade", () => {
   assert.ok(game.spellingSkillChoices().some((s) => s.id === "review"), "signed-in children get the review focus");
 });
 
+test("the paint mixin draws the mosaic and lays out pages deterministically", () => {
+  const { context } = loadGame();
+  vm.runInContext(fs.readFileSync(path.join(root, "static", "kata-svg.js"), "utf8"), context);
+  vm.runInContext(fs.readFileSync(path.join(root, "static", "kata.js"), "utf8"), context);
+  vm.runInContext(fs.readFileSync(path.join(root, "static", "paint.js"), "utf8"), context);
+  const game = context.dojo();
+  const mosaic = { size: 2, palette: ["#eee", "#f00"], cells: "0110", revealed: 2, total: 4, order: [3, 1, 0, 2] };
+  const cells = game.mosaicCells(mosaic);
+  assert.equal(cells.length, 4);
+  assert.equal(JSON.stringify(cells.map((c) => c.shown)), JSON.stringify([false, true, false, true]));
+  assert.equal(cells[1].color, "#f00");
+  assert.equal(cells[3].color, "#eee");
+  assert.equal(game.mosaicLabel(mosaic), "This week's mosaic, 2 of 4 tiles revealed");
+  const a = game.regionShape(3, 14, 123);
+  const b = game.regionShape(3, 14, 123);
+  assert.equal(a.path, b.path, "layout is a pure function of the seed");
+  assert.notEqual(a.path, game.regionShape(3, 14, 124).path);
+  game.page = { regions: [{ idx: 0, filled: true, answer: "7", color: 1 }, { idx: 1, filled: true, answer: "7", color: 1 }, { idx: 2, filled: false, color: -1 }] };
+  assert.equal(JSON.stringify(game.pageLegend().map((l) => l.answer)), JSON.stringify(["7"]));
+  assert.equal(game.regionColor(game.page.regions[1]), game.pageLegend()[0].color);
+  assert.equal(game.regionColor(game.page.regions[2]), "");
+  // Colors come from the server's per-answer index, so solving more never recolors.
+  const before = game.regionColor(game.page.regions[0]);
+  game.page.regions[2] = { idx: 2, filled: true, answer: "12", color: 0 };
+  assert.equal(game.regionColor(game.page.regions[0]), before);
+  assert.notEqual(game.regionColor(game.page.regions[2]), before);
+  game.child = null;
+  game.startCooldown();
+  assert.notEqual(game.view, "cooldown", "anonymous play never enters cooldown");
+  game.pageSelected = 1;
+  game.page = { seed: 5, total: 3, regions: [{ idx: 0, prompt: "3 + 4", filled: true, answer: "7" }, { idx: 1, prompt: "<b>", filled: false }, { idx: 2, prompt: "9 - 2", filled: false }] };
+  const svg = game.pageSVG();
+  assert.match(svg, /role="group" aria-label="Color by number page"/);
+  assert.equal((svg.match(/data-region=/g) || []).length, 3);
+  assert.match(svg, /aria-pressed="true"/);
+  assert.ok(svg.includes("&lt;b&gt;") && !svg.includes("<b>"), "prompts are escaped");
+  // Cooldown painting only honours strict hex colors.
+  game.cooldown = { seed: 5, palette: "tide", regions: 20, colors: Array(20).fill("") };
+  game.cooldown.colors[0] = "#ef476f";
+  assert.match(game.cooldownSVG(), /#ef476f/);
+});
+
 test("the kata mixin is merged and renders deterministic creatures", () => {
   const { context } = loadGame();
   vm.runInContext(fs.readFileSync(path.join(root, "static", "kata-svg.js"), "utf8"), context);
