@@ -1,6 +1,10 @@
 // Practice test page (Alpine component). One question per screen, every
 // answer saved to the server as it changes, so a closed tab resumes.
 function ostTest() {
+  // Per-item save chains and the ids whose last save failed. Kept out of
+  // the Alpine object so proxies never wrap promises.
+  const inflight = new Map();
+  const failed = new Set();
   return {
     view: "loading",
     grade: Number(document.querySelector("[data-test-grade]")?.dataset.testGrade) || 3,
@@ -84,23 +88,37 @@ function ostTest() {
     async save(id) {
       clearTimeout(this.saveTimers[id]);
       delete this.saveTimers[id];
+      // Serialize saves per item so an older request cannot land after a
+      // newer one. Promises live outside the reactive object.
+      const prior = inflight.get(id) || Promise.resolve();
+      const run = prior.then(() => this.send(id));
+      inflight.set(id, run);
+      const ok = await run;
+      if (inflight.get(id) === run) inflight.delete(id);
+      return ok;
+    },
+    async send(id) {
       const a = this.answers[id] || {};
       try {
         await this.post("/api/ost/answer", { attempt_id: this.attemptId, item_id: id, choices: a.choices || [], text: a.text || "" });
-        if (Object.keys(this.saveTimers).length === 0) this.saveState = "Saved";
+        failed.delete(id);
+        if (Object.keys(this.saveTimers).length === 0 && inflight.size <= 1) this.saveState = "Saved";
         this.error = "";
         return true;
       } catch (err) {
+        failed.add(id);
         this.saveState = "";
         this.error = "Could not save that answer: " + err.message;
         return false;
       }
     },
-    // flush sends every answer still waiting on its debounce.
+    // flush sends every answer still waiting on its debounce, retries any
+    // that failed, and waits for everything in flight. False if any failed.
     async flush() {
-      const pending = Object.keys(this.saveTimers);
-      const results = await Promise.all(pending.map((id) => this.save(id)));
-      return results.every(Boolean);
+      const ids = new Set([...Object.keys(this.saveTimers), ...failed]);
+      const results = await Promise.all([...ids].map((id) => this.save(id)));
+      await Promise.all([...inflight.values()]);
+      return results.every(Boolean) && failed.size === 0;
     },
     prev() {
       if (this.index > 0) this.index -= 1;
