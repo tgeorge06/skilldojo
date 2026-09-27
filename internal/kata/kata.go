@@ -82,6 +82,9 @@ func Load(cur *curriculum.Curriculum) (*Roster, error) {
 		case c.Name == "" || c.HintVague == "" || c.HintSpecific == "":
 			return nil, fmt.Errorf("kata: creature %q is missing text", c.ID)
 		}
+		if kind, grade, ok := expectedFor(c.SkillID, cur); !ok || kind != c.Kind || grade != c.Grade {
+			return nil, fmt.Errorf("kata: creature %q kind/grade %s/%d do not match its skill", c.ID, c.Kind, c.Grade)
+		}
 		ids[c.ID] = true
 		names[strings.ToLower(c.Name)] = true
 		r.creatures = append(r.creatures, c)
@@ -116,12 +119,21 @@ func Load(cur *curriculum.Curriculum) (*Roster, error) {
 			continue
 		}
 		hint := " " + lettersOnly(c.HintVague+" "+c.HintSpecific) + " "
-		for _, w := range cur.AllWords() {
-			skill := w.Skill
-			if skill == curriculum.SightWordSkill {
-				continue // sight words are common English; checked by bank below
+		var bank []curriculum.Word
+		if strings.HasPrefix(c.SkillID, "sight-") {
+			bank = cur.SightWords(c.Grade)
+		} else {
+			for _, w := range cur.Words(c.Grade) {
+				if w.Skill == c.SkillID {
+					bank = append(bank, w)
+				}
 			}
-			if skill == c.SkillID && len(w.Word) > 3 && strings.Contains(hint, " "+w.Word+" ") {
+		}
+		for _, w := range bank {
+			if strings.HasPrefix(c.SkillID, "sight-") && hintStopWords[w.Word] {
+				continue // an English hint cannot avoid "the"; content words are still checked
+			}
+			if strings.Contains(hint, " "+w.Word+" ") {
 				return nil, fmt.Errorf("kata: hint for %q leaks its word %q", c.ID, w.Word)
 			}
 		}
@@ -133,6 +145,33 @@ func Load(cur *curriculum.Curriculum) (*Roster, error) {
 		return r.creatures[i].Seed < r.creatures[j].Seed
 	})
 	return r, nil
+}
+
+// hintStopWords are the function words a sight-word hint is allowed to
+// contain even though they are themselves sight words. Anything else in the
+// band (see, look, little, ...) is still a leak.
+var hintStopWords = map[string]bool{
+	"the": true, "a": true, "an": true, "in": true, "on": true, "of": true, "to": true, "and": true,
+	"or": true, "it": true, "is": true, "are": true, "you": true, "your": true, "that": true,
+	"this": true, "with": true, "for": true, "as": true, "at": true, "by": true, "from": true,
+}
+
+// expectedFor derives the kind and grade a skill id implies.
+func expectedFor(skill string, cur *curriculum.Curriculum) (kind string, grade int, ok bool) {
+	var op string
+	if n, _ := fmt.Sscanf(skill, "math-%3s-g%d", &op, &grade); n == 2 || strings.HasPrefix(skill, "math-") {
+		if n, _ := fmt.Sscanf(skill[strings.LastIndex(skill, "-g")+2:], "%d", &grade); n == 1 {
+			return "math", grade, true
+		}
+		return "", 0, false
+	}
+	if n, _ := fmt.Sscanf(skill, "sight-g%d", &grade); n == 1 {
+		return "spelling", grade, true
+	}
+	if _, found := cur.Skill(skill); found && len(skill) > 2 && skill[0] == 'g' {
+		return "spelling", int(skill[1] - '0'), true
+	}
+	return "", 0, false
 }
 
 // lettersOnly lower-cases and replaces every non-letter with a space so a
@@ -218,11 +257,23 @@ func (s *Store) Apply(ctx context.Context, tx *sql.Tx, child progress.Child, ski
 			state = StateSeen
 		}
 		t := Touched{ID: c.ID, Name: c.Name, Seed: c.Seed, Palette: c.Palette, Regions: c.Regions, NewlySeen: newly}
-		t.FillsAdded = reward.FillsBySkill[skill]
-		fills = min(c.Regions, fills+t.FillsAdded)
+		before := fills
+		fills = min(c.Regions, fills+reward.FillsBySkill[skill])
+		t.FillsAdded = fills - before
 		var caughtAt, evolvedAt any
 		if state == StateSeen && fills >= c.Regions {
 			state, t.Caught, caughtAt = StateCaught, true, ts(now)
+		}
+		// Mastery recorded earlier (before the creature existed, or on a
+		// round this creature was not part of) still evolves it.
+		if !evolved[skill] && state != StateEvolved {
+			var evolvedOn sql.NullString
+			if err := tx.QueryRowContext(ctx,
+				`SELECT evolved_on FROM skill_progress WHERE child_id = ? AND account_id = ? AND skill_id = ?`,
+				child.ChildID, child.AccountID, skill).Scan(&evolvedOn); err != nil && !errors.Is(err, sql.ErrNoRows) {
+				return err
+			}
+			evolved[skill] = evolvedOn.Valid
 		}
 		if state != StateEvolved && evolved[skill] {
 			if state == StateSeen { // mastery implies enough practice to count as caught
@@ -243,6 +294,9 @@ func (s *Store) Apply(ctx context.Context, tx *sql.Tx, child progress.Child, ski
 			return err
 		}
 		touched = append(touched, t)
+	}
+	if len(touched) == 0 {
+		return nil // nothing practiced, nothing to reveal
 	}
 	encoded, err := json.Marshal(touched)
 	if err != nil {
@@ -279,6 +333,8 @@ type Index struct {
 	ChildGrade int            `json:"child_grade"`
 }
 
+// Index merges the roster with the child's state. reviewDue is the count
+// of words the child keeps missing, computed by the caller.
 func (s *Store) Index(ctx context.Context, child progress.Child, prog []progress.SkillProgress, reviewDue int, cur *curriculum.Curriculum) (Index, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT creature_id, state, fills FROM creature_state WHERE child_id = ? AND account_id = ?`,

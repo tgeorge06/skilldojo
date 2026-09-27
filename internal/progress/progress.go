@@ -599,9 +599,13 @@ func (s *Store) Finish(ctx context.Context, child Child, req FinishRequest, now 
 		return FinishResponse{}, err
 	}
 	if s.sink != nil {
+		// Only skills the child actually attempted count as practiced; a
+		// blank submission must not mark creatures seen.
 		var skills []string
 		for _, it := range items {
-			skills = append(skills, it.skill)
+			if it.attempted {
+				skills = append(skills, it.skill)
+			}
 		}
 		if err := s.sink.Apply(ctx, tx, child, skills, &resp.Reward, now); err != nil {
 			return FinishResponse{}, err
@@ -752,6 +756,23 @@ func missedWords(ctx context.Context, q queryer, child Child, now time.Time) ([]
 func countMissed(ctx context.Context, tx *sql.Tx, child Child, now time.Time) (int, error) {
 	words, err := missedWords(ctx, tx, child, now)
 	return len(words), err
+}
+
+// MissedCount is the bounded count path for the index: the same window
+// query, aggregated in SQL.
+func (s *Store) MissedCount(ctx context.Context, child Child, now time.Time) (int, error) {
+	var n int
+	err := s.db.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM (
+		   SELECT item_key, correct,
+		          ROW_NUMBER() OVER (PARTITION BY item_key ORDER BY answered_at DESC) AS rn,
+		          SUM(CASE WHEN correct = 0 THEN 1 ELSE 0 END) OVER (PARTITION BY item_key) AS misses
+		   FROM round_items
+		   WHERE child_id = ? AND account_id = ? AND answered_at > ? AND correct IS NOT NULL
+		     AND skill_id NOT LIKE 'math-%'
+		 ) WHERE rn = 1 AND correct = 0 AND misses >= 2`,
+		child.ChildID, child.AccountID, ts(now.Add(-MissedWindow))).Scan(&n)
+	return n, err
 }
 
 // MissedWords is the public form, used for the review focus and the index.

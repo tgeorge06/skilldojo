@@ -61,8 +61,9 @@ function kataMixin() {
     kataAboveGrade(entry) {
       return this.child && entry.grade > this.child.grade;
     },
-    // Train here: point the setup at this creature's skill and start.
-    trainHere(entry) {
+    // Train here: point the setup at this creature's skill and start. A
+    // failure to start surfaces on the index, where the child still is.
+    async trainHere(entry) {
       if (entry.kind === "math") {
         this.subject = "math";
         this.ops = [entry.focus];
@@ -72,14 +73,16 @@ function kataMixin() {
         this.spellingFocus = entry.focus;
         this.spellingGrade = entry.grade;
       }
-      this.startTraining();
+      await this.startTraining();
+      if (this.view === "kata-index" && this.error) this.kataError = this.error;
     },
-    trainReview() {
+    async trainReview() {
       this.subject = "spelling";
       this.spellingFocus = "review";
       this.spellingGrade = this.child ? this.child.grade : this.spellingGrade;
       this.spellingCount = 5;
-      this.startTraining();
+      await this.startTraining();
+      if (this.view === "kata-index" && this.error) this.kataError = this.error;
     },
     // Creatures touched by the round just finished, for the reveal.
     rewardCreatures() {

@@ -69,9 +69,9 @@ function dojo() {
       this.subject = subject;
       this.error = "";
     },
-    startTraining() {
-      if (this.subject === "spelling") this.startSpelling();
-      else this.startSheet();
+    async startTraining() {
+      if (this.subject === "spelling") await this.startSpelling();
+      else await this.startSheet();
     },
 
     // Math dojo methods.

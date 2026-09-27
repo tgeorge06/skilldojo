@@ -81,8 +81,39 @@ func TestRosterValidationRejectsLeaksAndGaps(t *testing.T) {
 	stray := f
 	stray.Creatures = append(append([]Creature(nil), f.Creatures...), Creature{ID: "g9-nope", SkillID: "g9-nope", Kind: "spelling", Grade: 1, Name: "Nope", HintVague: "x", HintSpecific: "x", Seed: 99, Regions: 20})
 	rosterJSON, _ = json.Marshal(stray)
-	if _, err := Load(cur); err == nil || !strings.Contains(err.Error(), "unknown skill") {
-		t.Fatalf("stray creature accepted: %v", err)
+	if _, err := Load(cur); err == nil {
+		t.Fatal("stray creature accepted")
+	}
+	// A creature whose kind or grade disagrees with its skill id is rejected.
+	wrong := f
+	wrong.Creatures = append([]Creature(nil), f.Creatures...)
+	for i, c := range wrong.Creatures {
+		if c.ID == "g2-endings" {
+			wrong.Creatures[i].Grade = 3
+		}
+	}
+	rosterJSON, _ = json.Marshal(wrong)
+	if _, err := Load(cur); err == nil || !strings.Contains(err.Error(), "do not match") {
+		t.Fatalf("wrong grade accepted: %v", err)
+	}
+	// Sight hints may use function words but not content words from the band.
+	sightLeak := f
+	sightLeak.Creatures = append([]Creature(nil), f.Creatures...)
+	var content string
+	for _, w := range cur.SightWords(1) {
+		if !hintStopWords[w.Word] {
+			content = w.Word
+			break
+		}
+	}
+	for i, c := range sightLeak.Creatures {
+		if c.ID == "sight-g1" {
+			sightLeak.Creatures[i].HintVague = "The one " + content + " on every page."
+		}
+	}
+	rosterJSON, _ = json.Marshal(sightLeak)
+	if _, err := Load(cur); err == nil || !strings.Contains(err.Error(), "leaks") {
+		t.Fatalf("sight content word accepted: %v", err)
 	}
 }
 
@@ -253,6 +284,40 @@ func TestBelowGradeRoundsRevealButDoNotColor(t *testing.T) {
 	got := entry(e.index(t, day0), "g1-blends")
 	if got.State != StateSeen || got.Fills != 0 {
 		t.Fatalf("below-grade entry: %+v", got)
+	}
+}
+
+func TestBlankRoundsDoNotRevealCreatures(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	if _, err := e.prog.Start(ctx, e.child, progress.StartRequest{RoundID: "blank-round-1", Kind: progress.KindSpelling, Focus: "g2-endings", Grade: 2, Count: 5}, day0); err != nil {
+		t.Fatal(err)
+	}
+	fin, err := e.prog.Finish(ctx, e.child, progress.FinishRequest{RoundID: "blank-round-1", Guesses: make([][]curriculum.Guess, 5)}, day0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(fin.Reward.Creatures) != 0 {
+		t.Fatalf("blank round touched creatures: %s", fin.Reward.Creatures)
+	}
+	if got := entry(e.index(t, day0), "g2-endings"); got.State != StateUnknown {
+		t.Fatalf("blank round revealed a creature: %+v", got)
+	}
+}
+
+func TestFillsAddedIsTheCappedDelta(t *testing.T) {
+	e := newEnv(t)
+	skill := "g2-endings"
+	var fin progress.FinishResponse
+	for i := 0; i < 5; i++ {
+		fin = e.play(t, "cap-round-"+string(rune('a'+i)), skill, 2, day0.Add(time.Duration(i)*time.Hour))
+	}
+	var touched []Touched
+	json.Unmarshal(fin.Reward.Creatures, &touched)
+	for _, tc := range touched {
+		if tc.ID == skill && (tc.Fills != 20 || tc.FillsAdded != 0) {
+			t.Fatalf("full creature should report +0: %+v", tc)
+		}
 	}
 }
 

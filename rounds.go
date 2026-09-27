@@ -97,12 +97,12 @@ func (s *server) handleKataIndex(w http.ResponseWriter, r *http.Request) {
 		writeProgressError(w, err)
 		return
 	}
-	missed, err := s.progress.MissedWords(r.Context(), child, now)
+	missed, err := s.progress.MissedCount(r.Context(), child, now)
 	if err != nil {
 		writeProgressError(w, err)
 		return
 	}
-	idx, err := s.kata.Index(r.Context(), child, prog, len(missed), s.cur)
+	idx, err := s.kata.Index(r.Context(), child, prog, missed, s.cur)
 	if err != nil {
 		writeProgressError(w, err)
 		return
