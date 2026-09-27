@@ -10,13 +10,23 @@
 </head>
 <body class="min-h-full bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 antialiased">
 <a href="#main-content" class="skip-link">Skip to practice</a>
-<div x-data="dojo()" @keydown.window="handleKey($event)" class="mx-auto max-w-3xl px-4 py-8 sm:py-12">
-  <header class="mb-8 flex items-center gap-3">
-    <span class="text-4xl" aria-hidden="true">🥋</span>
-    <div>
-      <h1 class="text-2xl font-bold tracking-tight">SkillDojo</h1>
-      <p class="text-sm text-slate-500 dark:text-slate-400" x-text="headerSubtitle()"></p>
+<div x-data="dojo()" @keydown.window="handleKey($event)" class="mx-auto max-w-3xl px-4 py-8 sm:py-12"
+     {{if .ActiveChild}}data-child-id="{{.ActiveChild.ID}}" data-child-nickname="{{.ActiveChild.Nickname}}" data-child-grade="{{.ActiveChild.Grade}}"{{end}}>
+  <header class="mb-8 flex flex-wrap items-center justify-between gap-3">
+    <div class="flex items-center gap-3">
+      <span class="text-4xl" aria-hidden="true">🥋</span>
+      <div>
+        <h1 class="text-2xl font-bold tracking-tight">SkillDojo</h1>
+        <p class="text-sm text-slate-500 dark:text-slate-400" x-text="headerSubtitle()"></p>
+      </div>
     </div>
+    {{if .ActiveChild}}
+      <a href="/family" class="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-100">Training: {{.ActiveChild.Nickname}}</a>
+    {{else if .SignedIn}}
+      <a href="/family" class="text-sm text-slate-500 underline dark:text-slate-400">Choose who's training</a>
+    {{else}}
+      <a href="/login" class="text-sm text-slate-500 underline dark:text-slate-400">Parents</a>
+    {{end}}
   </header>
 
   <main id="main-content" tabindex="-1">

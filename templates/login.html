@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Parent sign-in · SkillDojo</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🥋</text></svg>">
+</head>
+<body class="min-h-full bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 antialiased">
+<a href="#main-content" class="skip-link">Skip to sign-in</a>
+<div class="mx-auto max-w-md px-4 py-8 sm:py-12">
+  <header class="mb-8 flex items-center gap-3">
+    <span class="text-4xl" aria-hidden="true">🥋</span>
+    <div>
+      <h1 class="text-2xl font-bold tracking-tight"><a href="/">SkillDojo</a></h1>
+      <p class="text-sm text-slate-500 dark:text-slate-400">Parent area</p>
+    </div>
+  </header>
+  <main id="main-content" tabindex="-1" class="rounded-2xl bg-white dark:bg-slate-900 p-6 sm:p-8 shadow-sm border border-slate-200 dark:border-slate-800 space-y-6">
+    <div>
+      <h2 class="text-lg font-semibold">Sign in with your email</h2>
+      <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">We email you a one-time link. No passwords. Kids never need an account: profiles are just a nickname.</p>
+    </div>
+    {{if .Error}}<p role="alert" class="rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-200">{{.Error}}</p>{{end}}
+    <form method="post" action="/auth/magic" class="space-y-4">
+      <label class="block">
+        <span class="text-sm font-medium">Email</span>
+        <input type="email" name="email" required autocomplete="email" inputmode="email" maxlength="254"
+               class="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
+      </label>
+      <input type="hidden" name="tz" value="UTC" id="tz">
+      <button type="submit" class="w-full rounded-xl bg-emerald-600 px-6 py-3 text-lg font-bold text-white shadow-sm transition hover:bg-emerald-700">Email me a sign-in link</button>
+    </form>
+  </main>
+</div>
+<script>
+  // The parent's timezone keys weekly recaps to their local calendar.
+  try { document.getElementById("tz").value = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"; } catch (e) {}
+</script>
+</body>
+</html>

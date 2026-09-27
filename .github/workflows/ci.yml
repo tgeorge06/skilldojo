@@ -24,5 +24,8 @@ jobs:
       - run: npm test
       # Verify the committed words.js matches the curriculum JSON.
       - run: node scripts/generate-words.js --check
+      # Render gate: every page and view in headless Chromium, failing on page errors.
+      - run: npx playwright install --with-deps chromium
+      - run: make ui-test
       - run: ./node_modules/.bin/tailwindcss -i input.css -o static/app.css --minify
       - run: git diff --exit-code static/app.css

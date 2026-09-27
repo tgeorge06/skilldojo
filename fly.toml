@@ -1,0 +1,34 @@
+# Fly.io app definition. One machine, one volume, SQLite inside.
+# Secrets (fly secrets set ...): RESEND_API_KEY, LITESTREAM_BUCKET,
+# LITESTREAM_ENDPOINT, LITESTREAM_ACCESS_KEY_ID, LITESTREAM_SECRET_ACCESS_KEY.
+app = "skilldojo"
+primary_region = "iad"
+
+[build]
+
+[env]
+  DATABASE_PATH = "/data/skilldojo.db"
+  BASE_URL = "https://skilldojo.io"
+  MAIL_FROM = "SkillDojo <hello@skilldojo.io>"
+  BEHIND_PROXY = "1"
+
+[mounts]
+  source = "skilldojo_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # SQLite lives on one machine; never scale to zero or to two.
+  auto_stop_machines = "off"
+  auto_start_machines = false
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 200
+    hard_limit = 250
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

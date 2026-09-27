@@ -1,0 +1,415 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/cookiejar"
+	"net/http/httptest"
+	"net/url"
+	"path/filepath"
+	"regexp"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/tgeorge06/skilldojo/internal/db"
+	"github.com/tgeorge06/skilldojo/internal/mail"
+)
+
+// captureMailer records outbound mail so tests can pull the magic link.
+type captureMailer struct {
+	mu   sync.Mutex
+	sent []mail.Message
+}
+
+func (c *captureMailer) Send(_ context.Context, m mail.Message) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.sent = append(c.sent, m)
+	return nil
+}
+
+func (c *captureMailer) last() mail.Message {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if len(c.sent) == 0 {
+		return mail.Message{}
+	}
+	return c.sent[len(c.sent)-1]
+}
+
+type testEnv struct {
+	srv    *httptest.Server
+	mailer *captureMailer
+	s      *server
+}
+
+func newTestEnv(t *testing.T) *testEnv {
+	t.Helper()
+	d, err := db.Open(filepath.Join(t.TempDir(), "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { d.Close() })
+	if _, err := db.Migrate(context.Background(), d); err != nil {
+		t.Fatal(err)
+	}
+	mailer := &captureMailer{}
+	s, err := newServer(config{dev: true, baseURL: "http://placeholder"}, d, mailer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(s.handler())
+	t.Cleanup(srv.Close)
+	s.cfg.baseURL = srv.URL
+	return &testEnv{srv: srv, mailer: mailer, s: s}
+}
+
+// client returns an HTTP client with its own cookie jar that does not follow
+// redirects, so tests can assert on 303s.
+func (e *testEnv) client(t *testing.T) *http.Client {
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return &http.Client{
+		Jar:           jar,
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+	}
+}
+
+func (e *testEnv) postForm(t *testing.T, c *http.Client, path string, form url.Values, headers ...string) *http.Response {
+	t.Helper()
+	req, _ := http.NewRequest(http.MethodPost, e.srv.URL+path, strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Sec-Fetch-Site", "same-origin")
+	for i := 0; i+1 < len(headers); i += 2 {
+		req.Header.Set(headers[i], headers[i+1])
+	}
+	res, err := c.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return res
+}
+
+func body(t *testing.T, res *http.Response) string {
+	t.Helper()
+	defer res.Body.Close()
+	b, err := io.ReadAll(res.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}
+
+var linkRE = regexp.MustCompile(`/auth/verify\?t=[A-Za-z0-9_-]+`)
+
+// signIn runs the magic-link flow for email and returns a signed-in client.
+func (e *testEnv) signIn(t *testing.T, email string) *http.Client {
+	t.Helper()
+	c := e.client(t)
+	res := e.postForm(t, c, "/auth/magic", url.Values{"email": {email}, "tz": {"America/New_York"}})
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("magic: %d", res.StatusCode)
+	}
+	page := body(t, res)
+	if !strings.Contains(page, strings.ToLower(email)) {
+		t.Fatalf("sent page should echo the address: %s", page)
+	}
+	link := linkRE.FindString(e.mailer.last().Text)
+	if link == "" {
+		t.Fatalf("no link in mail: %q", e.mailer.last().Text)
+	}
+	// GET only confirms; it must not consume the token.
+	res, err := c.Get(e.srv.URL + link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page := body(t, res); res.StatusCode != http.StatusOK || !strings.Contains(page, "Sign in as "+strings.ToLower(email)) {
+		t.Fatalf("verify page: %d %s", res.StatusCode, page[:300])
+	}
+	res, _ = c.Get(e.srv.URL + link)
+	if body(t, res); res.StatusCode != http.StatusOK {
+		t.Fatalf("second GET of the link should still confirm, got %d", res.StatusCode)
+	}
+	token := strings.TrimPrefix(link, "/auth/verify?t=")
+	res = e.postForm(t, c, "/auth/verify", url.Values{"t": {token}})
+	body(t, res)
+	if res.StatusCode != http.StatusSeeOther || res.Header.Get("Location") != "/family" {
+		t.Fatalf("verify: %d -> %q", res.StatusCode, res.Header.Get("Location"))
+	}
+	return c
+}
+
+func TestMagicLinkSignInFlow(t *testing.T) {
+	e := newTestEnv(t)
+	c := e.signIn(t, "Parent@Example.com")
+
+	// The link is single use: both the page and the redeem refuse it now.
+	link := linkRE.FindString(e.mailer.last().Text)
+	res, _ := c.Get(e.srv.URL + link)
+	if page := body(t, res); res.StatusCode != http.StatusBadRequest || !strings.Contains(page, "expired or was already used") {
+		t.Fatalf("reused link page: %d %s", res.StatusCode, page)
+	}
+	res = e.postForm(t, c, "/auth/verify", url.Values{"t": {strings.TrimPrefix(link, "/auth/verify?t=")}})
+	if page := body(t, res); res.StatusCode != http.StatusBadRequest || !strings.Contains(page, "expired or was already used") {
+		t.Fatalf("reused link redeem: %d", res.StatusCode)
+	}
+	// A cross-site redeem is refused before the token is touched.
+	c3 := e.client(t)
+	e.postForm(t, c3, "/auth/magic", url.Values{"email": {"other@example.com"}}).Body.Close()
+	tok := strings.TrimPrefix(linkRE.FindString(e.mailer.last().Text), "/auth/verify?t=")
+	res = e.postForm(t, c3, "/auth/verify", url.Values{"t": {tok}}, "Sec-Fetch-Site", "cross-site")
+	body(t, res)
+	if res.StatusCode != http.StatusForbidden {
+		t.Fatalf("cross-site redeem: %d", res.StatusCode)
+	}
+	res = e.postForm(t, c3, "/auth/verify", url.Values{"t": {tok}})
+	body(t, res)
+	if res.StatusCode != http.StatusSeeOther {
+		t.Fatalf("token should survive a refused cross-site attempt: %d", res.StatusCode)
+	}
+
+	// Signed-in parent sees the family page with their (normalized) email.
+	res, _ = c.Get(e.srv.URL + "/family")
+	if page := body(t, res); res.StatusCode != http.StatusOK || !strings.Contains(page, "parent@example.com") {
+		t.Fatalf("family: %d %s", res.StatusCode, page[:200])
+	}
+
+	// Cookie flags.
+	u, _ := url.Parse(e.srv.URL)
+	var found bool
+	for _, ck := range c.Jar.Cookies(u) {
+		if ck.Name == sessionCookie {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("session cookie not set")
+	}
+
+	// Sign out clears it.
+	res = e.postForm(t, c, "/auth/logout", url.Values{})
+	body(t, res)
+	res, _ = c.Get(e.srv.URL + "/family")
+	body(t, res)
+	if res.StatusCode != http.StatusSeeOther || res.Header.Get("Location") != "/login" {
+		t.Fatalf("after logout: %d -> %q", res.StatusCode, res.Header.Get("Location"))
+	}
+}
+
+func TestMagicDoesNotRevealOrFlood(t *testing.T) {
+	e := newTestEnv(t)
+	c := e.client(t)
+	// Production responses must be byte-identical whether or not mail was
+	// sent; dev mode deliberately echoes the link, so turn it off here.
+	e.s.cfg.dev = false
+	var pages []string
+	for i := 0; i < 5; i++ {
+		res := e.postForm(t, c, "/auth/magic", url.Values{"email": {"same@example.com"}})
+		if res.StatusCode != http.StatusOK {
+			t.Fatalf("attempt %d: %d", i, res.StatusCode)
+		}
+		pages = append(pages, body(t, res))
+	}
+	// Rate-limited responses are identical to successful ones.
+	if pages[0] != pages[4] {
+		t.Fatal("rate-limited response differs from normal response")
+	}
+	if n := len(e.mailer.sent); n != 3 {
+		t.Fatalf("sent %d mails, want 3 (limit)", n)
+	}
+	if strings.Contains(pages[0], "/auth/verify?t=") {
+		t.Fatal("production response must never echo the sign-in link")
+	}
+	res := e.postForm(t, c, "/auth/magic", url.Values{"email": {"not-an-email"}})
+	if page := body(t, res); !strings.Contains(page, "valid email") {
+		t.Fatalf("bad email should re-render login: %s", page[:200])
+	}
+}
+
+func TestSessionCookieAttributes(t *testing.T) {
+	e := newTestEnv(t)
+	c := e.client(t)
+	e.postForm(t, c, "/auth/magic", url.Values{"email": {"a@example.com"}}).Body.Close()
+	link := linkRE.FindString(e.mailer.last().Text)
+	res := e.postForm(t, c, "/auth/verify", url.Values{"t": {strings.TrimPrefix(link, "/auth/verify?t=")}})
+	body(t, res)
+	raw := res.Header.Get("Set-Cookie")
+	for _, want := range []string{"HttpOnly", "SameSite=Lax", "Path=/", "Max-Age=7776000"} {
+		if !strings.Contains(raw, want) {
+			t.Errorf("Set-Cookie %q lacks %s", raw, want)
+		}
+	}
+	if strings.Contains(raw, "Secure") {
+		t.Error("dev mode should not set Secure over http")
+	}
+	e.s.cfg.dev = false
+	rec := httptest.NewRecorder()
+	e.s.setSessionCookie(rec, "x")
+	if !strings.Contains(rec.Header().Get("Set-Cookie"), "Secure") {
+		t.Error("production cookie must be Secure")
+	}
+}
+
+func TestChildrenAreFencedAcrossAccounts(t *testing.T) {
+	e := newTestEnv(t)
+	a := e.signIn(t, "a@example.com")
+	b := e.signIn(t, "b@example.com")
+
+	res := e.postForm(t, a, "/family/children", url.Values{"nickname": {" Nova "}, "grade": {"2"}})
+	body(t, res)
+	if res.StatusCode != http.StatusSeeOther {
+		t.Fatalf("create: %d", res.StatusCode)
+	}
+	res, _ = a.Get(e.srv.URL + "/family")
+	page := body(t, res)
+	if !strings.Contains(page, "Nova") || !strings.Contains(page, "training now") {
+		t.Fatalf("first child should be active: %s", page)
+	}
+	idRE := regexp.MustCompile(`/family/children/(\d+)`)
+	m := idRE.FindStringSubmatch(page)
+	if m == nil {
+		t.Fatal("no child id in page")
+	}
+	childPath := "/family/children/" + m[1]
+
+	// The practice page shows the active child via data attributes, escaped.
+	res, _ = a.Get(e.srv.URL + "/")
+	page = body(t, res)
+	if !strings.Contains(page, `data-child-nickname="Nova"`) || !strings.Contains(page, "Training: Nova") {
+		t.Fatalf("index should carry the active child: %s", page[:400])
+	}
+
+	// B cannot touch A's child by id: every action is a 404.
+	for _, action := range []string{"select", "rename", "delete"} {
+		res = e.postForm(t, b, childPath, url.Values{"action": {action}, "nickname": {"Hacked"}, "grade": {"1"}})
+		body(t, res)
+		if res.StatusCode != http.StatusNotFound {
+			t.Errorf("cross-account %s: %d, want 404", action, res.StatusCode)
+		}
+	}
+	res, _ = b.Get(e.srv.URL + "/family")
+	if page := body(t, res); strings.Contains(page, "Train as Nova") || strings.Contains(page, childPath) {
+		t.Fatal("B can see A's child")
+	}
+
+	// A can rename, and validation errors come back as 400 with a message.
+	res = e.postForm(t, a, childPath, url.Values{"action": {"rename"}, "nickname": {"<b>x</b>"}, "grade": {"3"}})
+	if page := body(t, res); res.StatusCode != http.StatusBadRequest || !strings.Contains(page, "letters, numbers") {
+		t.Fatalf("bad nickname: %d %s", res.StatusCode, page[:300])
+	}
+	res = e.postForm(t, a, childPath, url.Values{"action": {"rename"}, "nickname": {"Nova B"}, "grade": {"3"}})
+	body(t, res)
+	res, _ = a.Get(e.srv.URL + "/")
+	if page := body(t, res); !strings.Contains(page, `data-child-nickname="Nova B"`) || !strings.Contains(page, `data-child-grade="3"`) {
+		t.Fatalf("rename not reflected: %s", page[:400])
+	}
+
+	// Nicknames are HTML-escaped wherever they render.
+	res = e.postForm(t, a, "/family/children", url.Values{"nickname": {"O'Neil"}, "grade": {"1"}})
+	body(t, res)
+	res, _ = a.Get(e.srv.URL + "/family")
+	if page := body(t, res); !strings.Contains(page, "O&#39;Neil") {
+		t.Fatalf("apostrophe not escaped: %s", page)
+	}
+
+	// Delete hides it and clears the selection.
+	res = e.postForm(t, a, childPath, url.Values{"action": {"delete"}})
+	body(t, res)
+	res, _ = a.Get(e.srv.URL + "/")
+	if page := body(t, res); strings.Contains(page, "Nova B") {
+		t.Fatal("deleted child still active on index")
+	}
+}
+
+func TestCrossOriginPostsAreRejected(t *testing.T) {
+	e := newTestEnv(t)
+	c := e.client(t)
+	res := e.postForm(t, c, "/auth/magic", url.Values{"email": {"a@example.com"}}, "Sec-Fetch-Site", "cross-site")
+	body(t, res)
+	if res.StatusCode != http.StatusForbidden {
+		t.Fatalf("cross-site POST: %d, want 403", res.StatusCode)
+	}
+	if len(e.mailer.sent) != 0 {
+		t.Fatal("cross-site POST sent mail")
+	}
+}
+
+func TestFreeTierIsUntouchedWithoutSession(t *testing.T) {
+	e := newTestEnv(t)
+	c := e.client(t)
+	res, _ := c.Get(e.srv.URL + "/")
+	page := body(t, res)
+	if res.StatusCode != http.StatusOK || strings.Contains(page, "data-child-id") || !strings.Contains(page, `href="/login"`) {
+		t.Fatalf("anonymous index: %d", res.StatusCode)
+	}
+	req, _ := http.NewRequest(http.MethodPost, e.srv.URL+"/api/sheet", strings.NewReader(`{"ops":["addsub"],"grade":1,"count":10}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Sec-Fetch-Site", "same-origin")
+	res, err := c.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page := body(t, res); res.StatusCode != http.StatusOK || !strings.Contains(page, `"questions"`) {
+		t.Fatalf("api/sheet without session: %d %s", res.StatusCode, page)
+	}
+}
+
+func TestRateLimiterIsBoundedAndChecksIPFirst(t *testing.T) {
+	l := newRateLimiter()
+	l.maxKeys = 3
+	base := time.Date(2026, 9, 27, 12, 0, 0, 0, time.UTC)
+	for i, key := range []string{"a", "b", "c"} {
+		if !l.allow(key, 1, base) {
+			t.Fatalf("key %d denied", i)
+		}
+	}
+	if l.allow("d", 1, base) {
+		t.Fatal("table full: a new key must be denied, not grown")
+	}
+	if l.allow("a", 1, base) {
+		t.Fatal("limit 1 exceeded")
+	}
+	// After the window the sweep frees space.
+	if !l.allow("d", 1, base.Add(16*time.Minute)) {
+		t.Fatal("expired keys should be swept when full")
+	}
+
+	e := newTestEnv(t)
+	c := e.client(t)
+	for i := 0; i < 12; i++ {
+		e.postForm(t, c, "/auth/magic", url.Values{"email": {fmt.Sprintf("u%d@example.com", i)}}).Body.Close()
+	}
+	if n := len(e.mailer.sent); n != 10 {
+		t.Fatalf("one IP sent %d mails, want 10", n)
+	}
+	if len(e.s.limiter.hits) != 11 { // ip + 10 emails; the 2 denied never added keys
+		t.Fatalf("denied requests added limiter keys: %d", len(e.s.limiter.hits))
+	}
+}
+
+func TestConfigValidation(t *testing.T) {
+	if err := (config{dev: true}).validate(); err != nil {
+		t.Fatalf("dev config should validate: %v", err)
+	}
+	bad := []config{
+		{},
+		{baseURL: "http://skilldojo.io", resendKey: "re_x", mailFrom: "a@b.c"},
+		{baseURL: "https://skilldojo.io", resendKey: "changeme", mailFrom: "a@b.c"},
+		{baseURL: "https://skilldojo.io", resendKey: "re_x", mailFrom: ""},
+	}
+	for i, c := range bad {
+		if err := c.validate(); err == nil {
+			t.Errorf("config %d accepted: %+v", i, c)
+		}
+	}
+	if err := (config{baseURL: "https://skilldojo.io", resendKey: "re_x", mailFrom: "SkillDojo <hi@skilldojo.io>"}).validate(); err != nil {
+		t.Fatal(err)
+	}
+	_ = time.Second
+}

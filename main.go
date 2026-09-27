@@ -2,8 +2,11 @@
 package main
 
 import (
+	"context"
+	"database/sql"
 	"embed"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"html/template"
@@ -12,44 +15,153 @@ import (
 	"log"
 	"mime"
 	"net/http"
+	"os"
 	"strings"
 	"time"
+	_ "time/tzdata" // Fly's base image has no zoneinfo; embed it.
 
+	"github.com/tgeorge06/skilldojo/internal/account"
 	"github.com/tgeorge06/skilldojo/internal/curriculum"
+	"github.com/tgeorge06/skilldojo/internal/db"
+	"github.com/tgeorge06/skilldojo/internal/mail"
 	"github.com/tgeorge06/skilldojo/internal/sheet"
 )
 
-//go:embed templates/index.html
+//go:embed templates
 var templateFS embed.FS
 
 //go:embed static
 var staticFS embed.FS
 
+// config is everything main() reads from flags and the environment.
+type config struct {
+	addr        string
+	dbPath      string
+	dev         bool // console mail, insecure cookies, magic links echoed on-page
+	baseURL     string
+	behindProxy bool // trust Fly-Client-IP for rate limiting
+	resendKey   string
+	mailFrom    string
+}
+
+func (c config) validate() error {
+	if c.dev {
+		return nil
+	}
+	var problems []string
+	if !strings.HasPrefix(c.baseURL, "https://") {
+		problems = append(problems, "BASE_URL must start with https://")
+	}
+	if !strings.HasPrefix(c.resendKey, "re_") {
+		problems = append(problems, "RESEND_API_KEY must be a Resend key (re_...)")
+	}
+	if c.mailFrom == "" || !strings.Contains(c.mailFrom, "@") {
+		problems = append(problems, "MAIL_FROM must be an address")
+	}
+	if len(problems) > 0 {
+		return errors.New("config: " + strings.Join(problems, "; ") + " (or run with -dev)")
+	}
+	return nil
+}
+
 type server struct {
-	store *sheet.Store
-	tmpl  *template.Template
+	cfg      config
+	store    *sheet.Store
+	accounts *account.Store
+	mailer   mail.Mailer
+	tmpl     *template.Template
+	limiter  *rateLimiter
+	now      func() time.Time
 }
 
 func main() {
-	addr := flag.String("addr", "127.0.0.1:8080", "listen address")
+	cfg := config{
+		baseURL:     strings.TrimRight(os.Getenv("BASE_URL"), "/"),
+		behindProxy: os.Getenv("BEHIND_PROXY") == "1",
+		resendKey:   os.Getenv("RESEND_API_KEY"),
+		mailFrom:    os.Getenv("MAIL_FROM"),
+	}
+	flag.StringVar(&cfg.addr, "addr", "127.0.0.1:8080", "listen address")
+	flag.StringVar(&cfg.dbPath, "db", envOr("DATABASE_PATH", "skilldojo.db"), "SQLite database path")
+	flag.BoolVar(&cfg.dev, "dev", false, "development mode: log email instead of sending, allow http cookies")
 	flag.Parse()
-
-	s := &server{
-		store: sheet.NewStore(),
-		tmpl:  template.Must(template.ParseFS(templateFS, "templates/index.html")),
+	if cfg.dev && cfg.baseURL == "" {
+		cfg.baseURL = "http://" + cfg.addr
+	}
+	if err := cfg.validate(); err != nil {
+		log.Fatal(err)
 	}
 
-	staticFiles, err := fs.Sub(staticFS, "static")
+	database, err := db.Open(cfg.dbPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer database.Close()
+	applied, err := db.Migrate(context.Background(), database)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if applied > 0 {
+		log.Printf("applied %d migration(s) to %s", applied, cfg.dbPath)
+	}
+
+	mailer, err := mail.New(cfg.dev, cfg.resendKey, cfg.mailFrom)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// Fail fast if the embedded curriculum is malformed; the server will grade
-	// spelling rounds against it once accounts land.
-	if _, err := curriculum.Load(); err != nil {
+	s, err := newServer(cfg, database, mailer)
+	if err != nil {
 		log.Fatal(err)
 	}
+	go s.housekeeping(context.Background())
 
+	srv := &http.Server{
+		Addr:              cfg.addr,
+		Handler:           s.handler(),
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      15 * time.Second,
+	}
+	log.Printf("SkillDojo listening on http://%s", cfg.addr)
+	log.Fatal(srv.ListenAndServe())
+}
+
+func envOr(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
+}
+
+// newServer wires the handlers. Tests call it with a temp database and a
+// capturing mailer.
+func newServer(cfg config, database *sql.DB, mailer mail.Mailer) (*server, error) {
+	// Fail fast if the embedded curriculum is malformed; the server grades
+	// spelling rounds against it.
+	if _, err := curriculum.Load(); err != nil {
+		return nil, err
+	}
+	tmpl, err := template.ParseFS(templateFS, "templates/*.html")
+	if err != nil {
+		return nil, err
+	}
+	return &server{
+		cfg:      cfg,
+		store:    sheet.NewStore(),
+		accounts: account.New(database),
+		mailer:   mailer,
+		tmpl:     tmpl,
+		limiter:  newRateLimiter(),
+		now:      time.Now,
+	}, nil
+}
+
+func (s *server) handler() http.Handler {
+	staticFiles, err := fs.Sub(staticFS, "static")
+	if err != nil {
+		log.Fatal(err)
+	}
 	if err := mime.AddExtensionType(".opus", "audio/ogg"); err != nil {
 		log.Printf("register Opus MIME type: %v", err)
 	}
@@ -66,21 +178,66 @@ func main() {
 	mux.HandleFunc("POST /api/sheet", s.handleNewSheet)
 	mux.HandleFunc("POST /api/grade", s.handleGrade)
 
-	srv := &http.Server{
-		Addr:              *addr,
-		Handler:           mux,
-		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       15 * time.Second,
-		WriteTimeout:      15 * time.Second,
+	mux.HandleFunc("GET /login", s.handleLoginPage)
+	mux.HandleFunc("POST /auth/magic", s.handleMagic)
+	mux.HandleFunc("GET /auth/verify", s.handleVerifyPage)
+	mux.HandleFunc("POST /auth/verify", s.handleVerify)
+	mux.HandleFunc("POST /auth/logout", s.handleLogout)
+	mux.HandleFunc("GET /family", s.handleFamily)
+	mux.HandleFunc("POST /family/children", s.handleCreateChild)
+	mux.HandleFunc("POST /family/children/{id}", s.handleChildAction)
+
+	// Reject cross-origin form posts (Sec-Fetch-Site / Origin based), which
+	// with SameSite=Lax cookies is the CSRF defence for every POST above.
+	csrf := http.NewCrossOriginProtection()
+	return csrf.Handler(mux)
+}
+
+// housekeeping purges expired tokens and sessions hourly.
+func (s *server) housekeeping(ctx context.Context) {
+	t := time.NewTicker(time.Hour)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			if err := s.accounts.PurgeExpired(ctx, s.now()); err != nil {
+				log.Printf("purge expired: %v", err)
+			}
+			s.limiter.purge(s.now())
+		}
 	}
-	log.Printf("SkillDojo listening on http://%s", *addr)
-	log.Fatal(srv.ListenAndServe())
+}
+
+// indexData is what the practice page needs to know about the signed-in
+// parent. Nicknames reach Alpine through data attributes, never x-data.
+type indexData struct {
+	SignedIn    bool
+	ActiveChild *account.Child
+	Children    []account.Child
 }
 
 func (s *server) handleIndex(w http.ResponseWriter, r *http.Request) {
+	data := indexData{}
+	if sess, ok := s.currentSession(r); ok {
+		data.SignedIn = true
+		if kids, err := s.accounts.Children(r.Context(), sess.AccountID); err == nil {
+			data.Children = kids
+			for i := range kids {
+				if kids[i].ID == sess.ActiveChildID {
+					data.ActiveChild = &kids[i]
+				}
+			}
+		}
+	}
+	s.render(w, "index.html", data)
+}
+
+func (s *server) render(w http.ResponseWriter, name string, data any) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := s.tmpl.Execute(w, nil); err != nil {
-		log.Printf("render: %v", err)
+	if err := s.tmpl.ExecuteTemplate(w, name, data); err != nil {
+		log.Printf("render %s: %v", name, err)
 	}
 }
 
