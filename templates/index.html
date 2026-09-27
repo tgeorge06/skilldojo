@@ -308,7 +308,11 @@
           <button type="button" @click="trainReview" class="rounded-xl bg-amber-600 px-4 py-2 font-bold text-white transition hover:bg-amber-700">Train here</button>
         </div>
       </div>
-      <div x-show="canBattle()" x-cloak class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-rose-300 bg-rose-50 p-4 dark:border-rose-800 dark:bg-rose-950">
+      <div x-show="hasPendingBattle()" x-cloak class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-rose-300 bg-rose-50 p-4 dark:border-rose-800 dark:bg-rose-950">
+        <p class="font-bold">A battle is waiting for you.</p>
+        <button type="button" @click="startBattle()" :disabled="battleBusy" class="rounded-xl bg-rose-600 px-4 py-2 font-bold text-white transition hover:bg-rose-700 disabled:opacity-40">Resume battle ⚔️</button>
+      </div>
+      <div x-show="canBattle() && !hasPendingBattle()" x-cloak class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-rose-300 bg-rose-50 p-4 dark:border-rose-800 dark:bg-rose-950">
         <div>
           <p class="font-bold">A battle is ready.</p>
           <p class="text-sm text-slate-600 dark:text-slate-300">Your strongest kata takes on a challenger. Answer to strike; three in a row is a special move.</p>

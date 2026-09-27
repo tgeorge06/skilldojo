@@ -120,10 +120,22 @@ type State struct {
 	Message  string  `json:"message"`
 }
 
-// stored adds the answer for persistence only.
+// stored adds the answer for persistence only. Exposed remembers every
+// answer the client has been shown (a miss teaches it, and the log echoes
+// what was typed), so the next item is never one of them.
 type stored struct {
 	State
-	ItemAnswer string `json:"item_answer"`
+	ItemAnswer string   `json:"item_answer"`
+	Exposed    []string `json:"exposed"`
+}
+
+func (st *stored) exposed(answer string) bool {
+	for _, a := range st.Exposed {
+		if a == answer {
+			return true
+		}
+	}
+	return false
 }
 
 // StartRequest opens a battle with one of the child's creatures.
@@ -151,6 +163,9 @@ func (s *Store) Start(ctx context.Context, child progress.Child, req StartReques
 		return State{}, fmt.Errorf("%w: battle_id must be 8-64 url-safe characters", ErrBadRequest)
 	}
 	if existing, err := s.Load(ctx, child, req.BattleID); err == nil {
+		if existing.Child.ID != req.CreatureID {
+			return State{}, fmt.Errorf("%w: that battle id belongs to a different kata", ErrBadRequest)
+		}
 		return existing, nil
 	} else if !errors.Is(err, ErrNotFound) {
 		return State{}, err
@@ -210,6 +225,12 @@ func (s *Store) Start(ctx context.Context, child progress.Child, req StartReques
 	if _, err := tx.ExecContext(ctx,
 		`INSERT INTO battles (id, account_id, child_id, state_json, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`,
 		req.BattleID, child.AccountID, child.ChildID, string(encoded), ts(now), ts(now)); err != nil {
+		if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+			// A concurrent start with the same id won; its credit spend
+			// stands and ours rolls back. Replay the winner.
+			tx.Rollback()
+			return s.Start(ctx, child, req, now)
+		}
 		return State{}, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -239,13 +260,21 @@ func (s *Store) pickOpponent(own kata.Creature) kata.Creature {
 	return pool[rand.IntN(len(pool))]
 }
 
-// nextItem poses a fresh question from the creature's skill.
+// nextItem poses a fresh question from the creature's skill whose answer
+// the client has not already been shown in this battle.
 func (s *Store) nextItem(st *stored, own kata.Creature) error {
 	if own.Kind == "math" {
 		op := strings.TrimSuffix(strings.TrimPrefix(own.SkillID, "math-"), fmt.Sprintf("-g%d", own.Grade))
-		sh, err := sheet.GenerateCount([]string{op}, own.Grade, 1)
-		if err != nil {
-			return err
+		var sh *sheet.Sheet
+		for attempt := 0; attempt < 12; attempt++ {
+			var err error
+			sh, err = sheet.GenerateCount([]string{op}, own.Grade, 1)
+			if err != nil {
+				return err
+			}
+			if !st.exposed(sh.Answers()[0]) {
+				break
+			}
 		}
 		st.Item = &item{Kind: "math", Prompt: sh.Questions[0].Prompt}
 		st.ItemAnswer = sh.Answers()[0]
@@ -264,7 +293,16 @@ func (s *Store) nextItem(st *stored, own kata.Creature) error {
 	if len(bank) == 0 {
 		return errors.New("battle: no words for skill " + own.SkillID)
 	}
-	w := bank[rand.IntN(len(bank))]
+	var fresh []curriculum.Word
+	for _, w := range bank {
+		if !st.exposed(w.Word) {
+			fresh = append(fresh, w)
+		}
+	}
+	if len(fresh) == 0 {
+		fresh = bank // every word has been shown; a long battle may repeat
+	}
+	w := fresh[rand.IntN(len(fresh))]
 	st.Item = &item{Kind: "spelling", Prompt: "Spell the word", Clue: w.Clue, Sentence: blank(w.Sentence, w.Word)}
 	st.ItemAnswer = w.Word
 	return nil
@@ -371,6 +409,7 @@ func (s *Store) Play(ctx context.Context, child progress.Child, req TurnRequest,
 		st.Message = fmt.Sprintf("Not quite. It was %s. %s loses a heart.", st.ItemAnswer, st.Child.Name)
 	}
 	st.Log = append(st.Log, turn)
+	st.Exposed = append(st.Exposed, st.ItemAnswer)
 	st.Turn++
 	switch {
 	case st.Opponent.HP == 0:

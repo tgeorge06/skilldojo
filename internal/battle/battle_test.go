@@ -225,6 +225,31 @@ func (e env) answerFor(t *testing.T, id string) string {
 	return st.ItemAnswer
 }
 
+func TestNextItemNeverRepeatsAnExposedAnswer(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	e.earnCredit(t, "credit-round-1", day0)
+	st, _ := e.battle.Start(ctx, e.child, StartRequest{BattleID: "battle-expose-1", CreatureID: "g2-endings"}, day0)
+	seen := map[string]bool{}
+	for i := 0; i < 4 && !st.Done; i++ {
+		answer := e.answerFor(t, "battle-expose-1")
+		if seen[answer] {
+			t.Fatalf("turn %d re-asked an answer already shown: %q", i, answer)
+		}
+		seen[answer] = true
+		// A miss teaches the answer in the message; it must not come back.
+		var err error
+		st, err = e.battle.Play(ctx, e.child, TurnRequest{BattleID: "battle-expose-1", Turn: st.Turn, Answer: "zzzz"}, day0)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Replaying the start with another creature is refused.
+	if _, err := e.battle.Start(ctx, e.child, StartRequest{BattleID: "battle-expose-1", CreatureID: "g2-vowel-teams"}, day0); !errors.Is(err, ErrBadRequest) {
+		t.Fatalf("replay with a different creature: %v", err)
+	}
+}
+
 func TestBlankMasksOnlyWholeWords(t *testing.T) {
 	if got := blank("The cat sat on the catalog.", "cat"); got != "The _____ sat on the catalog." {
 		t.Fatal(got)

@@ -10,6 +10,7 @@ function battleMixin() {
     battleBusy: false,
     battleError: "",
     battleCredits: null,
+    battleRequest: "",
 
     async loadBattleCredits() {
       try {
@@ -32,28 +33,52 @@ function battleMixin() {
       known.sort((a, b) => b.fills - a.fills);
       return known.length ? known[0].id : "";
     },
+    // The pending battle (id + creature) is persisted before the request so
+    // a dropped response or a reload retries the same id: the server replays
+    // it and the credit is spent once. Cleared when the battle ends.
+    pendingBattle() {
+      try {
+        const raw = sessionStorage.getItem("sd_pending_battle");
+        return raw ? JSON.parse(raw) : null;
+      } catch {
+        return null;
+      }
+    },
+    setPendingBattle(value) {
+      try {
+        if (value) sessionStorage.setItem("sd_pending_battle", JSON.stringify(value));
+        else sessionStorage.removeItem("sd_pending_battle");
+      } catch {}
+    },
     async startBattle(creatureId) {
-      const id = creatureId || this.battleCreatureId();
+      if (this.battleBusy) return;
+      const pending = this.pendingBattle();
+      const id = (pending && pending.creature) || creatureId || this.battleCreatureId();
       if (!id) {
         this.battleError = "Find a kata first by training its skill.";
         return;
       }
+      const battleId = (pending && pending.id) || newRoundId();
+      this.setPendingBattle({ id: battleId, creature: id });
       this.battleBusy = true;
       this.battleError = "";
-      const battleId = newRoundId();
+      this.battleRequest = battleId; // request token: only the latest start may apply
       try {
         const st = await this.post("/api/battle/start", { battle_id: battleId, creature_id: id });
+        if (this.battleRequest !== battleId) return;
         this.battleId = battleId;
         this.battle = st;
         this.battleAnswer = "";
+        if (st.done) this.setPendingBattle(null);
         this.view = "battle";
         this.moveToTop("#battle-heading");
         await this.loadBattleCredits();
       } catch (e) {
+        if (this.battleRequest !== battleId) return;
         this.battleError = e.message;
         this.error = e.message;
       } finally {
-        this.battleBusy = false;
+        if (this.battleRequest === battleId) this.battleBusy = false;
       }
     },
     async submitBattleAnswer() {
@@ -68,6 +93,7 @@ function battleMixin() {
         if (this.battleId !== battleId) return;
         this.battle = st;
         this.battleAnswer = "";
+        if (st.done) this.setPendingBattle(null);
         if (st.done && st.won) confettiBurst();
         requestAnimationFrame(() => document.querySelector("#battle-answer")?.focus());
       } catch (e) {
@@ -84,9 +110,16 @@ function battleMixin() {
       return KataSVG.creature(f.seed, { palette: f.palette, regions: f.regions, fills: f.fills, evolved: f.evolved, name: f.name, size: size || 120 });
     },
     leaveBattle() {
+      // Invalidate any in-flight request and hand the buttons back.
       this.battleId = "";
+      this.battleRequest = "";
       this.battle = null;
+      this.battleBusy = false;
       this.reset();
+    },
+    // A battle interrupted by a reload can be resumed from the index.
+    hasPendingBattle() {
+      return !!(this.child && this.pendingBattle());
     },
   };
 }
