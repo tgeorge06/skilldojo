@@ -35,6 +35,14 @@
   }
   const HEX = /^#[0-9a-f]{6}$/i;
 
+  // Color math for cel shading: every part gets a shade, a highlight, and
+  // an outline derived from its own fill, the way painted monster art does.
+  function hexToRgb(h) { return [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]; }
+  function rgbToHex([r, g, b]) { return "#" + [r, g, b].map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, "0")).join(""); }
+  function mix(a, b, t) { const A = hexToRgb(a), B = hexToRgb(b); return rgbToHex([A[0] + (B[0] - A[0]) * t, A[1] + (B[1] - A[1]) * t, A[2] + (B[2] - A[2]) * t]); }
+  const shadeOf = (hex) => mix(hex, "#1e1b4b", 0.42);   // cool shadow
+  const outlineOf = (hex) => mix(hex, "#111827", 0.62); // colored ink
+
   // hsl -> hex, so designs can be authored as hues and stay harmonious.
   function hsl(h, s, l) {
     h = ((h % 360) + 360) % 360; s /= 100; l /= 100;
@@ -49,10 +57,10 @@
     const h = Number(d.hue) || 0, a = d.accent === undefined ? h + 150 : Number(d.accent) || 0;
     const dark = d.mood === "dark";
     return {
-      base: hsl(h, dark ? 45 : 62, dark ? 38 : 56),
-      light: hsl(h, dark ? 40 : 60, dark ? 68 : 82),
-      accent: hsl(a, 80, 58),
-      dark: hsl(h, dark ? 50 : 60, dark ? 22 : 32),
+      base: hsl(h, dark ? 52 : 70, dark ? 40 : 58),
+      light: hsl(h, dark ? 45 : 65, dark ? 70 : 84),
+      accent: hsl(a, 85, 58),
+      dark: hsl(h, dark ? 55 : 65, dark ? 24 : 34),
     };
   }
 
@@ -77,6 +85,12 @@
   const featherWing = (x, y, d, s) =>
     `M${f1(x)},${f1(y)} Q${f1(x + d * s * 0.5)},${f1(y - s * 0.8)} ${f1(x + d * s * 1.2)},${f1(y - s * 0.55)} Q${f1(x + d * s * 0.9)},${f1(y - s * 0.3)} ${f1(x + d * s * 1.25)},${f1(y - s * 0.15)} Q${f1(x + d * s * 0.9)},${f1(y)} ${f1(x + d * s * 1.1)},${f1(y + s * 0.25)} Q${f1(x + d * s * 0.5)},${f1(y + s * 0.3)} ${f1(x)},${f1(y + s * 0.1)} Z`;
 
+  // Ink details: thin strokes drawn over the parts that suggest volume
+  // (toe lines, inner ears, chest fluff). Never regions.
+  const toes = (x, y, w) => `<path d="M${f1(x - w * 0.3)},${f1(y + 2)} l0,-5 M${f1(x)},${f1(y + 2)} l0,-6 M${f1(x + w * 0.3)},${f1(y + 2)} l0,-5" stroke="${OUT}" stroke-width="1.6" stroke-linecap="round" opacity="0.7"/>`;
+  const innerEar = (x, y, rx, ry, color) => `<ellipse cx="${f1(x)}" cy="${f1(y)}" rx="${f1(rx)}" ry="${f1(ry)}" fill="${color}" opacity="0.85"/>`;
+  const fluff = (x, y) => `<path d="M${f1(x - 10)},${f1(y)} q3,-6 6,0 q3,-6 6,0 q3,-6 6,0" fill="none" stroke="${OUT}" stroke-width="1.6" stroke-linecap="round" opacity="0.6"/>`;
+
   // A part: { name, d, color, cx, cy, big?, back?, small? }
   const P = (name, d, color, cx, cy, extra) => Object.assign({ name, d, color, cx, cy }, extra || {});
 
@@ -91,7 +105,7 @@
       p.push(P("right arm", "M100,84 Q118,96 110,112 Q104,106 96,100 Z", C.base, 110, 102));
       p.push(P("left foot", ellipse(52, 128, 13, 8), C.dark, 52, 128));
       p.push(P("right foot", ellipse(88, 128, 13, 8), C.dark, 88, 128));
-      return { parts: p, face: { cx: 70, cy: 56, spread: 12, eye: v.cute ? 8.5 : 7.5 }, area: { cx: 70, cy: 104, rx: 16, ry: 13 } };
+      return { parts: p, face: { cx: 70, cy: 56, spread: 12, eye: v.cute ? 8.5 : 7.5 }, area: { cx: 70, cy: 104, rx: 16, ry: 13 }, details: toes(52, 128, 14) + toes(88, 128, 14) };
     },
     beast(C, v) {
       const p = [];
@@ -104,7 +118,7 @@
       p.push(P("right leg", ellipse(86, 124, 11, 12), C.base, 86, 126));
       p.push(P("head", ellipse(70, 56, 30, 26), C.base, 70, 44, { big: 1 }));
       p.push(P("muzzle", ellipse(70, 66, 13, 9), C.light, 70, 68));
-      return { parts: p, face: { cx: 70, cy: 54, spread: 13, eye: 7.5, muzzle: true }, area: { cx: 70, cy: 106, rx: 19, ry: 11 } };
+      return { parts: p, face: { cx: 70, cy: 54, spread: 13, eye: 7.5, muzzle: true }, area: { cx: 70, cy: 106, rx: 19, ry: 11 }, details: toes(54, 130, 12) + toes(86, 130, 12) + fluff(70, 82) };
     },
     bird(C, v) {
       const p = [];
@@ -155,7 +169,7 @@
       p.push(P("right foot", ellipse(88, 130, 13, 8), C.dark, 88, 130));
       p.push(P("head", ellipse(70, 54, 30, 26), C.base, 70, 44, { big: 1 }));
       p.push(P("snout", ellipse(70, 66, 14, 9), C.light, 70, 68, { small: true }));
-      return { parts: p, face: { cx: 70, cy: 52, spread: 12, eye: 7, brow: !v.cute }, area: { cx: 70, cy: 106, rx: 15, ry: 16 } };
+      return { parts: p, face: { cx: 70, cy: 52, spread: 12, eye: 7, brow: !v.cute }, area: { cx: 70, cy: 106, rx: 15, ry: 16 }, details: toes(52, 132, 14) + toes(88, 132, 14) };
     },
     ghost(C, v) {
       const p = [];
@@ -325,7 +339,7 @@
   }
 
   // ---- face, drawn on top, never a region ----
-  function face(F, C, d) {
+  function face(F, C, d, uid) {
     const cute = d.vibe !== "cool";
     const eyes = d.eyes || (cute ? "sparkle" : "sharp");
     const mouth = d.mouth || (cute ? "smile" : "fang");
@@ -336,10 +350,12 @@
       if (eyes === "sharp") out += `<path d="M${f1(ex - e)},${f1(ey + e * 0.6)} Q${f1(ex)},${f1(ey - e * 1.3)} ${f1(ex + e)},${f1(ey + e * 0.6)} Z" fill="#fff" stroke="${OUT}" stroke-width="2.4"/>`;
       else out += `<ellipse cx="${f1(ex)}" cy="${f1(ey)}" rx="${f1(e)}" ry="${f1(e * 1.12)}" fill="#fff" stroke="${OUT}" stroke-width="2.4"/>`;
       if (eyes === "sleepy") out += `<path d="M${f1(ex - e)},${f1(ey - e * 0.2)} a${f1(e)},${f1(e)} 0 0 1 ${f1(e * 2)},0" fill="${OUT}"/>`;
-      out += `<circle cx="${f1(ex + 1)}" cy="${f1(ey + 1.5)}" r="${f1(e * 0.62)}" fill="${C.dark}"/>`;
-      out += `<circle cx="${f1(ex + 1.2)}" cy="${f1(ey + 1.8)}" r="${f1(e * 0.36)}" fill="${OUT}"/>`;
-      out += `<circle cx="${f1(ex - 1.6)}" cy="${f1(ey - 1.8)}" r="${f1(e * 0.26)}" fill="#fff"/>`;
-      if (eyes === "sparkle" || eyes === "big") out += `<circle cx="${f1(ex + 2.6)}" cy="${f1(ey + 3.2)}" r="${f1(e * 0.13)}" fill="#fff"/>`;
+      out += `<circle cx="${f1(ex + 0.8)}" cy="${f1(ey + 1.6)}" r="${f1(e * 0.66)}" fill="url(#${uid}-iris)"/>`;
+      out += `<ellipse cx="${f1(ex + 1)}" cy="${f1(ey + 2.2)}" rx="${f1(e * 0.34)}" ry="${f1(e * 0.4)}" fill="${OUT}"/>`;
+      out += `<circle cx="${f1(ex - 1.8)}" cy="${f1(ey - 1.6)}" r="${f1(e * 0.3)}" fill="#fff"/>`;
+      out += `<circle cx="${f1(ex + 2.4)}" cy="${f1(ey + 3.4)}" r="${f1(e * 0.14)}" fill="#fff"/>`;
+      // Upper lid shadow gives the eye depth.
+      out += `<path d="M${f1(ex - e)},${f1(ey - e * 0.2)} a${f1(e)},${f1(e * 1.12)} 0 0 1 ${f1(e * 2)},0" fill="${OUT}" opacity="0.18"/>`;
       if ((eyes === "sharp" || F.brow) && ex !== F.cx) {
         const dd = ex < F.cx ? -1 : 1;
         out += `<path d="M${f1(ex - dd * e)},${f1(ey - e * 1.3)} L${f1(ex + dd * e * 0.9)},${f1(ey - e * 1.85)}" stroke="${OUT}" stroke-width="2.6" stroke-linecap="round"/>`;
@@ -353,6 +369,9 @@
       out += `<path d="M${f1(F.cx - F.spread - 12)},${f1(F.cy - 4)} L${f1(F.cx + F.spread + 12)},${f1(F.cy - 6)} L${f1(F.cx + F.spread + 8)},${f1(F.cy + 8)} L${f1(F.cx - F.spread - 8)},${f1(F.cy + 10)} Z" fill="${C.accent}" stroke="${OUT}" stroke-width="2.2"/>`;
       for (const [ex, ey] of pts.slice(0, 2)) out += `<ellipse cx="${f1(ex)}" cy="${f1(ey)}" rx="${f1(F.eye * 0.9)}" ry="${f1(F.eye)}" fill="#fff" stroke="${OUT}" stroke-width="2"/><circle cx="${f1(ex + 1)}" cy="${f1(ey + 1)}" r="${f1(F.eye * 0.45)}" fill="${OUT}"/>`;
     }
+    if (d.features.includes("pointEars")) out += innerEar(49, 28, 4, 7, C.light) + innerEar(91, 28, 4, 7, C.light);
+    if (d.features.includes("roundEars")) out += innerEar(46, 30, 5, 5, C.light) + innerEar(94, 30, 5, 5, C.light);
+    if (d.features.includes("longEars")) out += innerEar(50, 20, 3.5, 12, C.light) + innerEar(90, 20, 3.5, 12, C.light);
     if (cute && !F.fish) {
       out += `<ellipse cx="${f1(F.cx - F.spread - 6)}" cy="${f1(F.cy + 8)}" rx="4" ry="2.4" fill="${CHEEK}" opacity="0.8"/>`;
       out += `<ellipse cx="${f1(F.cx + F.spread + 6)}" cy="${f1(F.cy + 8)}" rx="4" ry="2.4" fill="${CHEEK}" opacity="0.8"/>`;
@@ -403,15 +422,29 @@
       return painted || (rg.index < fills ? rg.color : "");
     };
 
-    let back = "", front = "", badges = "";
+    let back = "", front = "", badges = "", defs = "";
+    const uid = `k${seed}`;
     const draw = (rg) => {
       if (o.silhouette) return `<path data-region="${rg.index}" d="${rg.d}" fill="#64748b" stroke="#334155" stroke-width="${rg.small ? 2.2 : 3}" stroke-linejoin="round"/>`;
       const fill = fillOf(rg);
+      const sw = rg.small ? 2 : 2.8;
       if (!fill) {
         badges += `<circle cx="${f1(rg.cx)}" cy="${f1(rg.cy)}" r="5.2" fill="${BADGE}" stroke="${OUT}" stroke-width="1"/>` +
           `<text x="${f1(rg.cx)}" y="${f1(rg.cy + 2.2)}" font-size="6.5" font-weight="700" text-anchor="middle" fill="${OUT}" font-family="ui-sans-serif, system-ui, sans-serif">${rg.index + 1}</text>`;
+        return `<path data-region="${rg.index}" d="${rg.d}" fill="${PAPER}" stroke="${OUT}" stroke-width="${sw}" stroke-linejoin="round"/>`;
       }
-      return `<path data-region="${rg.index}" d="${rg.d}" fill="${fill || PAPER}" stroke="${OUT}" stroke-width="${rg.small ? 2.2 : 3}" stroke-linejoin="round"/>`;
+      // Cel shading: paint the part in its shadow color, lay the lit color
+      // over it shifted up-left (leaving a shadow crescent lower-right),
+      // then a soft highlight top-left, all clipped to the part.
+      const cid = `${uid}-${rg.index}`;
+      defs += `<clipPath id="${cid}"><path d="${rg.d}"/></clipPath>`;
+      const lift = rg.small ? 2.4 : 4.4;
+      return `<g clip-path="url(#${cid})">` +
+        `<path data-region="${rg.index}" d="${rg.d}" fill="${shadeOf(fill)}"/>` +
+        `<path d="${rg.d}" fill="${fill}" transform="translate(${f1(-lift)},${f1(-lift * 1.3)})"/>` +
+        `<ellipse cx="${f1(rg.cx - lift * 2.5)}" cy="${f1(rg.cy - lift * 3.5)}" rx="${f1(rg.small ? 5 : 14)}" ry="${f1(rg.small ? 3 : 8)}" fill="#ffffff" opacity="0.3"/>` +
+        `</g>` +
+        `<path d="${rg.d}" fill="none" stroke="${outlineOf(fill)}" stroke-width="${sw}" stroke-linejoin="round"/>`;
     };
     for (const rg of parts) { if (rg.index === undefined) continue; if (rg.back) back += draw(rg); else front += draw(rg); }
     let padSVG = "";
@@ -437,7 +470,13 @@
     if (o.silhouette) {
       return open + shadow + back + front + padSVG + `<text x="${f1(built.face.cx)}" y="${f1(built.face.cy + 12)}" font-size="34" font-weight="900" text-anchor="middle" fill="#f8fafc" font-family="ui-sans-serif, system-ui, sans-serif">?</text></svg>`;
     }
-    return open + aura + shadow + back + front + padSVG + belt + face(built.face, C, d) + crown + badges + `</svg>`;
+    const irisDark = d.eyeColor && HEX.test(d.eyeColor) ? d.eyeColor : mix(C.accent, "#111827", 0.35);
+    defs += `<radialGradient id="${uid}-iris" cx="0.4" cy="0.35" r="0.8"><stop offset="0" stop-color="${mix(irisDark, "#ffffff", 0.45)}"/><stop offset="0.55" stop-color="${irisDark}"/><stop offset="1" stop-color="${mix(irisDark, "#000000", 0.5)}"/></radialGradient>`;
+    // A slight lean (direction from the seed) so the figure stands like a
+    // character rather than a diagram. Badges lean with it.
+    const lean = (seed % 2 ? -1 : 1) * (built.float ? 2 : 4);
+    const figure = back + front + padSVG + belt + (o.fills > 0 ? built.details || "" : "") + face(built.face, C, d, uid) + crown + badges;
+    return open + `<defs>${defs}</defs>` + aura + shadow + `<g transform="rotate(${lean} 70 100)">` + figure + `</g></svg>`;
   }
 
   // regionCount reports how many regions a design has with its pattern
