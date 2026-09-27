@@ -182,7 +182,10 @@ func (s *server) handleMagic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if s.cfg.dev {
-		sent.DevLink = link
+		// A relative link, so it works from another device on the LAN
+		// (with `make serve` the listen address is 0.0.0.0, which no
+		// tablet can open). The emailed link keeps the absolute base URL.
+		sent.DevLink = "/auth/verify?t=" + token
 	}
 	s.render(w, "sent.html", sent)
 }

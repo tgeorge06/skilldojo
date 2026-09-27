@@ -134,6 +134,11 @@ func (e *testEnv) signIn(t *testing.T, email string) *http.Client {
 	if link == "" {
 		t.Fatalf("no link in mail: %q", e.mailer.last().Text)
 	}
+	// The on-page dev link is relative, so a tablet on the LAN that reached
+	// the server by IP is not sent to the 0.0.0.0 listen address.
+	if !strings.Contains(page, `href="`+link+`"`) || strings.Contains(page, `href="http`) {
+		t.Fatalf("dev link should be the relative path %q: %s", link, snippet(page))
+	}
 	// GET only confirms; it must not consume the token.
 	res, err := c.Get(e.srv.URL + link)
 	if err != nil {
