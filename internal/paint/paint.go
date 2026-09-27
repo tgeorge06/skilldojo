@@ -119,7 +119,7 @@ type Week struct {
 	Revealed int      `json:"revealed"`
 	Total    int      `json:"total"`
 	Order    []int    `json:"order"`
-	Added    int      `json:"added,omitempty"`
+	Added    int      `json:"added"`
 }
 
 // Apply is the progress.Sink for mosaics: every mosaic cell earned reveals
@@ -130,14 +130,19 @@ func (s *Store) Apply(ctx context.Context, tx *sql.Tx, child progress.Child, _ [
 	}
 	week := WeekKey(now, child.Timezone)
 	img := s.imageFor(child.ChildID, week)
-	total := img.Size * img.Size
 	var cells int
+	var storedImage string
 	err := tx.QueryRowContext(ctx,
-		`SELECT cells FROM mosaic_weeks WHERE child_id = ? AND account_id = ? AND week_key = ?`,
-		child.ChildID, child.AccountID, week).Scan(&cells)
+		`SELECT cells, image_id FROM mosaic_weeks WHERE child_id = ? AND account_id = ? AND week_key = ?`,
+		child.ChildID, child.AccountID, week).Scan(&cells, &storedImage)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return err
 	}
+	// An in-progress week keeps its picture even if the catalog changes.
+	if m, ok := s.byID[storedImage]; ok {
+		img = m
+	}
+	total := img.Size * img.Size
 	added := min(reward.MosaicCells, total-cells)
 	cells += added
 	if _, err := tx.ExecContext(ctx,
@@ -161,11 +166,15 @@ func (s *Store) CurrentWeek(ctx context.Context, child progress.Child, now time.
 	week := WeekKey(now, child.Timezone)
 	img := s.imageFor(child.ChildID, week)
 	var cells int
+	var storedImage string
 	err := s.db.QueryRowContext(ctx,
-		`SELECT cells FROM mosaic_weeks WHERE child_id = ? AND account_id = ? AND week_key = ?`,
-		child.ChildID, child.AccountID, week).Scan(&cells)
+		`SELECT cells, image_id FROM mosaic_weeks WHERE child_id = ? AND account_id = ? AND week_key = ?`,
+		child.ChildID, child.AccountID, week).Scan(&cells, &storedImage)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return Week{}, err
+	}
+	if m, ok := s.byID[storedImage]; ok {
+		img = m
 	}
 	return Week{
 		WeekKey: week, ImageID: img.ID, Name: img.Name, Size: img.Size, Palette: img.Palette, Cells: img.Cells,
@@ -263,31 +272,51 @@ func fnv32(childID int64, id string) uint32 {
 	return h.Sum32() % 1_000_000
 }
 
+// MaxAttemptsPerRegion bounds guessing on a page: beyond it the page is
+// "tired" and a new one must be started, which also caps the writes an
+// automated client can cause.
+const MaxAttemptsPerRegion = 8
+
+// completed is the durable record of a finished page, so a replay after
+// the in-memory sheet is gone still returns the whole colored page.
+type completed struct {
+	Regions []Region `json:"regions"`
+}
+
 // page loads the page and merges the sheet's prompts with the fill mask.
 func (s *Store) page(ctx context.Context, child progress.Child, pageID string) (Page, error) {
 	var p Page
 	var sheetID string
 	var mask int64
+	var answers sql.NullString
 	err := s.db.QueryRowContext(ctx,
-		`SELECT sheet_id, grade, seed, regions, filled_mask, attempts FROM page_state
+		`SELECT sheet_id, grade, seed, regions, filled_mask, attempts, answers_json FROM page_state
 		 WHERE child_id = ? AND account_id = ? AND page_id = ?`, child.ChildID, child.AccountID, pageID).
-		Scan(&sheetID, &p.Grade, &p.Seed, &p.Total, &mask, &p.Attempts)
+		Scan(&sheetID, &p.Grade, &p.Seed, &p.Total, &mask, &p.Attempts, &answers)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Page{}, ErrNotFound
 	}
 	if err != nil {
 		return Page{}, err
 	}
+	p.PageID = pageID
+	if answers.Valid {
+		var c completed
+		if err := json.Unmarshal([]byte(answers.String), &c); err != nil {
+			return Page{}, err
+		}
+		p.Regions, p.Filled, p.Done = c.Regions, len(c.Regions), true
+		return p, nil
+	}
 	sh, ok := s.sheets.Peek(sheetID)
 	if !ok {
 		return Page{}, fmt.Errorf("%w: this page has expired, start a new one", ErrBadRequest)
 	}
-	p.PageID = pageID
-	answers := sh.Answers()
+	key := sh.Answers()
 	for i, q := range sh.Questions {
 		r := Region{Idx: i, Prompt: q.Prompt, Op: q.Op, Filled: mask&(1<<i) != 0}
 		if r.Filled {
-			r.Answer = answers[i]
+			r.Answer = key[i]
 			p.Filled++
 		}
 		p.Regions = append(p.Regions, r)
@@ -326,19 +355,30 @@ func (s *Store) Fill(ctx context.Context, child progress.Child, req FillRequest,
 	}
 	defer tx.Rollback()
 	var sheetID string
-	var regions int
+	var regions, attempts int
 	var mask int64
+	var done sql.NullString
 	err = tx.QueryRowContext(ctx,
-		`SELECT sheet_id, regions, filled_mask FROM page_state WHERE child_id = ? AND account_id = ? AND page_id = ?`,
-		child.ChildID, child.AccountID, req.PageID).Scan(&sheetID, &regions, &mask)
+		`SELECT sheet_id, regions, filled_mask, attempts, answers_json FROM page_state WHERE child_id = ? AND account_id = ? AND page_id = ?`,
+		child.ChildID, child.AccountID, req.PageID).Scan(&sheetID, &regions, &mask, &attempts, &done)
 	if errors.Is(err, sql.ErrNoRows) {
 		return FillResponse{}, ErrNotFound
 	}
 	if err != nil {
 		return FillResponse{}, err
 	}
+	if done.Valid {
+		p, err := s.page(ctx, child, req.PageID)
+		return FillResponse{Filled: []int{}, Page: p}, err
+	}
 	if req.Idx < 0 || req.Idx >= regions {
 		return FillResponse{}, fmt.Errorf("%w: no such region", ErrBadRequest)
+	}
+	if mask&(1<<req.Idx) != 0 {
+		return FillResponse{}, fmt.Errorf("%w: that region is already colored", ErrBadRequest)
+	}
+	if attempts >= regions*MaxAttemptsPerRegion {
+		return FillResponse{}, fmt.Errorf("%w: this page is tired, start a new one", ErrBadRequest)
 	}
 	sh, ok := s.sheets.Peek(sheetID)
 	if !ok {
@@ -360,31 +400,43 @@ func (s *Store) Fill(ctx context.Context, child progress.Child, req FillRequest,
 			}
 		}
 	}
+	// On completion, persist the whole colored page so a replay after the
+	// in-memory sheet expires still returns it; the sheet is then released.
+	var answersJSON any
+	finished := true
+	for i := range sh.Questions {
+		if mask&(1<<i) == 0 {
+			finished = false
+			break
+		}
+	}
+	if finished {
+		var c completed
+		key := sh.Answers()
+		for i, q := range sh.Questions {
+			c.Regions = append(c.Regions, Region{Idx: i, Prompt: q.Prompt, Op: q.Op, Filled: true, Answer: key[i]})
+		}
+		encoded, err := json.Marshal(c)
+		if err != nil {
+			return FillResponse{}, err
+		}
+		answersJSON = string(encoded)
+	}
 	if _, err := tx.ExecContext(ctx,
-		`UPDATE page_state SET filled_mask = ?, attempts = attempts + 1, updated_at = ?
+		`UPDATE page_state SET filled_mask = ?, attempts = attempts + 1, answers_json = ?, updated_at = ?
 		 WHERE child_id = ? AND account_id = ? AND page_id = ?`,
-		mask, ts(now), child.ChildID, child.AccountID, req.PageID); err != nil {
+		mask, answersJSON, ts(now), child.ChildID, child.AccountID, req.PageID); err != nil {
 		return FillResponse{}, err
 	}
 	if err := tx.Commit(); err != nil {
 		return FillResponse{}, err
 	}
+	if finished {
+		s.sheets.Remove(sheetID)
+	}
 	resp.Page, err = s.page(ctx, child, req.PageID)
 	if err != nil {
 		return FillResponse{}, err
 	}
-	if resp.Page.Done {
-		s.sheets.Remove(sheetID)
-		resp.Page.Regions = pageWithAnswers(resp.Page, sh)
-	}
 	return resp, nil
-}
-
-func pageWithAnswers(p Page, sh *sheet.Sheet) []Region {
-	answers := sh.Answers()
-	for i := range p.Regions {
-		p.Regions[i].Filled = true
-		p.Regions[i].Answer = answers[i]
-	}
-	return p.Regions
 }

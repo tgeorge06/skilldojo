@@ -10,6 +10,7 @@ CREATE TABLE page_state (
     regions     INTEGER NOT NULL,
     filled_mask INTEGER NOT NULL DEFAULT 0,
     attempts    INTEGER NOT NULL DEFAULT 0,
+    answers_json TEXT,
     created_at  TEXT NOT NULL,
     updated_at  TEXT NOT NULL,
     PRIMARY KEY (child_id, page_id)

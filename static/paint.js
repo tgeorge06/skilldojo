@@ -57,8 +57,12 @@ function paintMixin() {
       this.pageError = "";
       this.pageBusy = true;
       try {
-        this.pageId = newRoundId();
-        this.page = await this.post("/api/paint/page", { page_id: this.pageId, ops: this.ops, grade: this.grade });
+        // Keep the candidate id local so a failed start never pairs the old
+        // page with a new id.
+        const candidate = newRoundId();
+        const page = await this.post("/api/paint/page", { page_id: candidate, ops: this.ops, grade: this.grade });
+        this.pageId = candidate;
+        this.page = page;
         this.pageSelected = null;
         this.pageAnswer = "";
         this.lastFill = null;
@@ -99,9 +103,18 @@ function paintMixin() {
         this.pageBusy = false;
       }
     },
-    // Distinct answers map to distinct colors; the legend is the key.
+    // Each answer owns a stable color derived from the answer itself, so a
+    // region never changes color when another answer is solved later.
     pagePalette() {
-      return ["#ef476f", "#ffd166", "#06d6a0", "#3a86ff", "#7b5cff", "#f4a261", "#8ecae6", "#8fd694", "#ffb4a2", "#c7b8ff", "#a0f0e0", "#f2e94e"];
+      return ["#ef476f", "#ffd166", "#06d6a0", "#3a86ff", "#7b5cff", "#f4a261", "#8ecae6", "#8fd694",
+        "#ffb4a2", "#c7b8ff", "#a0f0e0", "#f2e94e", "#e76f51", "#2a9d8f", "#e9c46a", "#264653",
+        "#b5179e", "#4cc9f0", "#90be6d", "#f8961e", "#577590", "#f9c74f", "#43aa8b", "#9d4edd"];
+    },
+    answerColor(answer) {
+      let h = 0;
+      for (const ch of String(answer)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+      const palette = this.pagePalette();
+      return palette[h % palette.length];
     },
     pageLegend() {
       if (!this.page) return [];
@@ -109,13 +122,10 @@ function paintMixin() {
       for (const r of this.page.regions) {
         if (r.filled && r.answer && !seen.includes(r.answer)) seen.push(r.answer);
       }
-      return seen.map((answer, i) => ({ answer, color: this.pagePalette()[i % 12] }));
+      return seen.map((answer) => ({ answer, color: this.answerColor(answer) }));
     },
     regionColor(r) {
-      if (!r.filled) return "";
-      const legend = this.pageLegend();
-      const hit = legend.find((l) => l.answer === r.answer);
-      return hit ? hit.color : "#94a3b8";
+      return r.filled && r.answer ? this.answerColor(r.answer) : "";
     },
     // Regions are laid out as a mandala of wedges around a center, seeded
     // by the page so every page looks a little different.
@@ -165,6 +175,7 @@ function paintMixin() {
 
     // ---- cooldown painting (no server, no questions) ----
     startCooldown() {
+      if (!this.child) return; // signed-in feature; anonymous play is unchanged
       const list = this.rewardCreatures();
       const t = list[0];
       this.cooldown = t

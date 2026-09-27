@@ -216,7 +216,11 @@ func TestKeyPageFillsEveryRegionSharingTheAnswer(t *testing.T) {
 		t.Fatalf("cross-child fill: %v", err)
 	}
 	// Finish the page: the sheet is released and every answer is shown.
+	// Regions already colored by a shared answer are skipped.
 	for i, a := range answers {
+		if res.Page.Regions[i].Filled {
+			continue
+		}
 		res, err = e.paint.Fill(ctx, e.child, FillRequest{PageID: "page-0001", Idx: i, Answer: a}, day0)
 		if err != nil {
 			t.Fatal(err)
@@ -227,6 +231,47 @@ func TestKeyPageFillsEveryRegionSharingTheAnswer(t *testing.T) {
 	}
 	if _, ok := e.sheets.Peek(sheetIDFor(t, e, "page-0001")); ok {
 		t.Fatal("finished page should release its sheet")
+	}
+	// A replay of the finished page (the sheet is gone) still returns it whole.
+	replay, err := e.paint.StartPage(ctx, e.child, StartPageRequest{PageID: "page-0001", Ops: []string{"addsub"}, Grade: 2}, day0)
+	if err != nil || !replay.Done || replay.Filled != 14 || replay.Regions[3].Answer == "" {
+		t.Fatalf("replay after completion: %+v %v", replay, err)
+	}
+	if _, err := e.paint.Fill(ctx, e.child, FillRequest{PageID: "page-0001", Idx: 0, Answer: "1"}, day0); err != nil {
+		t.Fatalf("fill on a finished page should be a no-op, got %v", err)
+	}
+}
+
+func TestFillGuards(t *testing.T) {
+	e := newEnv(t, "UTC")
+	ctx := context.Background()
+	if _, err := e.paint.StartPage(ctx, e.child, StartPageRequest{PageID: "page-guard", Ops: []string{"addsub"}, Grade: 1}, day0); err != nil {
+		t.Fatal(err)
+	}
+	// Twelve regions allow 96 attempts; the 97th is refused.
+	for i := 0; i < 12*MaxAttemptsPerRegion; i++ {
+		if _, err := e.paint.Fill(ctx, e.child, FillRequest{PageID: "page-guard", Idx: 0, Answer: "x"}, day0); err != nil {
+			t.Fatalf("attempt %d: %v", i, err)
+		}
+	}
+	if _, err := e.paint.Fill(ctx, e.child, FillRequest{PageID: "page-guard", Idx: 0, Answer: "x"}, day0); !errors.Is(err, ErrBadRequest) {
+		t.Fatalf("attempt cap: %v", err)
+	}
+}
+
+func TestMosaicKeepsItsPictureAcrossCatalogChanges(t *testing.T) {
+	e := newEnv(t, "UTC")
+	ctx := context.Background()
+	start, _ := e.prog.Start(ctx, e.child, progress.StartRequest{RoundID: "keep-round-1", Kind: progress.KindSpelling, Focus: "g2-endings", Grade: 2, Count: 5}, day0)
+	e.prog.Finish(ctx, e.child, progress.FinishRequest{RoundID: "keep-round-1", Guesses: winAll(start.Words)}, day0)
+	before, _ := e.paint.CurrentWeek(ctx, e.child, day0)
+	// Simulate a catalog reorder: reverse the slice the picker indexes.
+	for i, j := 0, len(e.paint.mosaics)-1; i < j; i, j = i+1, j-1 {
+		e.paint.mosaics[i], e.paint.mosaics[j] = e.paint.mosaics[j], e.paint.mosaics[i]
+	}
+	after, _ := e.paint.CurrentWeek(ctx, e.child, day0)
+	if after.ImageID != before.ImageID || after.Revealed != 5 {
+		t.Fatalf("picture changed under the child: %s -> %s", before.ImageID, after.ImageID)
 	}
 }
 

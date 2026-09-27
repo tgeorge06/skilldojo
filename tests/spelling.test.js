@@ -265,6 +265,14 @@ test("the paint mixin draws the mosaic and lays out pages deterministically", ()
   assert.equal(JSON.stringify(game.pageLegend().map((l) => l.answer)), JSON.stringify(["7"]));
   assert.equal(game.regionColor(game.page.regions[1]), game.pageLegend()[0].color);
   assert.equal(game.regionColor(game.page.regions[2]), "");
+  // Colors are a pure function of the answer, so solving more never recolors.
+  const before = game.regionColor(game.page.regions[0]);
+  game.page.regions[2] = { idx: 2, filled: true, answer: "12" };
+  assert.equal(game.regionColor(game.page.regions[0]), before);
+  assert.notEqual(game.answerColor("7"), game.answerColor("8"));
+  game.child = null;
+  game.startCooldown();
+  assert.notEqual(game.view, "cooldown", "anonymous play never enters cooldown");
   game.pageSelected = 1;
   game.page = { seed: 5, total: 3, regions: [{ idx: 0, prompt: "3 + 4", filled: true, answer: "7" }, { idx: 1, prompt: "<b>", filled: false }, { idx: 2, prompt: "9 - 2", filled: false }] };
   const svg = game.pageSVG();

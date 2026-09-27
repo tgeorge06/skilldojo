@@ -97,6 +97,15 @@ func (e *testEnv) postForm(t *testing.T, c *http.Client, path string, form url.V
 	return res
 }
 
+// snippet truncates a body for failure messages without panicking on
+// short bodies.
+func snippet(s string) string {
+	if len(s) > 200 {
+		return s[:200]
+	}
+	return s
+}
+
 func body(t *testing.T, res *http.Response) string {
 	t.Helper()
 	defer res.Body.Close()
@@ -131,7 +140,7 @@ func (e *testEnv) signIn(t *testing.T, email string) *http.Client {
 		t.Fatal(err)
 	}
 	if page := body(t, res); res.StatusCode != http.StatusOK || !strings.Contains(page, "Sign in as "+strings.ToLower(email)) {
-		t.Fatalf("verify page: %d %s", res.StatusCode, page[:300])
+		t.Fatalf("verify page: %d %s", res.StatusCode, snippet(page))
 	}
 	res, _ = c.Get(e.srv.URL + link)
 	if body(t, res); res.StatusCode != http.StatusOK {
@@ -178,7 +187,7 @@ func TestMagicLinkSignInFlow(t *testing.T) {
 	// Signed-in parent sees the family page with their (normalized) email.
 	res, _ = c.Get(e.srv.URL + "/family")
 	if page := body(t, res); res.StatusCode != http.StatusOK || !strings.Contains(page, "parent@example.com") {
-		t.Fatalf("family: %d %s", res.StatusCode, page[:200])
+		t.Fatalf("family: %d %s", res.StatusCode, snippet(page))
 	}
 
 	// Cookie flags.
@@ -229,7 +238,7 @@ func TestMagicDoesNotRevealOrFlood(t *testing.T) {
 	}
 	res := e.postForm(t, c, "/auth/magic", url.Values{"email": {"not-an-email"}})
 	if page := body(t, res); !strings.Contains(page, "valid email") {
-		t.Fatalf("bad email should re-render login: %s", page[:200])
+		t.Fatalf("bad email should re-render login: %s", snippet(page))
 	}
 }
 
@@ -283,7 +292,7 @@ func TestChildrenAreFencedAcrossAccounts(t *testing.T) {
 	res, _ = a.Get(e.srv.URL + "/")
 	page = body(t, res)
 	if !strings.Contains(page, `data-child-nickname="Nova"`) || !strings.Contains(page, "Training: Nova") {
-		t.Fatalf("index should carry the active child: %s", page[:400])
+		t.Fatalf("index should carry the active child: %s", snippet(page))
 	}
 
 	// B cannot touch A's child by id: every action is a 404.
@@ -302,13 +311,13 @@ func TestChildrenAreFencedAcrossAccounts(t *testing.T) {
 	// A can rename, and validation errors come back as 400 with a message.
 	res = e.postForm(t, a, childPath, url.Values{"action": {"rename"}, "nickname": {"<b>x</b>"}, "grade": {"3"}})
 	if page := body(t, res); res.StatusCode != http.StatusBadRequest || !strings.Contains(page, "letters, numbers") {
-		t.Fatalf("bad nickname: %d %s", res.StatusCode, page[:300])
+		t.Fatalf("bad nickname: %d %s", res.StatusCode, snippet(page))
 	}
 	res = e.postForm(t, a, childPath, url.Values{"action": {"rename"}, "nickname": {"Nova B"}, "grade": {"3"}})
 	body(t, res)
 	res, _ = a.Get(e.srv.URL + "/")
 	if page := body(t, res); !strings.Contains(page, `data-child-nickname="Nova B"`) || !strings.Contains(page, `data-child-grade="3"`) {
-		t.Fatalf("rename not reflected: %s", page[:400])
+		t.Fatalf("rename not reflected: %s", snippet(page))
 	}
 
 	// Nicknames are HTML-escaped wherever they render.
@@ -550,7 +559,7 @@ func TestKataIndexEndpoint(t *testing.T) {
 	res, _ = c.Get(e.srv.URL + "/api/kata/index")
 	page = body(t, res)
 	if !strings.Contains(page, `"id":"g2-endings","name":"Tailfin"`) || !strings.Contains(page, `"state":"seen"`) {
-		t.Fatalf("index after round: %s", page[:300])
+		t.Fatalf("index after round: %s", snippet(page))
 	}
 }
 
@@ -567,7 +576,7 @@ func TestPaintEndpoints(t *testing.T) {
 	res, _ = c.Get(e.srv.URL + "/api/mosaic/week")
 	page := body(t, res)
 	if res.StatusCode != http.StatusOK || !strings.Contains(page, `"revealed":0`) || !strings.Contains(page, `"total":400`) {
-		t.Fatalf("mosaic week: %d %s", res.StatusCode, page[:200])
+		t.Fatalf("mosaic week: %d %s", res.StatusCode, snippet(page))
 	}
 
 	res, page = e.postJSON(t, c, "/api/paint/page", `{"page_id":"paint-page-1","ops":["addsub"],"grade":2}`)
@@ -576,7 +585,7 @@ func TestPaintEndpoints(t *testing.T) {
 	}
 	res, page = e.postJSON(t, c, "/api/paint/fill", `{"page_id":"paint-page-1","idx":0,"answer":"nope"}`)
 	if res.StatusCode != http.StatusOK || !strings.Contains(page, `"right":false`) || !strings.Contains(page, `"attempts":1`) {
-		t.Fatalf("wrong fill: %d %s", res.StatusCode, page[:200])
+		t.Fatalf("wrong fill: %d %s", res.StatusCode, snippet(page))
 	}
 	res, page = e.postJSON(t, c, "/api/paint/fill", `{"page_id":"paint-page-1","idx":99,"answer":"1"}`)
 	if res.StatusCode != http.StatusBadRequest {
@@ -609,7 +618,7 @@ func TestPaintEndpoints(t *testing.T) {
 	}
 	res, _ = c.Get(e.srv.URL + "/api/mosaic/week")
 	if page = body(t, res); !strings.Contains(page, `"revealed":5`) {
-		t.Fatalf("mosaic after round: %s", page[:200])
+		t.Fatalf("mosaic after round: %s", snippet(page))
 	}
 }
 
