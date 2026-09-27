@@ -257,8 +257,10 @@ func (s *Store) Apply(ctx context.Context, tx *sql.Tx, child progress.Child, ski
 			state = StateSeen
 		}
 		t := Touched{ID: c.ID, Name: c.Name, Seed: c.Seed, Palette: c.Palette, Regions: c.Regions, NewlySeen: newly}
-		before := fills
-		fills = min(c.Regions, fills+reward.FillsBySkill[skill])
+		// A roster edit may shrink a creature's regions under stored fills;
+		// clamp so a delta is never negative and a full creature is caught.
+		before := min(fills, c.Regions)
+		fills = min(c.Regions, before+reward.FillsBySkill[skill])
 		t.FillsAdded = fills - before
 		var caughtAt, evolvedAt any
 		if state == StateSeen && fills >= c.Regions {
@@ -370,7 +372,10 @@ func (s *Store) Index(ctx context.Context, child progress.Child, prog []progress
 		e := Entry{ID: c.ID, Name: c.Name, Kind: c.Kind, Grade: c.Grade, SkillID: c.SkillID, Seed: c.Seed,
 			Palette: c.Palette, Regions: c.Regions, State: StateUnknown, Hint: c.HintVague, Mastered: mastered[c.SkillID]}
 		if v, ok := states[c.ID]; ok {
-			e.State, e.Fills, e.Hint = v.state, v.fills, c.HintSpecific
+			e.State, e.Fills, e.Hint = v.state, min(v.fills, c.Regions), c.HintSpecific
+			if e.State == StateSeen && e.Fills >= c.Regions {
+				e.State = StateCaught // regions shrank under stored progress
+			}
 		}
 		e.Label, e.Focus = labelFor(c, cur)
 		totals := idx.ByGrade[c.Grade]

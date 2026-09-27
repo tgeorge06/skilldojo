@@ -441,8 +441,8 @@
       const lift = rg.small ? 2.4 : 4.4;
       return `<g clip-path="url(#${cid})">` +
         `<path data-region="${rg.index}" d="${rg.d}" fill="${shadeOf(fill)}"/>` +
-        `<path d="${rg.d}" fill="${fill}" transform="translate(${f1(-lift)},${f1(-lift * 1.3)})"/>` +
-        `<ellipse cx="${f1(rg.cx - lift * 2.5)}" cy="${f1(rg.cy - lift * 3.5)}" rx="${f1(rg.small ? 5 : 14)}" ry="${f1(rg.small ? 3 : 8)}" fill="#ffffff" opacity="0.3"/>` +
+        `<path data-region="${rg.index}" data-lit="1" d="${rg.d}" fill="${fill}" transform="translate(${f1(-lift)},${f1(-lift * 1.3)})"/>` +
+        `<ellipse data-region="${rg.index}" cx="${f1(rg.cx - lift * 2.5)}" cy="${f1(rg.cy - lift * 3.5)}" rx="${f1(rg.small ? 5 : 14)}" ry="${f1(rg.small ? 3 : 8)}" fill="#ffffff" opacity="0.3"/>` +
         `</g>` +
         `<path d="${rg.d}" fill="none" stroke="${outlineOf(fill)}" stroke-width="${sw}" stroke-linejoin="round"/>`;
     };
