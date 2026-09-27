@@ -1,6 +1,6 @@
 // SkillDojo front-end state (Alpine component).
 function dojo() {
-  return {
+  const core = {
     view: "setup",
     subject: "math",
     // Signed-in child, read from data attributes the server renders on the
@@ -69,9 +69,9 @@ function dojo() {
       this.subject = subject;
       this.error = "";
     },
-    startTraining() {
-      if (this.subject === "spelling") this.startSpelling();
-      else this.startSheet();
+    async startTraining() {
+      if (this.subject === "spelling") await this.startSpelling();
+      else await this.startSheet();
     },
 
     // Math dojo methods.
@@ -159,7 +159,9 @@ function dojo() {
       return this.spellingGradeHints[this.spellingGrade] || "";
     },
     spellingSkillChoices() {
-      return [...(SPELLING_SKILLS[this.spellingGrade] || []), SIGHT_WORD_SKILL];
+      const choices = [...(SPELLING_SKILLS[this.spellingGrade] || []), SIGHT_WORD_SKILL];
+      if (this.child) choices.push(REVIEW_SKILL);
+      return choices;
     },
     spellingFocusDescription() {
       if (this.spellingFocus === "mixed") {
@@ -473,6 +475,7 @@ function dojo() {
       this.moveToTop();
     },
   };
+  return Object.assign(core, typeof kataMixin === "function" ? kataMixin() : {});
 }
 
 // readChild pulls the signed-in child from the root element's data
@@ -483,6 +486,10 @@ function defaultGrades() {
   const grade = child ? child.grade : 1;
   return { grade, spellingGrade: grade };
 }
+
+// Review focus exists only for signed-in children; the server picks the
+// words this child keeps missing.
+const REVIEW_SKILL = { id: "review", label: "Words I keep missing", tip: "The server picks the words you have missed lately. Rescue them and they leave the list." };
 
 function readChild() {
   const root = typeof document !== "undefined" && document.querySelector ? document.querySelector("[data-child-id]") : null;

@@ -21,7 +21,10 @@
       </div>
     </div>
     {{if .ActiveChild}}
-      <a href="/family" class="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-100">Training: {{.ActiveChild.Nickname}}</a>
+      <div class="flex items-center gap-2">
+        <button type="button" @click="openKata" :aria-pressed="view === 'kata-index'" class="rounded-full border border-violet-300 bg-violet-50 px-3 py-1 text-sm font-semibold text-violet-800 transition hover:bg-violet-100 dark:border-violet-800 dark:bg-violet-950 dark:text-violet-100">My kata 🐾</button>
+        <a href="/family" class="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-100">Training: {{.ActiveChild.Nickname}}</a>
+      </div>
     {{else if .SignedIn}}
       <a href="/family" class="text-sm text-slate-500 underline dark:text-slate-400">Choose who's training</a>
     {{else}}
@@ -167,6 +170,17 @@
         <p class="mt-2 text-lg font-semibold text-slate-600 dark:text-slate-300"><span x-text="report.score"></span> out of <span x-text="report.total"></span> correct</p>
         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400" x-text="gradeMessage()"></p>
         <p x-show="rewardSummary()" x-cloak class="mt-3 inline-block rounded-full bg-emerald-100 px-4 py-1 text-sm font-semibold text-emerald-800 dark:bg-emerald-900 dark:text-emerald-100" x-text="rewardSummary()"></p>
+      <div x-show="rewardCreatures().length" x-cloak class="mt-4 grid gap-3 sm:grid-cols-2" role="list" aria-label="Kata touched by this round">
+        <template x-for="t in rewardCreatures()" :key="t.id">
+          <div role="listitem" class="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-left dark:border-slate-800 dark:bg-slate-950">
+            <div class="shrink-0" x-html="revealSVG(t)"></div>
+            <div>
+              <p class="font-bold" x-text="revealLabel(t)"></p>
+              <p class="text-sm text-slate-500 dark:text-slate-400" x-text="`${t.fills} of ${t.regions} regions colored`"></p>
+            </div>
+          </div>
+        </template>
+      </div>
       </div>
       <div class="space-y-2">
         <template x-for="(r, i) in report.results" :key="i">
@@ -230,6 +244,17 @@
         <p class="mt-3 text-xl font-bold text-violet-700 dark:text-violet-300">You rescued <span x-text="spellingScore"></span> of <span x-text="spellingWords.length"></span> words</p>
         <p class="mt-2 text-slate-600 dark:text-slate-300" x-text="spellingResultMessage()"></p>
         <p x-show="rewardSummary()" x-cloak class="mt-3 inline-block rounded-full bg-violet-100 px-4 py-1 text-sm font-semibold text-violet-800 dark:bg-violet-900 dark:text-violet-100" x-text="rewardSummary()"></p>
+      <div x-show="rewardCreatures().length" x-cloak class="mt-4 grid gap-3 sm:grid-cols-2" role="list" aria-label="Kata touched by this round">
+        <template x-for="t in rewardCreatures()" :key="t.id">
+          <div role="listitem" class="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-left dark:border-slate-800 dark:bg-slate-950">
+            <div class="shrink-0" x-html="revealSVG(t)"></div>
+            <div>
+              <p class="font-bold" x-text="revealLabel(t)"></p>
+              <p class="text-sm text-slate-500 dark:text-slate-400" x-text="`${t.fills} of ${t.regions} regions colored`"></p>
+            </div>
+          </div>
+        </template>
+      </div>
       </div>
       <div class="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 sm:p-6 shadow-sm">
         <h3 class="text-lg font-bold mb-4">Words you trained</h3>
@@ -242,10 +267,49 @@
         <button type="button" @click="reset" class="rounded-xl border-2 border-slate-300 dark:border-slate-700 px-6 py-4 text-lg font-bold transition hover:bg-white dark:hover:bg-slate-900">Choose another dojo</button>
       </div>
     </section>
+
+    <section x-show="view === 'kata-index'" x-cloak class="space-y-5">
+      <div class="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 sm:p-8 shadow-sm">
+        <h2 id="kata-heading" tabindex="-1" class="text-2xl font-black">My kata</h2>
+        <p class="mt-1 text-slate-600 dark:text-slate-300">Every kata lives in a skill. Train the skill to find it, color it in, and let it evolve.</p>
+        <p x-show="kataError" x-cloak role="alert" class="mt-3 rounded-lg border border-rose-300 bg-rose-50 px-3 py-2 text-sm text-rose-800 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-200" x-text="kataError"></p>
+        <div class="mt-4 flex flex-wrap gap-2" role="group" aria-label="Grade">
+          <template x-for="g in kataGrades()" :key="g">
+            <button type="button" @click="kataGrade = g" :aria-pressed="kataGrade === g" class="rounded-full border px-3 py-1 text-sm font-semibold transition" :class="kataGrade === g ? 'border-violet-600 bg-violet-600 text-white' : 'border-slate-300 dark:border-slate-700'">
+              Grade <span x-text="g"></span> <span class="opacity-70" x-text="`${kataProgress(g).done}/${kataProgress(g).total}`"></span>
+            </button>
+          </template>
+        </div>
+        <div x-show="kata && kata.review_due > 0" x-cloak class="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950">
+          <div>
+            <p class="font-bold">A rare one is hiding in the words you keep missing.</p>
+            <p class="text-sm text-slate-600 dark:text-slate-300"><span x-text="kata ? kata.review_due : 0"></span> words are waiting. Rescue them and they leave the list.</p>
+          </div>
+          <button type="button" @click="trainReview" class="rounded-xl bg-amber-600 px-4 py-2 font-bold text-white transition hover:bg-amber-700">Train here</button>
+        </div>
+      </div>
+      <p x-show="kataLoading" class="text-center text-slate-500">Loading your kata…</p>
+      <ul class="grid gap-4 sm:grid-cols-2" role="list">
+        <template x-for="entry in kataEntries(kataGrade)" :key="entry.id">
+          <li class="flex gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900" :class="kataAboveGrade(entry) ? 'opacity-90' : ''">
+            <div class="shrink-0" x-html="kataSVG(entry, 96)"></div>
+            <div class="min-w-0 flex-1">
+              <p class="text-lg font-bold" x-text="kataName(entry)"></p>
+              <p class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400" x-text="kataStateLabel(entry) + (kataAboveGrade(entry) ? ' · up the mountain' : '')"></p>
+              <p class="mt-1 text-sm text-slate-600 dark:text-slate-300" x-text="entry.hint"></p>
+              <button type="button" @click="trainHere(entry)" class="mt-2 rounded-lg border border-violet-300 px-3 py-1 text-sm font-semibold text-violet-800 transition hover:bg-violet-50 dark:border-violet-800 dark:text-violet-100 dark:hover:bg-violet-950">Train here</button>
+            </div>
+          </li>
+        </template>
+      </ul>
+      <button type="button" @click="reset" class="w-full rounded-xl border-2 border-slate-300 dark:border-slate-700 px-6 py-4 text-lg font-bold transition hover:bg-white dark:hover:bg-slate-900">Back to training</button>
+    </section>
   </main>
 </div>
 <script src="/static/words.js"></script>
 <script src="/static/audio/spelling/manifest.js"></script>
+<script src="/static/kata-svg.js"></script>
+<script src="/static/kata.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>

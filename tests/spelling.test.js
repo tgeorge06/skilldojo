@@ -241,6 +241,26 @@ test("a signed-in child starts at their own grade", () => {
   assert.equal(game.child.grade, 3);
   assert.equal(game.grade, 3);
   assert.equal(game.spellingGrade, 3);
+  assert.ok(game.spellingSkillChoices().some((s) => s.id === "review"), "signed-in children get the review focus");
+});
+
+test("the kata mixin is merged and renders deterministic creatures", () => {
+  const { context } = loadGame();
+  vm.runInContext(fs.readFileSync(path.join(root, "static", "kata-svg.js"), "utf8"), context);
+  vm.runInContext(fs.readFileSync(path.join(root, "static", "kata.js"), "utf8"), context);
+  const game = context.dojo();
+  assert.equal(typeof game.openKata, "function");
+  const entry = { id: "g1-blends", name: "Brindle", seed: 3, palette: "meadow", regions: 20, fills: 7, state: "seen", kind: "spelling", grade: 1, focus: "g1-blends" };
+  const svg = game.kataSVG(entry, 96);
+  assert.match(svg, /role="img"/);
+  assert.match(svg, /aria-label="Brindle, 7 of 20 regions colored"/);
+  assert.equal(svg, game.kataSVG(entry, 96), "same seed, same picture");
+  assert.equal(game.kataName({ ...entry, state: "unknown" }), "???");
+  assert.equal(game.kataStateLabel(entry), "7 of 20 colored");
+  game.trainHere({ kind: "math", focus: "mul", grade: 3 });
+  assert.equal(game.subject, "math");
+  assert.deepEqual([...game.ops], ["mul"]);
+  assert.equal(game.grade, 3);
 });
 
 test("anonymous play never calls the round endpoints and keeps no log server could use", () => {

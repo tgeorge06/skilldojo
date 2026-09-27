@@ -500,6 +500,60 @@ func TestSignedInSpellingRoundIsGradedByTheServer(t *testing.T) {
 	}
 }
 
+func TestKataIndexEndpoint(t *testing.T) {
+	e := newTestEnv(t)
+	anon := e.client(t)
+	res, err := anon.Get(e.srv.URL + "/api/kata/index")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if body(t, res); res.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("anonymous index: %d", res.StatusCode)
+	}
+	c := e.signIn(t, "p@example.com")
+	e.postForm(t, c, "/family/children", url.Values{"nickname": {"Nova"}, "grade": {"2"}}).Body.Close()
+	res, _ = c.Get(e.srv.URL + "/api/kata/index")
+	page := body(t, res)
+	if res.StatusCode != http.StatusOK || res.Header.Get("Cache-Control") != "no-store" {
+		t.Fatalf("index: %d %s", res.StatusCode, res.Header.Get("Cache-Control"))
+	}
+	var idx struct {
+		Entries    []struct{ ID, State, Hint, Name string } `json:"entries"`
+		ChildGrade int                                      `json:"child_grade"`
+	}
+	if err := json.Unmarshal([]byte(page), &idx); err != nil || len(idx.Entries) != 51 || idx.ChildGrade != 2 {
+		t.Fatalf("index payload: %v, %d entries", err, len(idx.Entries))
+	}
+	// Names of unknown creatures are still in the payload (the client masks
+	// them); what must never be there is a curriculum word in a hint.
+	for _, en := range idx.Entries {
+		if en.State != "unknown" {
+			t.Fatalf("fresh child should have no state: %+v", en)
+		}
+	}
+
+	// Playing a round through the API touches the creature and the reveal
+	// payload carries it.
+	res, page = e.postJSON(t, c, "/api/round/start", `{"round_id":"kata-api-1","kind":"spelling","focus":"g2-endings","grade":2,"count":5}`)
+	var start struct {
+		Words []struct{ Word string } `json:"words"`
+	}
+	json.Unmarshal([]byte(page), &start)
+	var guesses []string
+	for _, w := range start.Words {
+		guesses = append(guesses, fmt.Sprintf(`[{"kind":"word","value":%q}]`, w.Word))
+	}
+	res, page = e.postJSON(t, c, "/api/round/finish", `{"round_id":"kata-api-1","guesses":[`+strings.Join(guesses, ",")+`]}`)
+	if res.StatusCode != http.StatusOK || !strings.Contains(page, `"creatures"`) || !strings.Contains(page, `"newly_seen":true`) {
+		t.Fatalf("finish reveal: %d %s", res.StatusCode, page)
+	}
+	res, _ = c.Get(e.srv.URL + "/api/kata/index")
+	page = body(t, res)
+	if !strings.Contains(page, `"id":"g2-endings","name":"Tailfin"`) || !strings.Contains(page, `"state":"seen"`) {
+		t.Fatalf("index after round: %s", page[:300])
+	}
+}
+
 func TestConfigValidation(t *testing.T) {
 	if err := (config{dev: true}).validate(); err != nil {
 		t.Fatalf("dev config should validate: %v", err)
