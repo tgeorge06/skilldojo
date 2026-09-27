@@ -60,6 +60,7 @@ function kataMixin() {
       return KataSVG.creature(entry.seed, {
         palette: entry.palette, regions: entry.regions, fills: entry.fills,
         evolved: entry.state === "evolved", name: this.kataName(entry), size: size || 120,
+        silhouette: entry.state === "unknown",
       });
     },
     kataAboveGrade(entry) {

@@ -233,7 +233,7 @@ func TestSeenCaughtEvolvedThroughRounds(t *testing.T) {
 	}
 	json.Unmarshal(fin.Reward.Creatures, &touched)
 	for _, tc := range touched {
-		if tc.ID == skill && (!tc.Caught || tc.State != StateCaught || tc.Fills != 20) {
+		if tc.ID == skill && (!tc.Caught || tc.State != StateCaught || tc.Fills != tc.Regions) {
 			t.Fatalf("should be caught on the fourth round: %+v", tc)
 		}
 	}
@@ -243,7 +243,7 @@ func TestSeenCaughtEvolvedThroughRounds(t *testing.T) {
 	}
 	// Fills never exceed regions.
 	e.play(t, "kata-round-x", skill, 2, day0.Add(5*time.Hour))
-	if entry(e.index(t, day0), skill).Fills != 20 {
+	if got := entry(e.index(t, day0), skill); got.Fills != got.Regions {
 		t.Fatal("fills exceeded regions")
 	}
 
@@ -315,7 +315,7 @@ func TestFillsAddedIsTheCappedDelta(t *testing.T) {
 	var touched []Touched
 	json.Unmarshal(fin.Reward.Creatures, &touched)
 	for _, tc := range touched {
-		if tc.ID == skill && (tc.Fills != 20 || tc.FillsAdded != 0) {
+		if tc.ID == skill && (tc.Fills != tc.Regions || tc.FillsAdded != 0) {
 			t.Fatalf("full creature should report +0: %+v", tc)
 		}
 	}
