@@ -752,3 +752,129 @@ func TestConfigValidation(t *testing.T) {
 	}
 	_ = time.Second
 }
+
+func TestPracticeTestEndpoints(t *testing.T) {
+	e := newTestEnv(t)
+	anon := e.client(t)
+	res, _ := e.postJSON(t, anon, "/api/ost/start", `{"grade":3}`)
+	if res.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("anonymous start: %d", res.StatusCode)
+	}
+	res, _ = anon.Get(e.srv.URL + "/test")
+	if res.StatusCode != http.StatusSeeOther {
+		t.Fatalf("anonymous test page: %d", res.StatusCode)
+	}
+
+	c := e.signIn(t, "p@example.com")
+	e.postForm(t, c, "/family/children", url.Values{"nickname": {"Nova"}, "grade": {"2"}}).Body.Close()
+
+	// A grade-2 child gets the grade-3 test by default; the page and the
+	// report both render before any attempt exists.
+	res, _ = c.Get(e.srv.URL + "/test")
+	if page := body(t, res); res.StatusCode != http.StatusOK || !strings.Contains(page, `data-test-grade="3"`) {
+		t.Fatalf("test page: %d %s", res.StatusCode, snippet(page))
+	}
+	res, _ = c.Get(e.srv.URL + "/family/tests")
+	if page := body(t, res); res.StatusCode != http.StatusOK || !strings.Contains(page, "No practice tests yet") {
+		t.Fatalf("tests page: %d %s", res.StatusCode, snippet(page))
+	}
+
+	res, page := e.postJSON(t, c, "/api/ost/start", `{"grade":9}`)
+	if res.StatusCode != http.StatusBadRequest {
+		t.Fatalf("grade 9: %d %s", res.StatusCode, page)
+	}
+	res, page = e.postJSON(t, c, "/api/ost/start", `{"grade":0}`)
+	var a struct {
+		ID    string `json:"id"`
+		Grade int    `json:"grade"`
+		Items []struct {
+			ID      string   `json:"id"`
+			Type    string   `json:"type"`
+			Choices []string `json:"choices"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal([]byte(page), &a); err != nil || res.StatusCode != http.StatusOK {
+		t.Fatalf("start: %d %s", res.StatusCode, page)
+	}
+	if a.Grade != 3 || len(a.Items) != 40 || strings.Contains(page, `"answer"`) || strings.Contains(page, `"numeric"`) || strings.Contains(page, `"explanation"`) {
+		t.Fatalf("start payload leaks or is short: grade %d, %d items, %s", a.Grade, len(a.Items), snippet(page))
+	}
+
+	// Starting again resumes the same attempt.
+	res, page = e.postJSON(t, c, "/api/ost/start", `{"grade":3}`)
+	if !strings.Contains(page, `"id":"`+a.ID+`"`) {
+		t.Fatalf("start should resume: %s", snippet(page))
+	}
+
+	// Answer every item with something valid; a wrong index is a 400.
+	first := a.Items[0]
+	res, page = e.postJSON(t, c, "/api/ost/answer", fmt.Sprintf(`{"attempt_id":%q,"item_id":%q,"choices":[9],"text":""}`, a.ID, first.ID))
+	if first.Type != "number" && res.StatusCode != http.StatusBadRequest {
+		t.Fatalf("bad choice: %d %s", res.StatusCode, page)
+	}
+	res, page = e.postJSON(t, c, "/api/ost/answer", fmt.Sprintf(`{"attempt_id":%q,"item_id":"nope","choices":[],"text":"1"}`, a.ID))
+	if res.StatusCode != http.StatusBadRequest {
+		t.Fatalf("bad item: %d %s", res.StatusCode, page)
+	}
+	for _, it := range a.Items {
+		payload := fmt.Sprintf(`{"attempt_id":%q,"item_id":%q,"choices":[0],"text":""}`, a.ID, it.ID)
+		if it.Type == "number" {
+			payload = fmt.Sprintf(`{"attempt_id":%q,"item_id":%q,"choices":[],"text":"7"}`, a.ID, it.ID)
+		}
+		if res, page = e.postJSON(t, c, "/api/ost/answer", payload); res.StatusCode != http.StatusOK {
+			t.Fatalf("answer %s: %d %s", it.ID, res.StatusCode, page)
+		}
+	}
+
+	// The saved answers come back on resume; the parent sees progress.
+	res, page = e.postJSON(t, c, "/api/ost/start", `{"grade":3}`)
+	if !strings.Contains(page, `"answers":{"q01"`) && !strings.Contains(page, `"q01":{`) {
+		t.Fatalf("resume should carry answers: %s", snippet(page))
+	}
+	res, _ = c.Get(e.srv.URL + "/family/tests")
+	if page := body(t, res); !strings.Contains(page, "40 of 40 answered") || !strings.Contains(page, "Resume test") {
+		t.Fatalf("in-progress row: %s", snippet(page))
+	}
+
+	res, graded := e.postJSON(t, c, "/api/ost/submit", fmt.Sprintf(`{"attempt_id":%q}`, a.ID))
+	page = graded
+	if res.StatusCode != http.StatusOK || !strings.Contains(page, `"report":{`) || !strings.Contains(page, `"level":"`) || !strings.Contains(page, `"categories":[`) {
+		t.Fatalf("submit: %d %s", res.StatusCode, snippet(page))
+	}
+	// After grading, answers are locked and a second submit returns the same report.
+	res, page = e.postJSON(t, c, "/api/ost/answer", fmt.Sprintf(`{"attempt_id":%q,"item_id":%q,"choices":[],"text":"8"}`, a.ID, a.Items[0].ID))
+	if res.StatusCode != http.StatusConflict {
+		t.Fatalf("answer after submit: %d %s", res.StatusCode, page)
+	}
+	res, page2 := e.postJSON(t, c, "/api/ost/submit", fmt.Sprintf(`{"attempt_id":%q}`, a.ID))
+	if res.StatusCode != http.StatusOK || page2 != graded {
+		t.Fatalf("second submit should return the stored report unchanged: %d\n%s\n%s", res.StatusCode, snippet(graded), snippet(page2))
+	}
+
+	// Parent report: history row, focus areas, and the item review page.
+	res, _ = c.Get(e.srv.URL + "/family/tests")
+	page = body(t, res)
+	if !strings.Contains(page, "Review</a>") || !strings.Contains(page, "Areas needing improvement") || !strings.Contains(page, "At a glance") {
+		t.Fatalf("report page: %s", snippet(page))
+	}
+	res, _ = c.Get(e.srv.URL + "/family/tests/1/" + a.ID)
+	if page := body(t, res); res.StatusCode != http.StatusOK || !strings.Contains(page, "Every question") || !strings.Contains(page, "DOK") {
+		t.Fatalf("attempt page: %d %s", res.StatusCode, snippet(page))
+	}
+
+	// A new attempt after submitting is a different test; the old one is fenced from other accounts.
+	res, page = e.postJSON(t, c, "/api/ost/start", `{"grade":3}`)
+	if res.StatusCode != http.StatusOK || strings.Contains(page, `"id":"`+a.ID+`"`) {
+		t.Fatalf("second attempt should be new: %d %s", res.StatusCode, snippet(page))
+	}
+	other := e.signIn(t, "q@example.com")
+	e.postForm(t, other, "/family/children", url.Values{"nickname": {"Zed"}, "grade": {"4"}}).Body.Close()
+	res, page = e.postJSON(t, other, "/api/ost/submit", fmt.Sprintf(`{"attempt_id":%q}`, a.ID))
+	if res.StatusCode != http.StatusNotFound {
+		t.Fatalf("cross-account submit: %d %s", res.StatusCode, page)
+	}
+	res, _ = other.Get(e.srv.URL + "/family/tests/1/" + a.ID)
+	if body(t, res); res.StatusCode != http.StatusNotFound {
+		t.Fatalf("cross-account review: %d", res.StatusCode)
+	}
+}

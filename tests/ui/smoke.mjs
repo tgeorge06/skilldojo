@@ -187,6 +187,35 @@ try {
   // Painted parts are cel-shaded; the lit layer carries the chosen color.
   const painted = await parent.locator("[x-html='cooldownSVG()'] [data-region='0'][data-lit]").getAttribute("fill");
   await expect(painted === "#ef476f", `first spot should take the first color, got ${painted}`);
+
+  // Practice test: start from the parent portal, answer one question, turn
+  // it in, and read the report back on the family page.
+  await parent.goto(base + "/family/tests");
+  await parent.locator("text=No practice tests yet").waitFor({ timeout: 5000 });
+  await parent.getByRole("button", { name: /Start a practice test/ }).click();
+  await parent.locator("#test-prompt").waitFor({ timeout: 5000 });
+  const testInput = parent.locator("#test-number");
+  if (await testInput.count()) {
+    await testInput.fill("7");
+  } else {
+    await parent.locator("input[type=radio], input[type=checkbox]").first().check();
+  }
+  await parent.locator("text=Saved").waitFor({ timeout: 5000 });
+  await parent.getByRole("button", { name: /Next/ }).click();
+  await expect((await parent.locator("text=/Question 2 of 40/").count()) === 1, "next should move to question 2");
+  await parent.reload();
+  await parent.locator("#test-prompt").waitFor({ timeout: 5000 });
+  await expect((await parent.locator("text=/1 answered/").count()) === 1, "a reload should resume with the saved answer");
+  // Jump to the end via the last question's review button.
+  await parent.evaluate(() => { const s = document.querySelector("[x-data]")._x_dataStack[0]; s.view = "review"; });
+  await parent.getByRole("button", { name: /Turn in my test/ }).click();
+  await parent.locator("#test-results-heading").waitFor({ timeout: 5000 });
+  await parent.getByRole("button", { name: /See every question/ }).click();
+  await expect((await parent.locator("[aria-label='Question review'] li").count()) === 40, "review should list every question");
+  await parent.goto(base + "/family/tests");
+  await parent.locator("text=Areas needing improvement").waitFor({ timeout: 5000 });
+  await parent.getByRole("link", { name: "Review", exact: true }).first().click();
+  await parent.locator("text=Every question").waitFor({ timeout: 5000 });
 } catch (err) {
   problems.push(`harness: ${err.message}`);
 } finally {

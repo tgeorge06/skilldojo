@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Practice tests · SkillDojo</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🥋</text></svg>">
+</head>
+<body class="min-h-full bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 antialiased">
+<a href="#main-content" class="skip-link">Skip to practice tests</a>
+<div class="mx-auto max-w-2xl px-4 py-8 sm:py-12">
+  <header class="mb-8 flex flex-wrap items-center justify-between gap-3">
+    <div class="flex items-center gap-3">
+      <span class="text-4xl" aria-hidden="true">📝</span>
+      <div>
+        <h1 class="text-2xl font-bold tracking-tight"><a href="/">SkillDojo</a> · Practice tests</h1>
+        <p class="text-sm text-slate-500 dark:text-slate-400">Signed in as {{.Email}} · <a href="/family" class="underline">Family</a></p>
+      </div>
+    </div>
+    <form method="post" action="/auth/logout"><button type="submit" class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm dark:border-slate-700">Sign out</button></form>
+  </header>
+
+  <main id="main-content" tabindex="-1" class="space-y-6">
+    {{if not .Children}}
+      <section class="rounded-2xl bg-white dark:bg-slate-900 p-6 sm:p-8 shadow-sm border border-slate-200 dark:border-slate-800">
+        <p class="text-slate-600 dark:text-slate-400"><a href="/family" class="underline">Add a profile</a> first, then start a practice test here.</p>
+      </section>
+    {{else}}
+    <nav aria-label="Child" class="flex flex-wrap gap-2">
+      {{range .Children}}
+        <a href="/family/tests?child={{.ID}}" class="rounded-full border px-3 py-1 text-sm font-semibold {{if and $.Selected (eq .ID $.Selected.Child.ID)}}border-violet-400 bg-violet-100 text-violet-900 dark:bg-violet-900 dark:text-violet-100{{else}}border-slate-300 dark:border-slate-700{{end}}">{{.Nickname}}</a>
+      {{end}}
+    </nav>
+    {{end}}
+
+    {{with .Selected}}
+    <section class="rounded-2xl bg-white dark:bg-slate-900 p-6 sm:p-8 shadow-sm border border-slate-200 dark:border-slate-800 space-y-4">
+      <h2 class="text-lg font-semibold">{{.Child.Nickname}} · Math, Ohio State Test style</h2>
+      <p class="text-sm text-slate-600 dark:text-slate-400">Full-length practice tests of {{40}} original questions built from Ohio's grade {{.TestGrade}} blueprint. Unlimited attempts; every attempt is a fresh test. Answers save as the child goes.</p>
+      {{if ne .Child.ID $.ActiveChildID}}
+        <p class="text-sm rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">Choose <strong>Train as {{.Child.Nickname}}</strong> on the <a href="/family" class="underline">family page</a> before starting a test for {{.Child.Nickname}}.</p>
+      {{else}}
+        {{if .InProgress}}
+          <p class="text-sm">A grade {{.InProgress.Grade}} test is in progress: {{.InProgress.Answered}} of {{.InProgress.Total}} answered.
+            <a href="/test?grade={{.InProgress.Grade}}" class="ml-2 rounded-xl bg-emerald-600 px-4 py-2 font-bold text-white shadow-sm hover:bg-emerald-700">Resume test</a></p>
+        {{end}}
+        <form method="get" action="/test" class="flex flex-wrap items-end gap-2">
+          <label class="block"><span class="text-xs font-medium">Test grade</span>
+            <select name="grade" class="mt-1 block rounded-lg border border-slate-300 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
+              {{$tg := .TestGrade}}{{range $.TestGrades}}<option value="{{.}}" {{if eq . $tg}}selected{{end}}>Grade {{.}}</option>{{end}}
+            </select></label>
+          <button type="submit" class="rounded-xl bg-violet-600 px-4 py-2 font-bold text-white shadow-sm hover:bg-violet-700">{{if .InProgress}}Start another test{{else}}Start a practice test{{end}}</button>
+        </form>
+        <p class="text-xs text-slate-500 dark:text-slate-400">Hand the device to {{.Child.Nickname}} after tapping start. Tests cover grades 3 to 5; younger children get the grade 3 test.</p>
+      {{end}}
+    </section>
+
+    {{with .Analysis}}
+    {{if gt .Finished 0}}
+    <section class="rounded-2xl bg-white dark:bg-slate-900 p-6 sm:p-8 shadow-sm border border-slate-200 dark:border-slate-800 space-y-4">
+      <h2 class="text-lg font-semibold">At a glance · grade {{$.Selected.AnalysisGrade}} tests</h2>
+      <p class="text-xs text-slate-500 dark:text-slate-400">Analysis covers the grade of the most recent finished test. Other grades still appear in the attempt list below.</p>
+      <dl class="grid grid-cols-3 gap-3 text-center">
+        <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800"><dt class="text-xs text-slate-500 dark:text-slate-400">Latest</dt><dd class="text-2xl font-bold">{{.Latest.Percent}}%</dd><dd class="text-xs">{{.Latest.Level}}</dd></div>
+        <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800"><dt class="text-xs text-slate-500 dark:text-slate-400">Best</dt><dd class="text-2xl font-bold">{{.Best}}%</dd></div>
+        <div class="rounded-xl border border-slate-200 p-3 dark:border-slate-800"><dt class="text-xs text-slate-500 dark:text-slate-400">Average of {{.Finished}}</dt><dd class="text-2xl font-bold">{{.Average}}%</dd></div>
+      </dl>
+      {{if gt (len .Trend) 1}}
+      <div>
+        <p class="text-sm font-medium mb-1">Score by attempt (oldest to newest)</p>
+        <div class="flex items-end gap-1 h-24" role="img" aria-label="Overall percent for each finished attempt">
+          {{range .Trend}}<div class="flex-1 rounded-t bg-violet-500" style="height:{{.}}%" title="{{.}}%"></div>{{end}}
+        </div>
+      </div>
+      {{end}}
+      <p class="text-xs text-slate-500 dark:text-slate-400">Levels (Limited, Basic, Proficient, Accomplished, Advanced) are estimated from percent correct on these practice tests. Ohio's real tests use scaled scores, so treat the level as a rough guide.</p>
+    </section>
+
+    <section class="rounded-2xl bg-white dark:bg-slate-900 p-6 sm:p-8 shadow-sm border border-slate-200 dark:border-slate-800 space-y-4">
+      <h2 class="text-lg font-semibold">Areas needing improvement</h2>
+      {{if not .Focus}}
+        <p class="text-sm text-slate-600 dark:text-slate-400">Every category is at or above {{70}}% on recent attempts. Keep the streak going with another test in a week or two.</p>
+      {{else}}
+      <ul class="space-y-4">
+        {{range .Focus}}
+        <li class="rounded-xl border border-amber-300 bg-amber-50/60 p-4 dark:border-amber-800 dark:bg-amber-950/40 space-y-2">
+          <div class="flex flex-wrap items-baseline justify-between gap-2">
+            <p class="font-bold">{{.Category}}</p>
+            <p class="text-sm">{{.Percent}}% on recent attempts</p>
+          </div>
+          {{if .Standards}}
+          <p class="text-sm text-slate-700 dark:text-slate-300">Weakest skills:</p>
+          <ul class="text-sm list-disc pl-5 space-y-0.5">
+            {{range .Standards}}<li>{{standardLabel .Name}} <span class="text-slate-500 dark:text-slate-400">({{.Right}}/{{.Total}})</span></li>{{end}}
+          </ul>
+          {{end}}
+          <p class="text-sm">
+            {{if .Practice.Path}}<a href="{{.Practice.Path}}" class="inline-block rounded-lg bg-emerald-600 px-3 py-1.5 font-semibold text-white hover:bg-emerald-700">Practice: {{.Practice.Label}}</a>{{else}}<span class="font-semibold">{{.Practice.Label}}.</span>{{end}}
+            {{if .Practice.Note}}<span class="text-slate-600 dark:text-slate-400"> {{.Practice.Note}}</span>{{end}}
+          </p>
+        </li>
+        {{end}}
+      </ul>
+      {{end}}
+      {{if .Strong}}<p class="text-sm text-slate-600 dark:text-slate-400">Going well: {{range $i, $c := .Strong}}{{if $i}}, {{end}}{{$c}}{{end}}.</p>{{end}}
+    </section>
+
+    <section class="rounded-2xl bg-white dark:bg-slate-900 p-6 sm:p-8 shadow-sm border border-slate-200 dark:border-slate-800 space-y-4">
+      <h2 class="text-lg font-semibold">By category</h2>
+      <ul class="space-y-3">
+        {{range .Categories}}
+        <li>
+          <div class="flex justify-between text-sm"><span>{{.Category}}</span><span class="text-slate-500 dark:text-slate-400">{{range $i, $p := .Points}}{{if $i}} → {{end}}{{$p}}%{{end}}</span></div>
+          <div class="flex items-end gap-1 h-8" aria-hidden="true">{{range .Points}}<div class="w-6 rounded-t bg-violet-400" style="height:{{.}}%"></div>{{end}}</div>
+        </li>
+        {{end}}
+      </ul>
+    </section>
+    {{end}}
+    {{end}}
+
+    <section class="rounded-2xl bg-white dark:bg-slate-900 p-6 sm:p-8 shadow-sm border border-slate-200 dark:border-slate-800 space-y-4">
+      <h2 class="text-lg font-semibold">Every attempt</h2>
+      {{if not .History}}
+        <p class="text-sm text-slate-600 dark:text-slate-400">No practice tests yet.</p>
+      {{else}}
+      <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead><tr class="text-left text-slate-500 dark:text-slate-400"><th class="py-1 pr-3">When</th><th class="py-1 pr-3">Grade</th><th class="py-1 pr-3">Score</th><th class="py-1 pr-3">Level</th>{{range .Categories}}<th class="py-1 pr-3">{{.}}</th>{{end}}<th></th></tr></thead>
+        <tbody>
+        {{$child := .Child}}
+        {{range .History}}
+          <tr class="border-t border-slate-200 dark:border-slate-800">
+            <td class="py-2 pr-3 whitespace-nowrap">{{.When}}</td>
+            <td class="py-2 pr-3">{{.Grade}}</td>
+            {{if .Finished}}
+              <td class="py-2 pr-3 font-semibold">{{.Percent}}% <span class="font-normal text-slate-500 dark:text-slate-400">({{.Score}}/{{.Total}})</span></td>
+              <td class="py-2 pr-3">{{.Level}}</td>
+              {{$cats := .Categories}}{{range $.Selected.Categories}}{{$name := .}}<td class="py-2 pr-3">{{range $cats}}{{if eq .Name $name}}{{.Percent}}%{{end}}{{end}}</td>{{end}}
+              <td class="py-2"><a href="/family/tests/{{$child.ID}}/{{.ID}}" class="underline">Review</a></td>
+            {{else}}
+              <td class="py-2 pr-3 text-slate-500 dark:text-slate-400" colspan="{{add 2 (len $.Selected.Categories)}}">In progress · {{.Answered}}/{{.Total}} answered</td>
+              <td></td>
+            {{end}}
+          </tr>
+        {{end}}
+        </tbody>
+      </table>
+      </div>
+      {{end}}
+    </section>
+    {{end}}
+  </main>
+</div>
+</body>
+</html>

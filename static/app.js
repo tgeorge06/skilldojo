@@ -510,12 +510,28 @@ function dojo() {
       this.moveToTop();
     },
   };
+  applyHash(core);
   return Object.assign(
     core,
     typeof kataMixin === "function" ? kataMixin() : {},
     typeof paintMixin === "function" ? paintMixin() : {},
     typeof battleMixin === "function" ? battleMixin() : {}
   );
+}
+
+// applyHash opens the dojo on a mode named in the URL hash, e.g. "#math/frac"
+// or "#math/tables", which is how parent-portal recommendations link in.
+// Unknown modes are ignored.
+function applyHash(state) {
+  const hash = typeof location !== "undefined" ? location.hash : "";
+  const m = /^#(math|spelling)(?:\/([a-z,]+))?$/.exec(hash || "");
+  if (!m) return;
+  state.subject = m[1];
+  if (m[1] === "math" && m[2]) {
+    const known = state.opChoices.map((o) => o.id);
+    const ops = m[2].split(",").filter((op) => known.includes(op));
+    if (ops.length) state.ops = ops;
+  }
 }
 
 // readChild pulls the signed-in child from the root element's data
