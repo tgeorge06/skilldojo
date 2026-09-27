@@ -11,7 +11,6 @@ import (
 	"errors"
 	"fmt"
 	"math/rand/v2"
-	"sort"
 	"strings"
 	"time"
 
@@ -54,13 +53,12 @@ type Store struct {
 	db     *sql.DB
 	cur    *curriculum.Curriculum
 	sheets *sheet.Store
-	rand   *rand.Rand
 }
 
 // New wraps the database, curriculum, and the in-memory sheet store the
 // math dojo already uses.
 func New(db *sql.DB, cur *curriculum.Curriculum, sheets *sheet.Store) *Store {
-	return &Store{db: db, cur: cur, sheets: sheets, rand: rand.New(rand.NewPCG(uint64(time.Now().UnixNano()), 7))}
+	return &Store{db: db, cur: cur, sheets: sheets}
 }
 
 // StartRequest is what the client sends to open a round.
@@ -129,7 +127,11 @@ type Child struct {
 	Timezone  string
 }
 
-func ts(t time.Time) string { return t.UTC().Format(time.RFC3339Nano) }
+// tsLayout is fixed width so lexical comparison in SQL is chronological;
+// RFC3339Nano drops trailing zeros and "05Z" would sort after "05.5Z".
+const tsLayout = "2006-01-02T15:04:05.000000000Z"
+
+func ts(t time.Time) string { return t.UTC().Format(tsLayout) }
 
 // localDate is the child's calendar date, which keys review scheduling.
 func localDate(now time.Time, tz string) string {
@@ -177,14 +179,28 @@ func (s *Store) Start(ctx context.Context, child Child, req StartRequest, now ti
 	} else if !errors.Is(err, ErrNotFound) {
 		return StartResponse{}, err
 	}
+	var resp StartResponse
+	var err error
 	switch req.Kind {
 	case KindSpelling:
-		return s.startSpelling(ctx, child, req, now)
+		resp, err = s.startSpelling(ctx, child, req, now)
 	case KindMath:
-		return s.startMath(ctx, child, req, now)
+		resp, err = s.startMath(ctx, child, req, now)
 	default:
 		return StartResponse{}, fmt.Errorf("%w: kind must be math or spelling", ErrBadRequest)
 	}
+	if err != nil && isUniqueViolation(err) {
+		// Two concurrent starts for the same id: the loser replays the winner.
+		return s.existingStart(ctx, child, req.RoundID)
+	}
+	return resp, err
+}
+
+// isUniqueViolation recognises SQLite's primary-key conflict. The round id
+// is the primary key, and a conflict from another child's round of the same
+// id surfaces as ErrNotFound from existingStart, never as their data.
+func isUniqueViolation(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed")
 }
 
 func (s *Store) existingStart(ctx context.Context, child Child, roundID string) (StartResponse, error) {
@@ -206,17 +222,18 @@ func (s *Store) existingStart(ctx context.Context, child Child, roundID string) 
 	resp := StartResponse{RoundID: roundID, Kind: kind}
 	if kind == KindSpelling {
 		rows, err := s.db.QueryContext(ctx,
-			`SELECT item_key FROM round_items WHERE round_id = ? ORDER BY idx`, roundID)
+			`SELECT item_key, skill_id FROM round_items WHERE round_id = ? AND account_id = ? AND child_id = ? ORDER BY idx`,
+			roundID, child.AccountID, child.ChildID)
 		if err != nil {
 			return StartResponse{}, err
 		}
 		defer rows.Close()
 		for rows.Next() {
-			var key string
-			if err := rows.Scan(&key); err != nil {
+			var key, skill string
+			if err := rows.Scan(&key, &skill); err != nil {
 				return StartResponse{}, err
 			}
-			if w, ok := s.cur.Word(key); ok {
+			if w, ok := s.wordFor(key, skill); ok {
 				resp.Words = append(resp.Words, w)
 			}
 		}
@@ -240,7 +257,7 @@ func (s *Store) startSpelling(ctx context.Context, child Child, req StartRequest
 	if focus == "" {
 		focus = FocusMixed
 	}
-	var missed []string
+	var missed []MissedWord
 	if focus == FocusReview {
 		var err error
 		if missed, err = s.MissedWords(ctx, child, now); err != nil {
@@ -284,6 +301,16 @@ func (s *Store) startSpelling(ctx context.Context, child Child, req StartRequest
 	return StartResponse{RoundID: req.RoundID, Kind: KindSpelling, Words: words}, nil
 }
 
+// wordFor resolves a recorded item back to its curriculum entry using the
+// skill it was recorded under, so a word present in both banks comes back
+// from the right one.
+func (s *Store) wordFor(word, skill string) (curriculum.Word, bool) {
+	if strings.HasPrefix(skill, "sight-") {
+		return s.cur.SightWord(word)
+	}
+	return s.cur.Word(word)
+}
+
 // wordSkill maps a word to the skill (and creature) it trains. Sight words
 // are banded by grade so each band has its own creature.
 func (s *Store) wordSkill(w curriculum.Word) string {
@@ -317,18 +344,19 @@ func (s *Store) sightBand(word string) int {
 
 func (s *Store) shuffle(words []curriculum.Word) []curriculum.Word {
 	out := append([]curriculum.Word(nil), words...)
-	s.rand.Shuffle(len(out), func(i, j int) { out[i], out[j] = out[j], out[i] })
+	// Package-level rand is goroutine-safe; a shared *rand.Rand is not.
+	rand.Shuffle(len(out), func(i, j int) { out[i], out[j] = out[j], out[i] })
 	return out
 }
 
 // selectWords ports selectSpellingWords from app.js: a 60/40 band mix for
 // sight words, focused-then-review for one skill, round-robin across skill
 // buckets for mixed, and the missed list for review.
-func (s *Store) selectWords(focus string, grade, count int, missed []string) []curriculum.Word {
+func (s *Store) selectWords(focus string, grade, count int, missed []MissedWord) []curriculum.Word {
 	if focus == FocusReview {
 		var words []curriculum.Word
-		for _, key := range missed {
-			if w, ok := s.cur.Word(key); ok {
+		for _, m := range missed {
+			if w, ok := s.wordFor(m.Word, m.Skill); ok {
 				words = append(words, w)
 			}
 		}
@@ -378,7 +406,7 @@ func (s *Store) selectWords(focus string, grade, count int, missed []string) []c
 		}
 		buckets = append(buckets, s.shuffle(b))
 	}
-	s.rand.Shuffle(len(buckets), func(i, j int) { buckets[i], buckets[j] = buckets[j], buckets[i] })
+	rand.Shuffle(len(buckets), func(i, j int) { buckets[i], buckets[j] = buckets[j], buckets[i] })
 	var selected []curriculum.Word
 	for round := 0; len(selected) < count; round++ {
 		added := false
@@ -399,9 +427,6 @@ func (s *Store) startMath(ctx context.Context, child Child, req StartRequest, no
 	sh, err := sheet.Generate(req.Ops, req.Grade, req.Count)
 	if err != nil {
 		return StartResponse{}, fmt.Errorf("%w: %v", ErrBadRequest, err)
-	}
-	if err := s.sheets.Put(sh); err != nil {
-		return StartResponse{}, err
 	}
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -425,15 +450,20 @@ func (s *Store) startMath(ctx context.Context, child Child, req StartRequest, no
 	if err := tx.Commit(); err != nil {
 		return StartResponse{}, err
 	}
+	// Only a committed round owns a sheet; a failed insert leaves nothing in memory.
+	if err := s.sheets.Put(sh); err != nil {
+		return StartResponse{}, err
+	}
 	return StartResponse{RoundID: req.RoundID, Kind: KindMath, SheetID: sh.ID, Questions: sh.Questions}, nil
 }
 
 type itemRow struct {
-	idx     int
-	key     string
-	skill   string
-	grade   int
-	correct bool
+	idx       int
+	key       string
+	skill     string
+	grade     int
+	correct   bool
+	attempted bool // at least one guess or a non-blank answer
 }
 
 // Finish grades the round on the server, records every item, updates
@@ -471,7 +501,8 @@ func (s *Store) Finish(ctx context.Context, child Child, req FinishRequest, now 
 	}
 
 	rows, err := tx.QueryContext(ctx,
-		`SELECT idx, item_key, skill_id, grade FROM round_items WHERE round_id = ? ORDER BY idx`, req.RoundID)
+		`SELECT idx, item_key, skill_id, grade FROM round_items WHERE round_id = ? AND account_id = ? AND child_id = ? ORDER BY idx`,
+		req.RoundID, child.AccountID, child.ChildID)
 	if err != nil {
 		return FinishResponse{}, err
 	}
@@ -501,10 +532,13 @@ func (s *Store) Finish(ctx context.Context, child Child, req FinishRequest, now 
 			}
 			out := curriculum.Replay(items[i].key, req.Guesses[i])
 			items[i].correct = out.Won
+			items[i].attempted = len(req.Guesses[i]) > 0
 			resp.WordResults = append(resp.WordResults, WordResult{Word: items[i].key, Won: out.Won, Mistakes: out.Mistakes})
 		}
 	case KindMath:
-		results, err := s.sheets.Grade(sheetID.String, req.Answers)
+		// Evaluate does not consume the sheet; it is removed only after the
+		// round commits, so a failed write leaves the round finishable.
+		results, err := s.sheets.Evaluate(sheetID.String, req.Answers)
 		if err != nil {
 			return FinishResponse{}, fmt.Errorf("%w: %v", ErrBadRequest, err)
 		}
@@ -513,6 +547,7 @@ func (s *Store) Finish(ctx context.Context, child Child, req FinishRequest, now 
 		}
 		for i := range items {
 			items[i].correct = results[i].Right
+			items[i].attempted = strings.TrimSpace(req.Answers[i]) != ""
 		}
 		resp.Results = results
 	}
@@ -527,14 +562,14 @@ func (s *Store) Finish(ctx context.Context, child Child, req FinishRequest, now 
 
 	// Which of these items had the child missed before? Read before writing
 	// this round's items so today's misses do not count as "previous".
-	previouslyMissed, err := missedBefore(ctx, tx, child, items)
+	previouslyMissed, err := missedBefore(ctx, tx, child, items, now)
 	if err != nil {
 		return FinishResponse{}, err
 	}
 	for _, it := range items {
 		if _, err := tx.ExecContext(ctx,
-			`UPDATE round_items SET correct = ?, answered_at = ? WHERE round_id = ? AND idx = ?`,
-			boolInt(it.correct), ts(now), req.RoundID, it.idx); err != nil {
+			`UPDATE round_items SET correct = ?, answered_at = ? WHERE round_id = ? AND idx = ? AND account_id = ? AND child_id = ?`,
+			boolInt(it.correct), ts(now), req.RoundID, it.idx, child.AccountID, child.ChildID); err != nil {
 			return FinishResponse{}, err
 		}
 	}
@@ -567,6 +602,9 @@ func (s *Store) Finish(ctx context.Context, child Child, req FinishRequest, now 
 	if err := tx.Commit(); err != nil {
 		return FinishResponse{}, err
 	}
+	if kind == KindMath {
+		s.sheets.Remove(sheetID.String)
+	}
 	return resp, nil
 }
 
@@ -583,86 +621,109 @@ func boolInt(b bool) int {
 // easy mode cannot be farmed. Mosaic cells count every correct answer.
 func computeReward(items []itemRow, childGrade int, previouslyMissed map[string]bool) Reward {
 	r := Reward{FillsBySkill: map[string]int{}}
+	attempted := 0
 	for _, it := range items {
+		if it.attempted {
+			attempted++
+		}
 		if !it.correct {
 			continue
 		}
 		r.MosaicCells++
 		weight := 0
 		switch {
-		case it.grade > childGrade:
+		case it.grade < childGrade:
+			weight = 0 // never, even for a previously missed word: no easy-mode farming
+		case it.grade > childGrade || previouslyMissed[it.key]:
 			weight = 2
-		case it.grade == childGrade:
+		default:
 			weight = 1
-		}
-		if previouslyMissed[it.key] {
-			weight = 2
 		}
 		r.Fills += weight
 		if weight > 0 {
 			r.FillsBySkill[it.skill] += weight
 		}
 	}
-	r.BattleCredit = len(items) >= 5
+	// A credit is for playing, not for being assigned five items.
+	r.BattleCredit = attempted >= 5
 	return r
 }
 
-func missedBefore(ctx context.Context, tx *sql.Tx, child Child, items []itemRow) (map[string]bool, error) {
+// missedBefore marks items whose most recent answered attempt inside the
+// missed window was wrong. A word answered correctly since then, or missed
+// long ago, is ordinary practice again, so a single old miss cannot be
+// farmed for double credit forever. One query for the whole round.
+func missedBefore(ctx context.Context, tx *sql.Tx, child Child, items []itemRow, now time.Time) (map[string]bool, error) {
 	out := map[string]bool{}
-	for _, it := range items {
-		var n int
-		if err := tx.QueryRowContext(ctx,
-			`SELECT COUNT(*) FROM round_items WHERE child_id = ? AND account_id = ? AND item_key = ? AND correct = 0`,
-			child.ChildID, child.AccountID, it.key).Scan(&n); err != nil {
+	if len(items) == 0 {
+		return out, nil
+	}
+	args := []any{child.ChildID, child.AccountID, ts(now.Add(-MissedWindow))}
+	placeholders := make([]string, len(items))
+	for i, it := range items {
+		placeholders[i] = "?"
+		args = append(args, it.key)
+	}
+	rows, err := tx.QueryContext(ctx,
+		`SELECT item_key FROM (
+		   SELECT item_key, correct,
+		          ROW_NUMBER() OVER (PARTITION BY item_key ORDER BY answered_at DESC) AS rn
+		   FROM round_items
+		   WHERE child_id = ? AND account_id = ? AND answered_at > ? AND correct IS NOT NULL
+		     AND item_key IN (`+strings.Join(placeholders, ",")+`)
+		 ) WHERE rn = 1 AND correct = 0`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var key string
+		if err := rows.Scan(&key); err != nil {
 			return nil, err
 		}
-		if n > 0 {
-			out[it.key] = true
-		}
+		out[key] = true
 	}
-	return out, nil
+	return out, rows.Err()
 }
 
 type queryer interface {
 	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
 }
 
+// MissedWord is a spelling item the child keeps missing, with the skill it
+// was recorded under so it resolves to the right curriculum bank.
+type MissedWord struct {
+	Word  string `json:"word"`
+	Skill string `json:"skill"`
+}
+
 // missedWords lists spelling words with two or more misses inside the
-// window whose most recent attempt was also a miss.
-func missedWords(ctx context.Context, q queryer, child Child, now time.Time) ([]string, error) {
+// window whose most recent attempt was also a miss, computed in SQL.
+func missedWords(ctx context.Context, q queryer, child Child, now time.Time) ([]MissedWord, error) {
 	rows, err := q.QueryContext(ctx,
-		`SELECT item_key, correct FROM round_items
-		 WHERE child_id = ? AND account_id = ? AND answered_at > ? AND skill_id NOT LIKE 'math-%'
-		 ORDER BY answered_at`,
+		`SELECT item_key, skill_id FROM (
+		   SELECT item_key, skill_id, correct,
+		          ROW_NUMBER() OVER (PARTITION BY item_key ORDER BY answered_at DESC) AS rn,
+		          SUM(CASE WHEN correct = 0 THEN 1 ELSE 0 END) OVER (PARTITION BY item_key) AS misses
+		   FROM round_items
+		   WHERE child_id = ? AND account_id = ? AND answered_at > ? AND correct IS NOT NULL
+		     AND skill_id NOT LIKE 'math-%'
+		 ) WHERE rn = 1 AND correct = 0 AND misses >= 2
+		 ORDER BY item_key`,
 		child.ChildID, child.AccountID, ts(now.Add(-MissedWindow)))
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	misses := map[string]int{}
-	lastWrong := map[string]bool{}
+	var out []MissedWord
 	for rows.Next() {
-		var key string
-		var correct int
-		if err := rows.Scan(&key, &correct); err != nil {
+		var m MissedWord
+		if err := rows.Scan(&m.Word, &m.Skill); err != nil {
 			return nil, err
 		}
-		if correct == 0 {
-			misses[key]++
-		}
-		lastWrong[key] = correct == 0
+		out = append(out, m)
 	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	var out []string
-	for key, n := range misses {
-		if n >= 2 && lastWrong[key] {
-			out = append(out, key)
-		}
-	}
-	sort.Strings(out)
-	return out, nil
+	return out, rows.Err()
 }
 
 func countMissed(ctx context.Context, tx *sql.Tx, child Child, now time.Time) (int, error) {
@@ -671,7 +732,7 @@ func countMissed(ctx context.Context, tx *sql.Tx, child Child, now time.Time) (i
 }
 
 // MissedWords is the public form, used for the review focus and the index.
-func (s *Store) MissedWords(ctx context.Context, child Child, now time.Time) ([]string, error) {
+func (s *Store) MissedWords(ctx context.Context, child Child, now time.Time) ([]MissedWord, error) {
 	return missedWords(ctx, s.db, child, now)
 }
 
@@ -720,12 +781,15 @@ func (s *Store) updateMastery(ctx context.Context, tx *sql.Tx, child Child, item
 		p := SkillProgress{SkillID: skill, DueOn: today}
 		var firstOK, evolvedOn sql.NullString
 		err := tx.QueryRowContext(ctx,
-			`SELECT box, due_on, reviews_ok, first_ok_on, rounds, evolved_on FROM skill_progress WHERE child_id = ? AND skill_id = ?`,
-			child.ChildID, skill).Scan(&p.Box, &p.DueOn, &p.ReviewsOK, &firstOK, &p.Rounds, &evolvedOn)
+			`SELECT box, due_on, reviews_ok, first_ok_on, rounds, evolved_on FROM skill_progress WHERE child_id = ? AND account_id = ? AND skill_id = ?`,
+			child.ChildID, child.AccountID, skill).Scan(&p.Box, &p.DueOn, &p.ReviewsOK, &firstOK, &p.Rounds, &evolvedOn)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return nil, err
 		}
 		p.FirstOKOn, p.EvolvedOn = firstOK.String, evolvedOn.String
+		// The calendar may have crossed the line since the last round; note
+		// it before this round's result can drop the box.
+		evolvedByCalendar := p.evolvedOn(today)
 
 		passed := float64(t.correct)/float64(t.total) >= MasteryThreshold
 		due := today >= p.DueOn
@@ -746,7 +810,7 @@ func (s *Store) updateMastery(ctx context.Context, tx *sql.Tx, child Child, item
 		p.Rounds++
 		// Evolution is observed here, whether the round or the calendar
 		// crossed the line, and recorded so it is reported exactly once.
-		newlyEvolved := p.EvolvedOn == "" && p.evolvedOn(today)
+		newlyEvolved := p.EvolvedOn == "" && (evolvedByCalendar || p.evolvedOn(today))
 		if newlyEvolved {
 			p.EvolvedOn = today
 		}

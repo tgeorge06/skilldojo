@@ -172,6 +172,11 @@ func TestPreviouslyMissedWordsPayDoubleAndFeedReview(t *testing.T) {
 	if len(missed) == 0 {
 		t.Fatal("two misses should feed review")
 	}
+	for _, m := range missed {
+		if m.Skill != "g2-endings" {
+			t.Fatalf("missed word carries its skill: %+v", m)
+		}
+	}
 	review, err := s.Start(ctx, kid, StartRequest{RoundID: "review-round", Kind: KindSpelling, Focus: FocusReview, Grade: 2, Count: 10}, day0.Add(2*time.Hour))
 	if err != nil {
 		t.Fatal(err)
@@ -179,7 +184,7 @@ func TestPreviouslyMissedWordsPayDoubleAndFeedReview(t *testing.T) {
 	for _, w := range review.Words {
 		found := false
 		for _, m := range missed {
-			if m == w.Word {
+			if m.Word == w.Word {
 				found = true
 			}
 		}
@@ -196,6 +201,16 @@ func TestPreviouslyMissedWordsPayDoubleAndFeedReview(t *testing.T) {
 	}
 	if fin.Reward.ReviewDue != 0 {
 		t.Fatalf("a correct latest attempt clears the word from review, got %d due", fin.Reward.ReviewDue)
+	}
+	// Once answered correctly, the same words are ordinary practice again:
+	// a single old miss cannot be farmed for double credit.
+	again, _ := s.Start(ctx, kid, StartRequest{RoundID: "after-review", Kind: KindSpelling, Focus: "g2-endings", Grade: 2, Count: 5}, day0.Add(4*time.Hour))
+	fin2, err := s.Finish(ctx, kid, FinishRequest{RoundID: "after-review", Guesses: winAll(again.Words)}, day0.Add(4*time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fin2.Reward.Fills != 5 {
+		t.Fatalf("words corrected since their miss should earn 1 each, got %+v", fin2.Reward)
 	}
 }
 
@@ -320,8 +335,8 @@ func TestMathRoundGradesOnServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if fin.Score != 0 || fin.Total != 10 || len(fin.Results) != 10 || fin.Reward.Fills != 0 || fin.Reward.MosaicCells != 0 || !fin.Reward.BattleCredit {
-		t.Fatalf("finish = %+v", fin)
+	if fin.Score != 0 || fin.Total != 10 || len(fin.Results) != 10 || fin.Reward.Fills != 0 || fin.Reward.MosaicCells != 0 || fin.Reward.BattleCredit {
+		t.Fatalf("blank answers must not earn a battle credit: %+v", fin)
 	}
 	all, _ := s.Progress(ctx, kid, day0)
 	if len(all) != 1 || all[0].SkillID != "math-addsub-g2" || all[0].Box != 0 {
@@ -332,6 +347,82 @@ func TestMathRoundGradesOnServer(t *testing.T) {
 	}
 	if _, err := s.Start(ctx, kid, StartRequest{RoundID: "x", Kind: KindMath, Ops: []string{"addsub"}, Grade: 2, Count: 10}, day0); !errors.Is(err, ErrBadRequest) {
 		t.Fatalf("short round id accepted: %v", err)
+	}
+}
+
+func TestBelowGradeNeverEarnsFillsEvenWhenMissed(t *testing.T) {
+	s, kid := newStore(t) // grade 2
+	ctx := context.Background()
+	first, _ := s.Start(ctx, kid, StartRequest{RoundID: "below-r1", Kind: KindSpelling, Focus: "g1-blends", Grade: 1, Count: 5}, day0)
+	s.Finish(ctx, kid, FinishRequest{RoundID: "below-r1", Guesses: loseAll(first.Words)}, day0)
+	second, _ := s.Start(ctx, kid, StartRequest{RoundID: "below-r2", Kind: KindSpelling, Focus: "g1-blends", Grade: 1, Count: 5}, day0.Add(time.Hour))
+	fin, err := s.Finish(ctx, kid, FinishRequest{RoundID: "below-r2", Guesses: winAll(second.Words)}, day0.Add(time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fin.Reward.Fills != 0 || fin.Reward.MosaicCells != 5 {
+		t.Fatalf("below-grade words earn no fills even after a miss: %+v", fin.Reward)
+	}
+}
+
+func TestBattleCreditNeedsFiveAttempts(t *testing.T) {
+	s, kid := newStore(t)
+	ctx := context.Background()
+	if _, err := s.Start(ctx, kid, StartRequest{RoundID: "credit-r1", Kind: KindSpelling, Focus: FocusMixed, Grade: 2, Count: 5}, day0); err != nil {
+		t.Fatal(err)
+	}
+	fin, err := s.Finish(ctx, kid, FinishRequest{RoundID: "credit-r1", Guesses: make([][]curriculum.Guess, 5)}, day0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fin.Reward.BattleCredit {
+		t.Fatal("five empty guess lists earned a battle credit")
+	}
+}
+
+func TestFailedMathFinishLeavesTheRoundFinishable(t *testing.T) {
+	s, kid := newStore(t)
+	ctx := context.Background()
+	start, _ := s.Start(ctx, kid, StartRequest{RoundID: "math-keep-1", Kind: KindMath, Ops: []string{"addsub"}, Grade: 2, Count: 10}, day0)
+	// A malformed submission fails before any write and must not consume the sheet.
+	if _, err := s.Finish(ctx, kid, FinishRequest{RoundID: "math-keep-1", Answers: []string{"1"}}, day0); !errors.Is(err, ErrBadRequest) {
+		t.Fatalf("short answers: %v", err)
+	}
+	if _, ok := s.sheets.Peek(start.SheetID); !ok {
+		t.Fatal("sheet consumed by a failed finish")
+	}
+	fin, err := s.Finish(ctx, kid, FinishRequest{RoundID: "math-keep-1", Answers: make([]string, 10)}, day0)
+	if err != nil || fin.Total != 10 {
+		t.Fatalf("second finish: %+v, %v", fin, err)
+	}
+	if _, ok := s.sheets.Peek(start.SheetID); ok {
+		t.Fatal("sheet should be removed after a committed finish")
+	}
+}
+
+func TestReviewResolvesSightWordsFromTheSightBank(t *testing.T) {
+	s, kid := newStore(t)
+	ctx := context.Background()
+	// "said" is both a grade-1 heart word and a sight word; missing it as a
+	// sight word must bring back the sight entry with its rank.
+	for i, id := range []string{"sight-miss-1", "sight-miss-2"} {
+		at := day0.Add(time.Duration(i) * time.Hour)
+		start, err := s.Start(ctx, kid, StartRequest{RoundID: id, Kind: KindSpelling, Focus: curriculum.SightWordSkill, Grade: 1, Count: 10}, at)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := s.Finish(ctx, kid, FinishRequest{RoundID: id, Guesses: loseAll(start.Words)}, at); err != nil {
+			t.Fatal(err)
+		}
+	}
+	review, err := s.Start(ctx, kid, StartRequest{RoundID: "sight-review", Kind: KindSpelling, Focus: FocusReview, Grade: 1, Count: 10}, day0.Add(3*time.Hour))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, w := range review.Words {
+		if w.Skill != curriculum.SightWordSkill || w.Rank == 0 {
+			t.Fatalf("review returned a non-sight entry: %+v", w)
+		}
 	}
 }
 

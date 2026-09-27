@@ -219,7 +219,7 @@
           <p class="font-bold text-violet-900 dark:text-violet-100"><span aria-hidden="true">🥋</span> Spelling lesson</p>
           <p class="mt-1 text-sm text-violet-800 dark:text-violet-200" x-text="currentSkillTip()"></p>
         </div>
-        <button id="next-spelling-button" x-show="roundDone" type="button" @click="nextSpellingWord" class="mt-3 w-full rounded-xl bg-violet-700 px-6 py-4 text-lg font-bold text-white shadow-sm transition hover:bg-violet-800"><span x-text="spellingRound + 1 === spellingWords.length ? 'See my results 🏆' : 'Next word →'"></span></button>
+        <button id="next-spelling-button" x-show="roundDone" :disabled="busy" type="button" @click="nextSpellingWord" class="mt-3 w-full rounded-xl bg-violet-700 px-6 py-4 text-lg font-bold text-white shadow-sm transition hover:bg-violet-800"><span x-text="spellingRound + 1 === spellingWords.length ? 'See my results 🏆' : 'Next word →'"></span></button>
       </article>
     </section>
 

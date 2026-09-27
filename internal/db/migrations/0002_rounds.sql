@@ -33,6 +33,7 @@ CREATE TABLE round_items (
     PRIMARY KEY (round_id, idx)
 );
 CREATE INDEX round_items_child_key ON round_items(child_id, item_key, answered_at);
+CREATE INDEX round_items_child_time ON round_items(child_id, answered_at);
 
 CREATE TABLE skill_progress (
     account_id   INTEGER NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,

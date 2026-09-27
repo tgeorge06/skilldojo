@@ -220,15 +220,27 @@ test("the browser round rules match the shared replay fixtures", () => {
     // The log the server will replay records every event the component
     // acted on, tagged, in order. Events the component ignored (repeats,
     // blanks, post-round) are absent, which the server also ignores.
-    const acted = fixture.guesses.filter((g, i, all) => {
-      if (g.kind === "word") return g.value.trim() !== "";
-      return !all.slice(0, i).some((p) => p.kind === "letter" && p.value === g.value);
-    });
+    const acted = fixture.guesses
+      .filter((g, i, all) => {
+        if (g.kind === "word") return g.value.trim() !== "";
+        return !all.slice(0, i).some((p) => p.kind === "letter" && p.value === g.value);
+      })
+      // Word guesses are logged as compared: trimmed and lower-cased.
+      .map((g) => (g.kind === "word" ? { kind: "word", value: g.value.trim().toLowerCase() } : g));
     const logged = game.guessLog[0];
     assert.ok(logged.length <= acted.length, `${fixture.name}: log has extra events`);
     // JSON round-trip: the log lives in the vm realm, so prototypes differ.
     assert.equal(JSON.stringify(logged), JSON.stringify(acted.slice(0, logged.length)), `${fixture.name}: log order`);
   }
+});
+
+test("a signed-in child starts at their own grade", () => {
+  const { context } = loadGame();
+  context.document.querySelector = (sel) => sel === "[data-child-id]" ? { dataset: { childId: "7", childNickname: "Nova", childGrade: "3" } } : null;
+  const game = context.dojo();
+  assert.equal(game.child.grade, 3);
+  assert.equal(game.grade, 3);
+  assert.equal(game.spellingGrade, 3);
 });
 
 test("anonymous play never calls the round endpoints and keeps no log server could use", () => {

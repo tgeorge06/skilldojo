@@ -130,7 +130,11 @@ func hashToken(plain string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-func ts(t time.Time) string { return t.UTC().Format(time.RFC3339Nano) }
+// tsLayout is fixed width so "expires_at > ?" compares chronologically in
+// SQL; RFC3339Nano drops trailing zeros and breaks lexical order.
+const tsLayout = "2006-01-02T15:04:05.000000000Z"
+
+func ts(t time.Time) string { return t.UTC().Format(tsLayout) }
 
 func parseTS(s string) time.Time {
 	t, _ := time.Parse(time.RFC3339Nano, s)
