@@ -100,6 +100,23 @@ try {
   await parent.locator("text=training now").waitFor({ timeout: 5000 });
   await parent.goto(base + "/");
   await expect(await parent.locator("text=Training: Nova").count() === 1, "practice page should show the active child");
+
+  // Signed in, a Word Rescue round goes through the server and earns a reward.
+  await parent.getByRole("button", { name: /Spelling/ }).click();
+  await parent.getByRole("button", { name: /Start word rescue/ }).click();
+  await parent.locator("#spelling-word-heading").waitFor({ timeout: 5000 });
+  for (let i = 0; i < 5; i += 1) {
+    // Read the answer from component state (a test harness privilege) and
+    // rescue it, so the reward is deterministic.
+    const word = await parent.evaluate(() => document.querySelector("[x-data]")._x_dataStack[0].currentWord.word);
+    await parent.fill("#whole-word", word);
+    await parent.getByRole("button", { name: /Rescue word/ }).click();
+    await parent.locator("#next-spelling-button").waitFor({ timeout: 5000 });
+    await parent.locator("#next-spelling-button").click();
+  }
+  await parent.locator("#spelling-results-heading").waitFor({ timeout: 5000 });
+  await parent.getByText(/\+\d+ mosaic tiles/).locator("visible=true").waitFor({ timeout: 5000 });
+  await expect(await parent.locator("text=You rescued 5 of 5").count() === 1, "server should agree all five were rescued");
 } catch (err) {
   problems.push(`harness: ${err.message}`);
 } finally {

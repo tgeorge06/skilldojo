@@ -24,6 +24,7 @@ import (
 	"github.com/tgeorge06/skilldojo/internal/curriculum"
 	"github.com/tgeorge06/skilldojo/internal/db"
 	"github.com/tgeorge06/skilldojo/internal/mail"
+	"github.com/tgeorge06/skilldojo/internal/progress"
 	"github.com/tgeorge06/skilldojo/internal/sheet"
 )
 
@@ -68,6 +69,7 @@ type server struct {
 	cfg      config
 	store    *sheet.Store
 	accounts *account.Store
+	progress *progress.Store
 	mailer   mail.Mailer
 	tmpl     *template.Template
 	limiter  *rateLimiter
@@ -139,17 +141,20 @@ func envOr(key, fallback string) string {
 func newServer(cfg config, database *sql.DB, mailer mail.Mailer) (*server, error) {
 	// Fail fast if the embedded curriculum is malformed; the server grades
 	// spelling rounds against it.
-	if _, err := curriculum.Load(); err != nil {
+	cur, err := curriculum.Load()
+	if err != nil {
 		return nil, err
 	}
 	tmpl, err := template.ParseFS(templateFS, "templates/*.html")
 	if err != nil {
 		return nil, err
 	}
+	sheets := sheet.NewStore()
 	return &server{
 		cfg:      cfg,
-		store:    sheet.NewStore(),
+		store:    sheets,
 		accounts: account.New(database),
+		progress: progress.New(database, cur, sheets),
 		mailer:   mailer,
 		tmpl:     tmpl,
 		limiter:  newRateLimiter(),
@@ -177,6 +182,8 @@ func (s *server) handler() http.Handler {
 	mux.HandleFunc("GET /{$}", s.handleIndex)
 	mux.HandleFunc("POST /api/sheet", s.handleNewSheet)
 	mux.HandleFunc("POST /api/grade", s.handleGrade)
+	mux.HandleFunc("POST /api/round/start", s.handleRoundStart)
+	mux.HandleFunc("POST /api/round/finish", s.handleRoundFinish)
 
 	mux.HandleFunc("GET /login", s.handleLoginPage)
 	mux.HandleFunc("POST /auth/magic", s.handleMagic)
@@ -305,7 +312,13 @@ func (s *server) handleGrade(w http.ResponseWriter, r *http.Request) {
 }
 
 func decodeJSON(w http.ResponseWriter, r *http.Request, v any) error {
-	r.Body = http.MaxBytesReader(w, r.Body, 64<<10)
+	return decodeJSONLimit(w, r, v, 64<<10)
+}
+
+// decodeJSONLimit is strict: a byte cap per endpoint, no unknown fields,
+// no trailing data.
+func decodeJSONLimit(w http.ResponseWriter, r *http.Request, v any, limit int64) error {
+	r.Body = http.MaxBytesReader(w, r.Body, limit)
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(v); err != nil {

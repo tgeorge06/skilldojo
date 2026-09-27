@@ -208,6 +208,20 @@ func (c *Curriculum) Word(word string) (Word, bool) {
 	return w, ok
 }
 
+// SightWord looks up a word in the sight-word bank only. Four words live
+// in both banks, so callers that recorded a sight-word item use this to get
+// the sight entry back rather than the pattern entry Word() prefers.
+func (c *Curriculum) SightWord(word string) (Word, bool) {
+	for _, g := range c.grades {
+		for _, w := range c.sightWords[g] {
+			if w.Word == word {
+				return w, true
+			}
+		}
+	}
+	return Word{}, false
+}
+
 // AllWords returns every entry from both banks; order is by grade then bank order.
 func (c *Curriculum) AllWords() []Word {
 	var out []Word

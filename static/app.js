@@ -3,12 +3,18 @@ function dojo() {
   return {
     view: "setup",
     subject: "math",
+    // Signed-in child, read from data attributes the server renders on the
+    // root element (never interpolated into x-data). Null when anonymous.
+    child: readChild(),
+    ...defaultGrades(),
+    roundId: "",
+    guessLog: [],
+    reward: null,
     busy: false,
     error: "",
 
     // Math dojo state.
     ops: ["addsub"],
-    grade: 1,
     count: 10,
     sheetId: "",
     questions: [],
@@ -29,7 +35,6 @@ function dojo() {
     },
 
     // Spelling dojo state.
-    spellingGrade: 1,
     spellingCount: 5,
     spellingFocus: "mixed",
     spellingWords: [],
@@ -100,12 +105,19 @@ function dojo() {
     async startSheet() {
       this.busy = true;
       this.error = "";
+      this.reward = null;
       try {
-        const data = await this.post("/api/sheet", {
-          ops: this.ops,
-          grade: this.grade,
-          count: this.count,
-        });
+        let data;
+        if (this.child) {
+          this.roundId = newRoundId();
+          data = await this.post("/api/round/start", {
+            round_id: this.roundId, kind: "math", ops: this.ops, grade: this.grade, count: this.count,
+          });
+          data = { id: data.sheet_id, questions: data.questions };
+        } else {
+          this.roundId = "";
+          data = await this.post("/api/sheet", { ops: this.ops, grade: this.grade, count: this.count });
+        }
         this.sheetId = data.id;
         this.questions = data.questions;
         this.answers = data.questions.map(() => "");
@@ -125,7 +137,13 @@ function dojo() {
       this.busy = true;
       this.error = "";
       try {
-        this.report = await this.post("/api/grade", { id: this.sheetId, answers: this.answers });
+        if (this.roundId) {
+          const data = await this.post("/api/round/finish", { round_id: this.roundId, answers: this.answers });
+          this.report = { results: data.results, score: data.score, total: data.total, percent: data.percent };
+          this.reward = data.reward;
+        } else {
+          this.report = await this.post("/api/grade", { id: this.sheetId, answers: this.answers });
+        }
         this.view = "math-results";
         this.moveToTop();
         if (this.report.percent === 100) confettiBurst();
@@ -188,9 +206,31 @@ function dojo() {
       }
       return selected;
     },
-    startSpelling() {
+    async startSpelling() {
       this.subject = "spelling";
-      this.spellingWords = this.selectSpellingWords();
+      this.error = "";
+      this.reward = null;
+      if (this.child) {
+        this.busy = true;
+        try {
+          this.roundId = newRoundId();
+          const data = await this.post("/api/round/start", {
+            round_id: this.roundId, kind: "spelling", focus: this.spellingFocus,
+            grade: this.spellingGrade, count: this.spellingCount,
+          });
+          this.spellingWords = data.words;
+        } catch (e) {
+          this.error = e.message;
+          this.roundId = "";
+          return;
+        } finally {
+          this.busy = false;
+        }
+      } else {
+        this.roundId = "";
+        this.spellingWords = this.selectSpellingWords();
+      }
+      this.guessLog = this.spellingWords.map(() => []);
       this.spellingRound = 0;
       this.spellingScore = 0;
       this.spellingResults = [];
@@ -248,6 +288,7 @@ function dojo() {
     guessLetter(letter) {
       if (this.view !== "spelling-game" || this.roundDone || this.guessedLetters.includes(letter)) return;
       this.guessedLetters = [...this.guessedLetters, letter];
+      this.logGuess("letter", letter);
       if (this.currentWord.word.toUpperCase().includes(letter)) {
         if (this.isWordRevealed()) this.finishSpellingRound(true);
         else this.statusMessage = `Nice! ${letter} is in the word.`;
@@ -260,6 +301,9 @@ function dojo() {
     guessWholeWord() {
       if (this.roundDone || !this.wholeWordGuess.trim()) return;
       const guess = this.wholeWordGuess.trim().toLowerCase();
+      // Log what was compared, not what was typed: the server requires the
+      // exact lowercase word, and this is what the browser judged.
+      this.logGuess("word", guess);
       if (guess === this.currentWord.word.toLowerCase()) {
         this.guessedLetters = [...new Set(this.currentWord.word.toUpperCase().split(""))];
         this.finishSpellingRound(true);
@@ -269,6 +313,10 @@ function dojo() {
       this.wholeWordGuess = "";
       if (this.mistakes >= 6) this.finishSpellingRound(false);
       else this.statusMessage = `Not quite. Check the clue and try again — ${this.triesLeft()} tries left.`;
+    },
+    logGuess(kind, value) {
+      const log = this.guessLog[this.spellingRound];
+      if (log) log.push({ kind, value });
     },
     finishSpellingRound(won) {
       this.roundDone = true;
@@ -285,9 +333,12 @@ function dojo() {
     spelledOutWord() {
       return this.currentWord.word.toUpperCase().split("").join("–");
     },
-    nextSpellingWord() {
+    async nextSpellingWord() {
       if (!this.roundDone) return;
       if (this.spellingRound + 1 >= this.spellingWords.length) {
+        // If the server could not record the round, stay here so the
+        // child can tap again; the same roundId makes the retry harmless.
+        if (this.roundId && !(await this.finishSpellingRound_())) return;
         this.view = "spelling-results";
         this.moveToTop("#spelling-results-heading");
         if (this.spellingScore === this.spellingWords.length) confettiBurst();
@@ -296,6 +347,34 @@ function dojo() {
       this.spellingRound += 1;
       this.loadSpellingWord();
       this.moveToTop("#spelling-word-heading");
+    },
+    // The server replays the guess log and decides the reward. Its verdict
+    // is what the results show; the local score was only for instant feedback.
+    async finishSpellingRound_() {
+      this.busy = true;
+      this.error = "";
+      try {
+        const data = await this.post("/api/round/finish", { round_id: this.roundId, guesses: this.guessLog });
+        this.reward = data.reward;
+        this.spellingScore = data.score;
+        this.spellingResults = data.word_results.map(({ word, won }) => ({ word, won }));
+        return true;
+      } catch (e) {
+        this.error = e.message;
+        this.statusMessage = "Could not save this round. Tap again to retry.";
+        return false;
+      } finally {
+        this.busy = false;
+      }
+    },
+    rewardSummary() {
+      if (!this.reward) return "";
+      const parts = [];
+      if (this.reward.fills > 0) parts.push(`+${this.reward.fills} energy`);
+      if (this.reward.mosaic_cells > 0) parts.push(`+${this.reward.mosaic_cells} mosaic tiles`);
+      if (this.reward.evolved && this.reward.evolved.length) parts.push("a skill evolved!");
+      if (this.reward.review_due > 0) parts.push(`${this.reward.review_due} words to review`);
+      return parts.join(" · ");
     },
     spellingResultMessage() {
       if (this.spellingScore === this.spellingWords.length) return "Perfect rescue! Every word is glowing.";
@@ -394,6 +473,32 @@ function dojo() {
       this.moveToTop();
     },
   };
+}
+
+// readChild pulls the signed-in child from the root element's data
+// attributes, which html/template escapes. Absent when anonymous or in tests.
+// Signed-in children start at their own grade; anonymous play keeps grade 1.
+function defaultGrades() {
+  const child = readChild();
+  const grade = child ? child.grade : 1;
+  return { grade, spellingGrade: grade };
+}
+
+function readChild() {
+  const root = typeof document !== "undefined" && document.querySelector ? document.querySelector("[data-child-id]") : null;
+  if (!root) return null;
+  return {
+    id: Number(root.dataset.childId),
+    nickname: root.dataset.childNickname || "",
+    grade: Number(root.dataset.childGrade) || 1,
+  };
+}
+
+// newRoundId is the idempotency key for a round; a retried finish is a
+// duplicate, not a double reward.
+function newRoundId() {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+  return Array.from({ length: 32 }, () => Math.floor(Math.random() * 16).toString(16)).join("");
 }
 
 function shuffle(items) {

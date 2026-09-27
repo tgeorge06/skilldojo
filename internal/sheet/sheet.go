@@ -130,6 +130,42 @@ func (s *Store) Put(sh *Sheet) error {
 	return nil
 }
 
+// Peek returns a stored, unexpired sheet without consuming it, so a client
+// that reloads mid-round can get its questions back.
+func (s *Store) Peek(id string) (*Sheet, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	sh, ok := s.sheets[id]
+	if ok && sh.CreatedAt.Before(time.Now().Add(-sheetTTL)) {
+		delete(s.sheets, id)
+		return nil, false
+	}
+	return sh, ok
+}
+
+// Evaluate scores answers against a stored sheet without consuming it, so
+// a caller can commit its own bookkeeping first and Remove the sheet after.
+func (s *Store) Evaluate(id string, answers []string) ([]Result, error) {
+	s.mu.Lock()
+	sh, ok := s.sheets[id]
+	if ok && sh.CreatedAt.Before(time.Now().Add(-sheetTTL)) {
+		delete(s.sheets, id)
+		ok = false
+	}
+	s.mu.Unlock()
+	if !ok {
+		return nil, fmt.Errorf("sheet not found (it may have expired) — start a new one")
+	}
+	return score(sh, answers)
+}
+
+// Remove forgets a sheet once its round is safely recorded.
+func (s *Store) Remove(id string) {
+	s.mu.Lock()
+	delete(s.sheets, id)
+	s.mu.Unlock()
+}
+
 // Grade scores answers against the stored sheet and removes it.
 func (s *Store) Grade(id string, answers []string) ([]Result, error) {
 	s.mu.Lock()
@@ -145,6 +181,10 @@ func (s *Store) Grade(id string, answers []string) ([]Result, error) {
 	if !ok {
 		return nil, fmt.Errorf("sheet not found (it may have expired) — start a new one")
 	}
+	return score(sh, answers)
+}
+
+func score(sh *Sheet, answers []string) ([]Result, error) {
 	if len(answers) != len(sh.Questions) {
 		return nil, fmt.Errorf("expected %d answers, got %d", len(sh.Questions), len(answers))
 	}

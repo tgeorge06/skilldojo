@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -390,6 +391,112 @@ func TestRateLimiterIsBoundedAndChecksIPFirst(t *testing.T) {
 	}
 	if len(e.s.limiter.hits) != 11 { // ip + 10 emails; the 2 denied never added keys
 		t.Fatalf("denied requests added limiter keys: %d", len(e.s.limiter.hits))
+	}
+}
+
+func (e *testEnv) postJSON(t *testing.T, c *http.Client, path, payload string) (*http.Response, string) {
+	t.Helper()
+	req, _ := http.NewRequest(http.MethodPost, e.srv.URL+path, strings.NewReader(payload))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Sec-Fetch-Site", "same-origin")
+	res, err := c.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return res, body(t, res)
+}
+
+func TestRoundEndpointsRequireASelectedChild(t *testing.T) {
+	e := newTestEnv(t)
+	anon := e.client(t)
+	res, page := e.postJSON(t, anon, "/api/round/start", `{"round_id":"abcdefgh","kind":"spelling","grade":1,"count":5}`)
+	if res.StatusCode != http.StatusUnauthorized || !strings.Contains(page, "sign in") {
+		t.Fatalf("anonymous start: %d %s", res.StatusCode, page)
+	}
+	parent := e.signIn(t, "p@example.com")
+	res, page = e.postJSON(t, parent, "/api/round/start", `{"round_id":"abcdefgh","kind":"spelling","grade":1,"count":5}`)
+	if res.StatusCode != http.StatusUnauthorized || !strings.Contains(page, "choose who") {
+		t.Fatalf("no child selected: %d %s", res.StatusCode, page)
+	}
+}
+
+func TestSignedInSpellingRoundIsGradedByTheServer(t *testing.T) {
+	e := newTestEnv(t)
+	c := e.signIn(t, "p@example.com")
+	e.postForm(t, c, "/family/children", url.Values{"nickname": {"Nova"}, "grade": {"2"}}).Body.Close()
+
+	res, page := e.postJSON(t, c, "/api/round/start", `{"round_id":"round-abc-123","kind":"spelling","focus":"g2-endings","grade":2,"count":5}`)
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("start: %d %s", res.StatusCode, page)
+	}
+	var start struct {
+		Words []struct{ Word string } `json:"words"`
+	}
+	if err := json.Unmarshal([]byte(page), &start); err != nil || len(start.Words) != 5 {
+		t.Fatalf("start payload: %v %s", err, page)
+	}
+
+	// The client claims every word but actually only knows the first two;
+	// the other three are six wrong whole-word guesses.
+	var guesses []string
+	for i, w := range start.Words {
+		if i < 2 {
+			guesses = append(guesses, fmt.Sprintf(`[{"kind":"word","value":%q}]`, w.Word))
+		} else {
+			guesses = append(guesses, `[{"kind":"word","value":"zz"},{"kind":"word","value":"zz"},{"kind":"word","value":"zz"},{"kind":"word","value":"zz"},{"kind":"word","value":"zz"},{"kind":"word","value":"zz"}]`)
+		}
+	}
+	finishBody := `{"round_id":"round-abc-123","guesses":[` + strings.Join(guesses, ",") + `]}`
+	res, page = e.postJSON(t, c, "/api/round/finish", finishBody)
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("finish: %d %s", res.StatusCode, page)
+	}
+	var fin struct {
+		Score  int `json:"score"`
+		Total  int `json:"total"`
+		Reward struct {
+			Fills        int  `json:"fills"`
+			MosaicCells  int  `json:"mosaic_cells"`
+			BattleCredit bool `json:"battle_credit"`
+		} `json:"reward"`
+	}
+	if err := json.Unmarshal([]byte(page), &fin); err != nil {
+		t.Fatal(err)
+	}
+	if fin.Score != 2 || fin.Total != 5 || fin.Reward.Fills != 2 || fin.Reward.MosaicCells != 2 || !fin.Reward.BattleCredit {
+		t.Fatalf("server verdict: %s", page)
+	}
+	// Retrying with an all-wins body returns the stored result.
+	res, page2 := e.postJSON(t, c, "/api/round/finish", finishBody)
+	if res.StatusCode != http.StatusOK || page2 != page {
+		t.Fatalf("retry differs: %s", page2)
+	}
+	// Unknown fields and oversized bodies are rejected.
+	res, _ = e.postJSON(t, c, "/api/round/finish", `{"round_id":"round-abc-123","correct":true}`)
+	if res.StatusCode != http.StatusBadRequest {
+		t.Fatalf("unknown field accepted: %d", res.StatusCode)
+	}
+	res, _ = e.postJSON(t, c, "/api/round/finish", `{"round_id":"round-abc-123","guesses":[`+strings.Repeat(`[{"kind":"word","value":"zz"}],`, 2000)+`[]]}`)
+	if res.StatusCode != http.StatusBadRequest {
+		t.Fatalf("oversized body accepted: %d", res.StatusCode)
+	}
+
+	// Another parent cannot finish this round even with the id.
+	other := e.signIn(t, "q@example.com")
+	e.postForm(t, other, "/family/children", url.Values{"nickname": {"Max"}, "grade": {"2"}}).Body.Close()
+	res, _ = e.postJSON(t, other, "/api/round/finish", finishBody)
+	if res.StatusCode != http.StatusNotFound {
+		t.Fatalf("cross-account finish: %d", res.StatusCode)
+	}
+
+	// Math rounds wrap the sheet store.
+	res, page = e.postJSON(t, c, "/api/round/start", `{"round_id":"round-math-1","kind":"math","ops":["addsub"],"grade":2,"count":10}`)
+	if res.StatusCode != http.StatusOK || !strings.Contains(page, `"questions"`) {
+		t.Fatalf("math start: %d %s", res.StatusCode, page)
+	}
+	res, page = e.postJSON(t, c, "/api/round/finish", `{"round_id":"round-math-1","answers":["","","","","","","","","",""]}`)
+	if res.StatusCode != http.StatusOK || !strings.Contains(page, `"score":0`) || !strings.Contains(page, `"results"`) {
+		t.Fatalf("math finish: %d %s", res.StatusCode, page)
 	}
 }
 
