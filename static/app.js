@@ -128,7 +128,8 @@ function dojo() {
       return next && next.id === q.id ? "now" : "locked";
     },
     async startQuest(q) {
-      if (!q || this.busy) return;
+      // Quests go in order: only the glowing one starts.
+      if (!q || this.busy || this.questState(q) !== "now") return;
       this.error = "";
       if (this.child) {
         this.grade = this.child.grade;
@@ -145,8 +146,16 @@ function dojo() {
     },
     // Buddy voice: the home creature speaks for itself. Cute designs are
     // bubbly; cool designs are short. Everything else stays factual.
+    // The buddy is the home creature, or the round's first creature on a
+    // results screen (the home list may not know about it yet).
+    buddy() {
+      const hero = this.heroKata();
+      if (hero) return hero;
+      const touched = typeof this.rewardCreatures === "function" ? this.rewardCreatures() : [];
+      return touched.length ? touched[0] : null;
+    },
     buddyVibe() {
-      const k = this.heroKata();
+      const k = this.buddy();
       const d = k && typeof kataDesign === "function" ? kataDesign(k.id) : null;
       return d && d.vibe === "cool" ? "cool" : "cute";
     },
@@ -422,6 +431,7 @@ function dojo() {
       try {
         if (this.roundId) {
           const data = await this.post("/api/round/finish", { round_id: this.roundId, answers: this.answers });
+          if (this.child) this.loadQuests(); // the finish may have completed a quest, even if the child already went Home
           if (seq !== this.roundSeq) return; // quit while grading: stay Home
           this.report = { results: data.results, score: data.score, total: data.total, percent: data.percent };
           this.reward = data.reward;
@@ -433,6 +443,7 @@ function dojo() {
         }
         this.view = "math-results";
         this.moveToTop("#math-results-heading");
+        if (this.child && typeof this.loadKata === "function") this.loadKata();
         if (this.report.percent === 100) confettiBurst();
       } catch (e) {
         if (seq === this.roundSeq) this.error = e.message;
@@ -656,9 +667,11 @@ function dojo() {
       const seq = this.roundSeq;
       try {
         const data = await this.post("/api/round/finish", { round_id: this.roundId, guesses: this.guessLog });
+        if (this.child) this.loadQuests();
         if (seq !== this.roundSeq) return false; // quit while saving: stay Home
         this.reward = data.reward;
         if (typeof this.loadBattleCredits === "function") this.loadBattleCredits();
+        if (typeof this.loadKata === "function") this.loadKata();
         this.spellingScore = data.score;
         this.spellingResults = data.word_results.map(({ word, won }) => ({ word, won }));
         return true;

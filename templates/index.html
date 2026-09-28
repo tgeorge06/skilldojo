@@ -66,7 +66,7 @@
           <ol class="kid-trail" aria-label="Quests">
             <template x-for="(q, i) in quests.quests" :key="q.id">
               <li class="kid-node" :class="'kid-node-' + questState(q)">
-                <button type="button" @click="startQuest(q)" :disabled="q.done || busy" class="kid-ball" :aria-label="`Quest ${i + 1}: ${q.label}${q.done ? ', done' : ''}`" x-text="q.done ? '✓' : (q.kind === 'math' ? (q.focus === 'tables' ? '✖️' : '🧮') : '🔤')"></button>
+                <button type="button" @click="startQuest(q)" :disabled="questState(q) !== 'now' || busy" class="kid-ball" :aria-label="`Quest ${i + 1}: ${q.label}${q.done ? ', done' : ''}`" x-text="q.done ? '✓' : (q.kind === 'math' ? (q.focus === 'tables' ? '✖️' : '🧮') : '🔤')"></button>
                 <div class="kid-node-label"><span x-text="q.label"></span><small x-text="q.done ? 'Done!' : q.reason"></small></div>
               </li>
             </template>
@@ -198,7 +198,7 @@
     <section x-show="view === 'math-results'" x-cloak class="space-y-4">
       <div class="kid-hero text-center space-y-2">
         <div class="text-6xl" aria-hidden="true" x-text="report.percent === 100 ? '🏆' : report.percent >= 80 ? '🎉' : report.percent >= 60 ? '💪' : '🥋'"></div>
-        <p x-show="child && heroKata()" x-cloak class="kid-bubble mx-auto" x-text="buddyReacts(report.percent)"></p>
+        <p x-show="child && buddy()" x-cloak class="kid-bubble mx-auto" x-text="buddyReacts(report.percent)"></p>
         <h2 id="math-results-heading" tabindex="-1" class="text-3xl font-black" x-text="`${report.score} out of ${report.total}!`"></h2>
         <p class="text-slate-600 dark:text-slate-300 font-semibold" x-text="gradeMessage()"></p>
         <p x-show="rewardSummary()" x-cloak class="inline-block rounded-full bg-emerald-100 px-4 py-1 text-sm font-bold text-emerald-800 dark:bg-emerald-900 dark:text-emerald-100" x-text="rewardSummary()"></p>
@@ -280,7 +280,7 @@
     <section x-show="view === 'spelling-results'" x-cloak class="space-y-4">
       <div class="kid-hero text-center space-y-2">
         <div class="text-6xl" aria-hidden="true" x-text="spellingScore === spellingWords.length ? '🏆' : spellingScore >= Math.ceil(spellingWords.length * .6) ? '🌟' : '💪'"></div>
-        <p x-show="child && heroKata()" x-cloak class="kid-bubble mx-auto" x-text="buddyReacts(spellingWords.length ? Math.round(spellingScore * 100 / spellingWords.length) : 0)"></p>
+        <p x-show="child && buddy()" x-cloak class="kid-bubble mx-auto" x-text="buddyReacts(spellingWords.length ? Math.round(spellingScore * 100 / spellingWords.length) : 0)"></p>
         <h2 id="spelling-results-heading" tabindex="-1" class="text-3xl font-black" x-text="`You rescued ${spellingScore} of ${spellingWords.length}!`"></h2>
         <p class="text-slate-600 dark:text-slate-300 font-semibold" x-text="spellingResultMessage()"></p>
         <p x-show="rewardSummary()" x-cloak class="inline-block rounded-full bg-violet-100 px-4 py-1 text-sm font-bold text-violet-800 dark:bg-violet-900 dark:text-violet-100" x-text="rewardSummary()"></p>

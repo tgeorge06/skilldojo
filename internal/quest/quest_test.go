@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -180,20 +181,76 @@ func TestMatches(t *testing.T) {
 	cases := []struct {
 		q           Quest
 		kind, focus string
+		grade       int
 		want        bool
 	}{
-		{Quest{Kind: "math", Focus: "mul"}, "math", "mul", true},
-		{Quest{Kind: "math", Focus: "mul"}, "math", "addsub,mul", true},
-		{Quest{Kind: "math", Focus: "mul"}, "math", "tables:7", false},
-		{Quest{Kind: "math", Focus: "tables"}, "math", "tables:7", true},
-		{Quest{Kind: "math", Focus: "tables"}, "math", "mul", false},
-		{Quest{Kind: "spelling", Focus: "mixed"}, "spelling", "g3-prefixes", true},
-		{Quest{Kind: "spelling", Focus: "review"}, "spelling", "mixed", false},
-		{Quest{Kind: "spelling", Focus: "review"}, "math", "review", false},
+		{Quest{Kind: "math", Focus: "mul", Grade: 3}, "math", "mul", 3, true},
+		{Quest{Kind: "math", Focus: "mul", Grade: 3}, "math", "addsub,mul", 3, true},
+		{Quest{Kind: "math", Focus: "mul", Grade: 3}, "math", "mul", 1, false},
+		{Quest{Kind: "math", Focus: "mul", Grade: 3}, "math", "tables:7", 3, false},
+		{Quest{Kind: "math", Focus: "tables", Table: 7, Grade: 3}, "math", "tables:7", 3, true},
+		{Quest{Kind: "math", Focus: "tables", Table: 7, Grade: 3}, "math", "tables:8", 3, false},
+		{Quest{Kind: "spelling", Focus: "mixed", Grade: 3}, "spelling", "g3-prefixes", 3, true},
+		{Quest{Kind: "spelling", Focus: "review", Grade: 3}, "spelling", "mixed", 3, true},
+		{Quest{Kind: "spelling", Focus: "review", Grade: 3}, "spelling", "sight-words", 3, false},
+		{Quest{Kind: "spelling", Focus: "review", Grade: 3}, "math", "review", 3, false},
 	}
 	for _, c := range cases {
-		if got := Matches(c.q, c.kind, c.focus); got != c.want {
-			t.Errorf("Matches(%+v, %s, %s) = %v", c.q, c.kind, c.focus, got)
+		if got := Matches(c.q, c.kind, c.focus, c.grade); got != c.want {
+			t.Errorf("Matches(%+v, %s, %s, %d) = %v", c.q, c.kind, c.focus, c.grade, got)
 		}
+	}
+}
+
+func TestPickerHandlesTablesAndUnsupportedCategories(t *testing.T) {
+	md := []ost.Summary{{Grade: 3, Finished: true, FinishedAt: time.Now(), Percent: 40, Categories: []ost.Tally{{Name: "Multiplication and Division", Right: 2, Total: 10, Percent: 20}}}}
+	for _, day := range []time.Time{time.Date(2026, 9, 28, 20, 0, 0, 0, time.UTC), time.Date(2026, 9, 29, 20, 0, 0, 0, time.UTC)} {
+		e := newEnv(t, fakeSources{history: md})
+		d, err := e.store.Today(e.ctx, e.child, day)
+		if err != nil {
+			t.Fatal(err)
+		}
+		q := d.Quests[0]
+		if q.Focus == "tables" && (q.Table < 3 || q.Table > 12 || q.Count != 12) {
+			t.Fatalf("a tables quest must carry a playable table: %+v", q)
+		}
+		if q.Focus != "tables" && q.Focus != "mul" {
+			t.Fatalf("multiplication weakness should steer to tables or mul: %+v", q)
+		}
+		if d.Quests[2].Focus == "tables" && q.Focus == "tables" {
+			t.Fatalf("two tables quests in one day: %+v", d.Quests)
+		}
+	}
+	geo := []ost.Summary{{Grade: 3, Finished: true, FinishedAt: time.Now(), Percent: 40, Categories: []ost.Tally{{Name: "Geometry", Right: 2, Total: 10, Percent: 20}}}}
+	e := newEnv(t, fakeSources{history: geo})
+	d, _ := e.store.Today(e.ctx, e.child, time.Date(2026, 9, 28, 20, 0, 0, 0, time.UTC))
+	if strings.Contains(d.Quests[0].Reason, "practice test") {
+		t.Fatalf("geometry has no drill, so it must not steer a quest: %+v", d.Quests[0])
+	}
+}
+
+func TestRoundCrossingMidnightCompletesItsOwnDay(t *testing.T) {
+	e := newEnv(t, fakeSources{})
+	lateNight := time.Date(2026, 9, 29, 3, 58, 0, 0, time.UTC) // 11:58 pm New York, Sept 28
+	d, _ := e.store.Today(e.ctx, e.child, lateNight)
+	q := d.Quests[1] // spelling mix
+	start, err := e.prog.Start(e.ctx, e.child, progress.StartRequest{RoundID: "midnight-1", Kind: "spelling", Focus: q.Focus, Grade: 3, Count: q.Count}, lateNight)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fin := progress.FinishRequest{RoundID: "midnight-1"}
+	for range start.Words {
+		fin.Guesses = append(fin.Guesses, nil)
+	}
+	if _, err := e.prog.Finish(e.ctx, e.child, fin, lateNight.Add(5*time.Minute)); err != nil { // 12:03 am
+		t.Fatal(err)
+	}
+	yesterday, _ := e.store.Today(e.ctx, e.child, lateNight)
+	if !yesterday.Quests[1].Done {
+		t.Fatalf("the quest tapped before midnight should be done: %+v", yesterday.Quests)
+	}
+	today, _ := e.store.Today(e.ctx, e.child, lateNight.Add(5*time.Minute))
+	if today.Day == yesterday.Day || today.Quests[1].Done {
+		t.Fatalf("the new day starts fresh: %+v", today)
 	}
 }

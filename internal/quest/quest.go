@@ -136,10 +136,7 @@ var mathLabels = map[string]string{"addsub": "Add & take away", "mul": "Multiply
 // pick chooses the day's three quests. Order: a math quest, a spelling
 // quest, then a third that alternates tables and sight words by day.
 func (s *Store) pick(ctx context.Context, child progress.Child, now time.Time, day string) ([]Quest, error) {
-	grade := child.Grade
-	if grade < 1 {
-		grade = 1
-	}
+	grade := min(max(child.Grade, 1), 5)
 	roundLen := child.RoundLen
 	if roundLen == 0 {
 		roundLen = 10
@@ -152,9 +149,14 @@ func (s *Store) pick(ctx context.Context, child progress.Child, now time.Time, d
 	if history, err := s.src.History(ctx, ost.Child{AccountID: child.AccountID, ChildID: child.ChildID, Grade: grade}, 20); err == nil && len(history) > 0 {
 		g := ost.AnalysisGrade(history, ost.NearestGrade(grade))
 		an := ost.Analyze(ost.OfGrade(history, g), g)
-		if len(an.Focus) > 0 {
-			mathOp = opForCategory(an.Focus[0].Category, seed)
-			mathReason = fmt.Sprintf("Your practice test says %s needs work", strings.ToLower(an.Focus[0].Category))
+		// The first weak area the dojo can actually drill; geometry and
+		// decimals have no drill yet, so they never steer a quest.
+		for _, f := range an.Focus {
+			if op := opForCategory(f.Category, seed); op != "" {
+				mathOp = op
+				mathReason = fmt.Sprintf("Your practice test says %s needs work", strings.ToLower(f.Category))
+				break
+			}
 		}
 	}
 	if mathOp == "" {
@@ -166,6 +168,11 @@ func (s *Store) pick(ctx context.Context, child progress.Child, now time.Time, d
 		mathReason = "Warm up your math"
 	}
 	q1 := Quest{Kind: "math", Focus: mathOp, Grade: grade, Count: roundLen, Label: mathLabels[mathOp], Reason: mathReason}
+	if mathOp == "tables" {
+		q1.Table = tableFor(grade, seed)
+		q1.Count = 12
+		q1.Label = fmt.Sprintf("Times tables: %ds", q1.Table)
+	}
 	if c, ok := s.roster.BySkill(fmt.Sprintf("math-%s-g%d", mathOp, grade)); ok && mathReason == "Warm up your math" {
 		q1.Reason = c.Name + " is waiting"
 	}
@@ -178,8 +185,8 @@ func (s *Store) pick(ctx context.Context, child progress.Child, now time.Time, d
 
 	// Third: times tables one day, sight words the next.
 	var q3 Quest
-	if seed%2 == 0 && grade >= 2 {
-		table := 2 + seed%11
+	if seed%2 == 0 && grade >= 2 && q1.Focus != "tables" {
+		table := tableFor(grade, seed+1)
 		q3 = Quest{Kind: "math", Focus: "tables", Table: table, Grade: grade, Count: 12, Label: fmt.Sprintf("Times tables: %ds", table), Reason: "In order, nice and steady"}
 		if c, ok := s.roster.BySkill(fmt.Sprintf("math-mul-g%d", grade)); ok {
 			q3.Reason = c.Name + " loves the " + itoa(table) + "s"
@@ -204,6 +211,8 @@ func dayNumber(day string) int {
 	return int(t.Unix() / 86400)
 }
 
+// opForCategory maps a practice-test reporting category onto a dojo
+// drill, or "" when the dojo has none for it.
 func opForCategory(category string, seed int) string {
 	switch category {
 	case "Multiplication and Division":
@@ -211,29 +220,44 @@ func opForCategory(category string, seed int) string {
 			return "tables"
 		}
 		return "mul"
-	case "Fractions", "Decimals":
+	case "Fractions":
 		return "frac"
 	case "Number and Operations":
 		return "addsub"
 	}
-	return "mul"
+	return ""
+}
+
+// tableFor picks a times table that suits the grade: 2s to 5s for grade
+// 2, 3s to 12s from grade 3.
+func tableFor(grade, seed int) int {
+	if grade >= 3 {
+		return 3 + seed%10
+	}
+	return 2 + seed%4
 }
 
 // Apply is the progress.Sink: a finished round completes the first open
 // quest it matches; the third completion reveals a kata. It runs after the
 // kata sink so the reveal joins the round's creatures.
 func (s *Store) Apply(ctx context.Context, tx *sql.Tx, child progress.Child, _ []string, reward *progress.Reward, now time.Time) error {
-	var kind, focus string
-	if err := tx.QueryRowContext(ctx, `SELECT kind, focus FROM rounds WHERE id = ? AND child_id = ? AND account_id = ?`,
-		reward.RoundID, child.ChildID, child.AccountID).Scan(&kind, &focus); err != nil {
+	var kind, focus, startedAt string
+	var grade int
+	if err := tx.QueryRowContext(ctx, `SELECT kind, focus, grade, started_at FROM rounds WHERE id = ? AND child_id = ? AND account_id = ?`,
+		reward.RoundID, child.ChildID, child.AccountID).Scan(&kind, &focus, &grade, &startedAt); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil
 		}
 		return err
 	}
+	// The round belongs to the day it was started on, so a round that
+	// crosses midnight still completes the quest the child tapped.
 	day := DayKey(now, child.Timezone)
+	if st, err := time.Parse(tsLayout, startedAt); err == nil {
+		day = DayKey(st, child.Timezone)
+	}
 	rows, err := tx.QueryContext(ctx,
-		`SELECT id, idx, kind, focus, tbl, done_at IS NOT NULL FROM quests WHERE child_id = ? AND account_id = ? AND day = ? ORDER BY idx`,
+		`SELECT id, idx, kind, focus, tbl, grade, done_at IS NOT NULL FROM quests WHERE child_id = ? AND account_id = ? AND day = ? ORDER BY idx`,
 		child.ChildID, child.AccountID, day)
 	if err != nil {
 		return err
@@ -242,7 +266,7 @@ func (s *Store) Apply(ctx context.Context, tx *sql.Tx, child progress.Child, _ [
 	total, done := 0, 0
 	for rows.Next() {
 		var q Quest
-		if err := rows.Scan(&q.ID, &q.Idx, &q.Kind, &q.Focus, &q.Table, &q.Done); err != nil {
+		if err := rows.Scan(&q.ID, &q.Idx, &q.Kind, &q.Focus, &q.Table, &q.Grade, &q.Done); err != nil {
 			rows.Close()
 			return err
 		}
@@ -259,7 +283,7 @@ func (s *Store) Apply(ctx context.Context, tx *sql.Tx, child progress.Child, _ [
 	}
 	var hit *Quest
 	for i := range open {
-		if Matches(open[i], kind, focus) {
+		if Matches(open[i], kind, focus, grade) {
 			hit = &open[i]
 			break
 		}
@@ -267,39 +291,49 @@ func (s *Store) Apply(ctx context.Context, tx *sql.Tx, child progress.Child, _ [
 	if hit == nil {
 		return nil
 	}
-	var revealJSON any
-	if total == 3 && done+1 == 3 {
-		t, err := s.reveal(ctx, tx, child, now)
-		if err != nil {
-			return err
-		}
-		if t != nil {
-			encoded, _ := json.Marshal(t)
-			revealJSON = string(encoded)
-			var touched []kata.Touched
-			if len(reward.Creatures) > 0 {
-				_ = json.Unmarshal(reward.Creatures, &touched)
-			}
-			touched = append(touched, *t)
-			reward.Creatures, _ = json.Marshal(touched)
-		}
+	// Claim the quest first; only the claim that lands may reveal.
+	res, err := tx.ExecContext(ctx, `UPDATE quests SET done_at = ?, round_id = ? WHERE id = ? AND child_id = ? AND account_id = ? AND done_at IS NULL`,
+		ts(now), reward.RoundID, hit.ID, child.ChildID, child.AccountID)
+	if err != nil {
+		return err
 	}
-	_, err = tx.ExecContext(ctx, `UPDATE quests SET done_at = ?, round_id = ?, reveal_json = ? WHERE id = ? AND child_id = ? AND account_id = ? AND done_at IS NULL`,
-		ts(now), reward.RoundID, revealJSON, hit.ID, child.ChildID, child.AccountID)
-	return err
+	if n, err := res.RowsAffected(); err != nil || n != 1 {
+		return err
+	}
+	if total != 3 || done+1 != 3 {
+		return nil
+	}
+	t, err := s.reveal(ctx, tx, child, now)
+	if err != nil || t == nil {
+		return err
+	}
+	encoded, _ := json.Marshal(t)
+	if _, err := tx.ExecContext(ctx, `UPDATE quests SET reveal_json = ? WHERE id = ? AND child_id = ? AND account_id = ?`,
+		string(encoded), hit.ID, child.ChildID, child.AccountID); err != nil {
+		return err
+	}
+	var touched []kata.Touched
+	if len(reward.Creatures) > 0 {
+		_ = json.Unmarshal(reward.Creatures, &touched)
+	}
+	touched = append(touched, *t)
+	reward.Creatures, _ = json.Marshal(touched)
+	return nil
 }
 
-// Matches reports whether a finished round of kind/focus completes q.
-// A math quest matches a round that practiced its op (a tables quest,
-// any table); a spelling quest matches its focus, and a "mixed" quest
-// matches any spelling round.
-func Matches(q Quest, kind, focus string) bool {
-	if q.Kind != kind {
+// Matches reports whether a finished round of kind/focus/grade completes
+// q. The round must be at the quest's grade. A math quest matches a round
+// that practiced its op; a tables quest needs its table. A spelling quest
+// matches its focus; a "mixed" quest matches any spelling round, and a
+// "review" quest also accepts a mix, so a review list that empties during
+// the day never leaves the quest impossible.
+func Matches(q Quest, kind, focus string, grade int) bool {
+	if q.Kind != kind || (q.Grade != 0 && grade != 0 && q.Grade != grade) {
 		return false
 	}
 	if kind == "math" {
 		if q.Focus == "tables" {
-			return strings.HasPrefix(focus, "tables:")
+			return focus == fmt.Sprintf("tables:%d", q.Table)
 		}
 		for _, op := range strings.Split(focus, ",") {
 			if op == q.Focus {
@@ -307,6 +341,9 @@ func Matches(q Quest, kind, focus string) bool {
 			}
 		}
 		return false
+	}
+	if q.Focus == "review" {
+		return focus == "review" || focus == "mixed"
 	}
 	return q.Focus == "mixed" || q.Focus == focus
 }
@@ -329,9 +366,10 @@ func (s *Store) reveal(ctx context.Context, tx *sql.Tx, child progress.Child, no
 		seen[id] = true
 	}
 	rows.Close()
+	grade := min(max(child.Grade, 1), 5) // the same clamp the picker uses
 	var pick *kata.Creature
 	for _, c := range s.roster.Creatures() {
-		if c.Grade == child.Grade && !seen[c.ID] {
+		if c.Grade == grade && !seen[c.ID] {
 			cc := c
 			pick = &cc
 			break
