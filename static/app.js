@@ -338,9 +338,10 @@ function dojo() {
     mathKey(event) {
       if (this.view !== "math-play" || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
       const tag = document.activeElement ? document.activeElement.tagName : "";
-      // A focused button or link keeps its own Enter/Space; only typing
-      // with nothing focused drives the pad.
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "BUTTON" || tag === "A") return;
+      // Text fields and links keep every key. A focused button (the one
+      // just tapped) keeps Enter and Space, but digits still type.
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "A") return;
+      if (tag === "BUTTON" && (event.key === "Enter" || event.key === " ")) return;
       if (/^[0-9]$/.test(event.key)) this.padPress(event.key);
       else if (event.key === "/") this.padPress("/");
       else if (event.key === "Backspace") this.padDelete();
@@ -434,21 +435,25 @@ function dojo() {
       this.subject = "spelling";
       this.error = "";
       this.reward = null;
+      const seq = ++this.roundSeq;
       if (this.child) {
         this.busy = true;
         try {
-          this.roundId = newRoundId();
+          const roundId = newRoundId();
           const data = await this.post("/api/round/start", {
-            round_id: this.roundId, kind: "spelling", focus: this.spellingFocus,
+            round_id: roundId, kind: "spelling", focus: this.spellingFocus,
             grade: this.spellingGrade, count: this.spellingCount,
           });
+          if (seq !== this.roundSeq) return; // the child went Home while this loaded
+          this.roundId = roundId;
           this.spellingWords = data.words;
         } catch (e) {
+          if (seq !== this.roundSeq) return;
           this.error = e.message;
           this.roundId = "";
           return;
         } finally {
-          this.busy = false;
+          if (seq === this.roundSeq) this.busy = false;
         }
       } else {
         this.roundId = "";
@@ -577,19 +582,22 @@ function dojo() {
     async finishSpellingRound_() {
       this.busy = true;
       this.error = "";
+      const seq = this.roundSeq;
       try {
         const data = await this.post("/api/round/finish", { round_id: this.roundId, guesses: this.guessLog });
+        if (seq !== this.roundSeq) return false; // quit while saving: stay Home
         this.reward = data.reward;
         if (typeof this.loadBattleCredits === "function") this.loadBattleCredits();
         this.spellingScore = data.score;
         this.spellingResults = data.word_results.map(({ word, won }) => ({ word, won }));
         return true;
       } catch (e) {
+        if (seq !== this.roundSeq) return false;
         this.error = e.message;
         this.statusMessage = "Could not save this round. Tap again to retry.";
         return false;
       } finally {
-        this.busy = false;
+        if (seq === this.roundSeq) this.busy = false;
       }
     },
     rewardSummary() {

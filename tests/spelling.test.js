@@ -536,4 +536,20 @@ test("a round that finishes loading after Home is dropped, and Enter on a button
   assert.deepEqual(events.map(String), ["5"], "Enter on a focused button is left to the button");
   key("7", "INPUT");
   assert.equal(game.answers[0], "5", "typing in a text field is not the pad");
+  key("7", "BUTTON");
+  assert.equal(game.answers[0], "57", "digits still type while a pad button holds focus");
+});
+
+test("a spelling round that finishes loading after Home is dropped", async () => {
+  const { game } = loadGame();
+  game.child = { id: 1, nickname: "Nova", grade: 2, round: 10 };
+  let resolve;
+  game.post = () => new Promise((r) => { resolve = r; });
+  const started = game.startSpelling();
+  game.reset();
+  resolve({ words: [{ word: "cat", clue: "pet", sentence: "The ___ sat." }] });
+  await started;
+  assert.equal(game.view, "home");
+  assert.equal(game.roundId, "", "the stale round id is never adopted");
+  assert.equal(game.busy, false);
 });
