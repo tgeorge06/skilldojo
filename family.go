@@ -15,6 +15,7 @@ type familyData struct {
 	ActiveChildID int64
 	Error         string
 	Grades        []int
+	RoundLens     []int
 }
 
 // requireSession loads the session or redirects to /login and returns false.
@@ -44,7 +45,7 @@ func (s *server) familyPage(w http.ResponseWriter, r *http.Request, sess account
 	}
 	s.render(w, "family.html", familyData{
 		Email: acct.Email, Children: kids, ActiveChildID: sess.ActiveChildID, Error: errMsg,
-		Grades: []int{1, 2, 3, 4, 5},
+		Grades: []int{1, 2, 3, 4, 5}, RoundLens: []int{5, 10, 20},
 	})
 }
 
@@ -107,7 +108,8 @@ func (s *server) handleChildAction(w http.ResponseWriter, r *http.Request) {
 		}
 	case "rename":
 		grade, _ := strconv.Atoi(r.PostFormValue("grade"))
-		err = s.accounts.UpdateChild(r.Context(), sess.AccountID, childID, r.PostFormValue("nickname"), grade)
+		roundLen, _ := strconv.Atoi(r.PostFormValue("round_len"))
+		err = s.accounts.UpdateChild(r.Context(), sess.AccountID, childID, r.PostFormValue("nickname"), grade, roundLen)
 	case "delete":
 		err = s.accounts.DeleteChild(r.Context(), sess.AccountID, childID, s.now())
 	default:

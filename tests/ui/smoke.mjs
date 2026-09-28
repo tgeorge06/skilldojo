@@ -57,9 +57,12 @@ try {
 
   // Anonymous practice: every view renders.
   await page.goto(base + "/");
-  await expect(await page.locator("text=Parents").count() === 1, "anonymous header should link to /login");
-  await page.getByRole("button", { name: /Math/ }).click();
-  await page.getByRole("button", { name: /Start math training/ }).click();
+  await expect(await page.getByRole("button", { name: /Parents/ }).count() === 1, "anonymous nav should carry the parent gate");
+  await expect(await page.getByRole("button", { name: /My kata/ }).count() === 0, "anonymous nav should not show My kata");
+  // Home Base: grade chip, then two taps to a sheet.
+  await page.getByRole("group", { name: "Grade" }).getByRole("button", { name: "2" }).click();
+  await page.getByRole("button", { name: /^Math/ }).click();
+  await page.getByRole("button", { name: /Add & take away/ }).click();
   const answers = page.locator("input[inputmode=numeric]:visible");
   await answers.first().waitFor({ timeout: 5000 });
   const answerCount = await answers.count();
@@ -67,24 +70,20 @@ try {
   for (let i = 0; i < answerCount; i += 1) await answers.nth(i).fill("1");
   await page.getByRole("button", { name: /Grade my sheet/ }).click();
   await page.locator("text=/out of/").first().waitFor({ timeout: 5000 });
-  await page.getByRole("button", { name: /Choose new training/ }).click();
+  await page.getByRole("button", { name: /Home 🏠/ }).click();
 
-  // Times tables: pick the 7s in order and check the first prompt.
+  // Times tables: Math → Times tables → 7 → ordered sheet of 12.
+  await page.getByRole("button", { name: /^Math/ }).click();
   await page.getByRole("button", { name: /Times tables/ }).click();
-  await page.getByRole("button", { name: "7s" }).click();
-  await page.getByRole("button", { name: /Start math training/ }).click();
-  const tableAnswers = page.locator("input[inputmode=numeric]:visible");
-  await tableAnswers.first().waitFor({ timeout: 5000 });
-  const tableInputs = await tableAnswers.count();
-  await expect(tableInputs === 12, `a table sheet should have 12 inputs, saw ${tableInputs}`);
-  await expect(await page.locator("form:visible", { hasText: "1 × 7" }).count() === 1, "the ordered 7s sheet should start at 1 × 7");
-  for (let i = 0; i < tableInputs; i += 1) await tableAnswers.nth(i).fill("7");
-  await page.getByRole("button", { name: /Grade my sheet/ }).click();
-  await page.locator("text=/out of/").first().waitFor({ timeout: 5000 });
-  await page.getByRole("button", { name: /Choose new training/ }).click();
+  await page.getByRole("button", { name: "7 times table" }).click();
+  await page.locator("input[inputmode=numeric]:visible").first().waitFor({ timeout: 5000 });
+  const tableInputs = await page.locator("input[inputmode=numeric]:visible").count();
+  await expect(tableInputs === 12, `times-table sheet should show 12 inputs, saw ${tableInputs}`);
+  await expect((await page.locator("form:visible").innerText()).includes("1 × 7"), "ordered 7s should start at 1 × 7");
+  await page.getByRole("button", { name: "Home", exact: true }).click();
 
-  await page.getByRole("button", { name: /Spelling/ }).click();
-  await page.getByRole("button", { name: /Start word rescue/ }).click();
+  await page.getByRole("button", { name: /^Spelling/ }).click();
+  await page.getByRole("button", { name: /Smart mix/ }).click();
   await page.locator("#spelling-word-heading").waitFor({ timeout: 5000 });
   for (const letter of ["E", "A", "T"]) {
     await page.locator("button.letter-key", { hasText: new RegExp(`^${letter}$`) }).click();
@@ -96,6 +95,10 @@ try {
     await page.getByRole("button", { name: /Rescue word/ }).click();
   }
   await expect(await page.locator("#next-spelling-button, button.letter-key").count() > 0, "spelling view should still be rendered");
+  // The parent gate needs a real hold: a tap does nothing.
+  await page.getByRole("button", { name: /Parents/ }).click();
+  await page.waitForTimeout(300);
+  await expect(page.url() === base + "/", "a tap on Parents must not leave the page");
 
   // Parent flow: sign in via the dev link, add a profile, see it on the practice page.
   const parent = await context.newPage();
@@ -113,11 +116,12 @@ try {
   await parent.getByRole("button", { name: "Add", exact: true }).click();
   await parent.locator("text=training now").waitFor({ timeout: 5000 });
   await parent.goto(base + "/");
-  await expect(await parent.locator("text=Training: Nova").count() === 1, "practice page should show the active child");
+  await expect(await parent.locator("text=Hi Nova!").count() === 1, "home should greet the active child");
+  await expect(await parent.getByRole("group", { name: "Grade" }).count() === 0, "a signed-in child never sees a grade picker");
 
   // Signed in, a Word Rescue round goes through the server and earns a reward.
-  await parent.getByRole("button", { name: /Spelling/ }).click();
-  await parent.getByRole("button", { name: /Start word rescue/ }).click();
+  await parent.getByRole("button", { name: /^Spelling/ }).click();
+  await parent.getByRole("button", { name: /Smart mix/ }).click();
   await parent.locator("#spelling-word-heading").waitFor({ timeout: 5000 });
   for (let i = 0; i < 5; i += 1) {
     // Read the answer from component state (a test harness privilege) and
@@ -145,20 +149,23 @@ try {
   }
   await parent.locator("text=rests for now").waitFor({ timeout: 5000 });
 
-  // The index renders every creature and Train here starts a round.
+  // The sticker book renders every creature and a tap starts a round.
   await parent.getByRole("button", { name: /My kata/ }).click();
   await parent.locator("#kata-heading").waitFor({ timeout: 5000 });
   await parent.locator("ul[aria-label=Kata] li svg").first().waitFor({ timeout: 5000 });
   const cards = await parent.locator("ul[aria-label=Kata] li").count();
   await expect(cards === 10 || cards === 11, `grade tab should list its creatures, saw ${cards}`);
-  await expect(await parent.locator("[aria-label^='This week']").count() === 1, "the index should show this week's mosaic");
+  await expect(await parent.locator("[aria-label^='This week']").count() === 1, "the sticker book should keep this week's mosaic");
   await parent.locator("ul[aria-label=Kata] li").first().getByRole("button", { name: /Train here/ }).click();
   await parent.locator("#spelling-word-heading, input[inputmode=numeric]").first().waitFor({ timeout: 5000 });
 
-  // Color by number: open a page, pick a region, answer wrong, see it wait.
+  // Home shows the child's most-loved creature once one is found.
   await parent.goto(base + "/");
-  await parent.getByRole("button", { name: /Math/ }).click();
-  await parent.getByRole("button", { name: /Color by number/ }).click();
+  await parent.locator(".kid-hero svg").first().waitFor({ timeout: 5000 });
+
+  // Color by number: Play → open a page, pick a region, answer wrong, see it wait.
+  await parent.getByRole("button", { name: /^Play/ }).click();
+  await parent.getByRole("button", { name: /^Color by number/ }).click();
   await parent.locator("#paint-heading").waitFor({ timeout: 5000 });
   const regions = await parent.locator("svg[aria-label='Color by number page'] g[role=button]").count();
   await expect(regions === 14, `grade-2 page should have 14 regions, saw ${regions}`);
@@ -169,8 +176,8 @@ try {
 
   // Cooldown painting after a lost round needs no server.
   await parent.goto(base + "/");
-  await parent.getByRole("button", { name: /Spelling/ }).click();
-  await parent.getByRole("button", { name: /Start word rescue/ }).click();
+  await parent.getByRole("button", { name: /^Spelling/ }).click();
+  await parent.getByRole("button", { name: /Smart mix/ }).click();
   await parent.locator("#spelling-word-heading").waitFor({ timeout: 5000 });
   for (let i = 0; i < 5; i += 1) {
     for (let k = 0; k < 6; k += 1) {

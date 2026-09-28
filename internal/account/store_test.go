@@ -160,7 +160,7 @@ func TestSessionsAndChildrenAreFencedByAccount(t *testing.T) {
 	if _, err := s.Child(ctx, b.ID, childA.ID); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("cross-account Child = %v", err)
 	}
-	if err := s.UpdateChild(ctx, b.ID, childA.ID, "Hacked", 1); !errors.Is(err, ErrNotFound) {
+	if err := s.UpdateChild(ctx, b.ID, childA.ID, "Hacked", 1, 10); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("cross-account UpdateChild = %v", err)
 	}
 	if err := s.DeleteChild(ctx, b.ID, childA.ID, now); !errors.Is(err, ErrNotFound) {
@@ -187,11 +187,14 @@ func TestSessionsAndChildrenAreFencedByAccount(t *testing.T) {
 	if sessA.ActiveChildID != childA.ID {
 		t.Fatalf("active child = %d", sessA.ActiveChildID)
 	}
-	if err := s.UpdateChild(ctx, a.ID, childA.ID, "Nova B", 3); err != nil {
+	if err := s.UpdateChild(ctx, a.ID, childA.ID, "Nova B", 3, 7); err == nil {
+		t.Fatal("round length 7 should be rejected")
+	}
+	if err := s.UpdateChild(ctx, a.ID, childA.ID, "Nova B", 3, 20); err != nil {
 		t.Fatal(err)
 	}
 	got, _ := s.Child(ctx, a.ID, childA.ID)
-	if got.Nickname != "Nova B" || got.Grade != 3 {
+	if got.Nickname != "Nova B" || got.Grade != 3 || got.RoundLen != 20 {
 		t.Fatalf("after update: %+v", got)
 	}
 

@@ -296,13 +296,13 @@ func TestChildrenAreFencedAcrossAccounts(t *testing.T) {
 	// The practice page shows the active child via data attributes, escaped.
 	res, _ = a.Get(e.srv.URL + "/")
 	page = body(t, res)
-	if !strings.Contains(page, `data-child-nickname="Nova"`) || !strings.Contains(page, "Training: Nova") {
+	if !strings.Contains(page, `data-child-nickname="Nova"`) || !strings.Contains(page, `data-child-round="10"`) {
 		t.Fatalf("index should carry the active child: %s", snippet(page))
 	}
 
 	// B cannot touch A's child by id: every action is a 404.
 	for _, action := range []string{"select", "rename", "delete"} {
-		res = e.postForm(t, b, childPath, url.Values{"action": {action}, "nickname": {"Hacked"}, "grade": {"1"}})
+		res = e.postForm(t, b, childPath, url.Values{"action": {action}, "nickname": {"Hacked"}, "grade": {"1"}, "round_len": {"10"}})
 		body(t, res)
 		if res.StatusCode != http.StatusNotFound {
 			t.Errorf("cross-account %s: %d, want 404", action, res.StatusCode)
@@ -314,14 +314,14 @@ func TestChildrenAreFencedAcrossAccounts(t *testing.T) {
 	}
 
 	// A can rename, and validation errors come back as 400 with a message.
-	res = e.postForm(t, a, childPath, url.Values{"action": {"rename"}, "nickname": {"<b>x</b>"}, "grade": {"3"}})
+	res = e.postForm(t, a, childPath, url.Values{"action": {"rename"}, "nickname": {"<b>x</b>"}, "grade": {"3"}, "round_len": {"10"}})
 	if page := body(t, res); res.StatusCode != http.StatusBadRequest || !strings.Contains(page, "letters, numbers") {
 		t.Fatalf("bad nickname: %d %s", res.StatusCode, snippet(page))
 	}
-	res = e.postForm(t, a, childPath, url.Values{"action": {"rename"}, "nickname": {"Nova B"}, "grade": {"3"}})
+	res = e.postForm(t, a, childPath, url.Values{"action": {"rename"}, "nickname": {"Nova B"}, "grade": {"3"}, "round_len": {"20"}})
 	body(t, res)
 	res, _ = a.Get(e.srv.URL + "/")
-	if page := body(t, res); !strings.Contains(page, `data-child-nickname="Nova B"`) || !strings.Contains(page, `data-child-grade="3"`) {
+	if page := body(t, res); !strings.Contains(page, `data-child-nickname="Nova B"`) || !strings.Contains(page, `data-child-grade="3"`) || !strings.Contains(page, `data-child-round="20"`) {
 		t.Fatalf("rename not reflected: %s", snippet(page))
 	}
 
@@ -360,7 +360,7 @@ func TestFreeTierIsUntouchedWithoutSession(t *testing.T) {
 	c := e.client(t)
 	res, _ := c.Get(e.srv.URL + "/")
 	page := body(t, res)
-	if res.StatusCode != http.StatusOK || strings.Contains(page, "data-child-id") || !strings.Contains(page, `href="/login"`) {
+	if res.StatusCode != http.StatusOK || strings.Contains(page, "data-child-id") || !strings.Contains(page, "Parents: press and hold") {
 		t.Fatalf("anonymous index: %d", res.StatusCode)
 	}
 	req, _ := http.NewRequest(http.MethodPost, e.srv.URL+"/api/sheet", strings.NewReader(`{"ops":["addsub"],"grade":1,"count":10}`))
@@ -504,6 +504,15 @@ func TestSignedInSpellingRoundIsGradedByTheServer(t *testing.T) {
 	}
 
 	// Math rounds wrap the sheet store.
+	// The profile's round length is enforced: 30 questions for a profile set to 10 is refused.
+	res, page = e.postJSON(t, c, "/api/round/start", `{"round_id":"round-math-0","kind":"math","ops":["addsub"],"grade":2,"count":30}`)
+	if res.StatusCode != http.StatusBadRequest || !strings.Contains(page, "rounds of 10") {
+		t.Fatalf("round length should be fenced: %d %s", res.StatusCode, page)
+	}
+	res, page = e.postJSON(t, c, "/api/round/start", `{"round_id":"round-math-0b","kind":"spelling","focus":"mixed","grade":2,"count":10}`)
+	if res.StatusCode != http.StatusBadRequest || !strings.Contains(page, "rounds of 5") {
+		t.Fatalf("spelling length should be fenced: %d %s", res.StatusCode, page)
+	}
 	res, page = e.postJSON(t, c, "/api/round/start", `{"round_id":"round-math-1","kind":"math","ops":["addsub"],"grade":2,"count":10}`)
 	if res.StatusCode != http.StatusOK || !strings.Contains(page, `"questions"`) {
 		t.Fatalf("math start: %d %s", res.StatusCode, page)

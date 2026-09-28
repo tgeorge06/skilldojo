@@ -29,7 +29,7 @@ const (
 )
 
 var validOps = map[string]bool{OpAddSub: true, OpMul: true, OpDiv: true, OpFrac: true}
-var validCounts = map[int]bool{10: true, 20: true, 30: true}
+var validCounts = map[int]bool{5: true, 10: true, 20: true, 30: true}
 
 // Question is one problem. The answer never leaves the server.
 type Question struct {
@@ -82,7 +82,7 @@ func Generate(ops []string, grade, count int) (*Sheet, error) {
 		return nil, fmt.Errorf("grade must be between %d and %d", MinGrade, MaxGrade)
 	}
 	if !validCounts[count] {
-		return nil, fmt.Errorf("count must be 10, 20, or 30")
+		return nil, fmt.Errorf("count must be 5, 10, 20, or 30")
 	}
 	return generate(ops, grade, count)
 }

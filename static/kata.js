@@ -82,6 +82,7 @@ function kataMixin() {
         this.subject = "math";
         this.ops = [entry.focus];
         this.grade = entry.grade;
+        this.count = defaultRoundLen();
         this.normalizeCount();
       } else {
         this.subject = "spelling";
@@ -95,7 +96,7 @@ function kataMixin() {
       this.subject = "spelling";
       this.spellingFocus = "review";
       this.spellingGrade = this.child ? this.child.grade : this.spellingGrade;
-      this.spellingCount = 5;
+      this.spellingCount = defaultRoundLen() > 10 ? 10 : 5;
       await this.startTraining();
       if (this.view === "kata-index" && this.error) this.kataError = this.error;
     },

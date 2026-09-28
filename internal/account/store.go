@@ -36,6 +36,8 @@ const (
 	MaxNickname = 24
 	// MinGrade and MaxGrade bound a child's grade.
 	MinGrade, MaxGrade = 1, 5
+	// DefaultRoundLen is the math questions per round for a new profile.
+	DefaultRoundLen = 10
 )
 
 // Account is a parent.
@@ -53,6 +55,7 @@ type Child struct {
 	AccountID int64
 	Nickname  string
 	Grade     int
+	RoundLen  int // math questions per round: 5, 10, or 20
 	CreatedAt time.Time
 }
 
@@ -308,7 +311,7 @@ func (s *Store) SetActiveChild(ctx context.Context, sessionID, accountID, childI
 // Children lists an account's live profiles, oldest first.
 func (s *Store) Children(ctx context.Context, accountID int64) ([]Child, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, account_id, nickname, grade, created_at FROM children
+		`SELECT id, account_id, nickname, grade, round_len, created_at FROM children
 		 WHERE account_id = ? AND deleted_at IS NULL ORDER BY id`, accountID)
 	if err != nil {
 		return nil, err
@@ -318,7 +321,7 @@ func (s *Store) Children(ctx context.Context, accountID int64) ([]Child, error) 
 	for rows.Next() {
 		var c Child
 		var created string
-		if err := rows.Scan(&c.ID, &c.AccountID, &c.Nickname, &c.Grade, &created); err != nil {
+		if err := rows.Scan(&c.ID, &c.AccountID, &c.Nickname, &c.Grade, &c.RoundLen, &created); err != nil {
 			return nil, err
 		}
 		c.CreatedAt = parseTS(created)
@@ -332,9 +335,9 @@ func (s *Store) Child(ctx context.Context, accountID, childID int64) (Child, err
 	var c Child
 	var created string
 	err := s.db.QueryRowContext(ctx,
-		`SELECT id, account_id, nickname, grade, created_at FROM children
+		`SELECT id, account_id, nickname, grade, round_len, created_at FROM children
 		 WHERE id = ? AND account_id = ? AND deleted_at IS NULL`, childID, accountID).
-		Scan(&c.ID, &c.AccountID, &c.Nickname, &c.Grade, &created)
+		Scan(&c.ID, &c.AccountID, &c.Nickname, &c.Grade, &c.RoundLen, &created)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Child{}, ErrNotFound
 	}
@@ -358,11 +361,15 @@ func (s *Store) CreateChild(ctx context.Context, accountID int64, nickname strin
 		return Child{}, err
 	}
 	id, _ := res.LastInsertId()
-	return Child{ID: id, AccountID: accountID, Nickname: nick, Grade: grade, CreatedAt: now}, nil
+	return Child{ID: id, AccountID: accountID, Nickname: nick, Grade: grade, RoundLen: DefaultRoundLen, CreatedAt: now}, nil
 }
 
-// UpdateChild renames or regrades a profile the account owns.
-func (s *Store) UpdateChild(ctx context.Context, accountID, childID int64, nickname string, grade int) error {
+// ValidRoundLen reports whether n is an allowed round length.
+func ValidRoundLen(n int) bool { return n == 5 || n == 10 || n == 20 }
+
+// UpdateChild renames, regrades, or resizes the rounds of a profile the
+// account owns.
+func (s *Store) UpdateChild(ctx context.Context, accountID, childID int64, nickname string, grade, roundLen int) error {
 	nick, err := ValidateNickname(nickname)
 	if err != nil {
 		return err
@@ -370,9 +377,12 @@ func (s *Store) UpdateChild(ctx context.Context, accountID, childID int64, nickn
 	if grade < MinGrade || grade > MaxGrade {
 		return errors.New("account: grade must be between 1 and 5")
 	}
+	if !ValidRoundLen(roundLen) {
+		return errors.New("account: round length must be 5, 10, or 20")
+	}
 	res, err := s.db.ExecContext(ctx,
-		`UPDATE children SET nickname = ?, grade = ? WHERE id = ? AND account_id = ? AND deleted_at IS NULL`,
-		nick, grade, childID, accountID)
+		`UPDATE children SET nickname = ?, grade = ?, round_len = ? WHERE id = ? AND account_id = ? AND deleted_at IS NULL`,
+		nick, grade, roundLen, childID, accountID)
 	if err != nil {
 		return err
 	}
