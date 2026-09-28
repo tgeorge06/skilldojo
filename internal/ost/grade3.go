@@ -117,7 +117,7 @@ func init() {
 		}},
 		Template{no, "3.MD.2", 2, func(r *rand.Rand) Item {
 			total, n := between(r, 2, 9), between(r, 2, 9)
-			return numeric(fmt.Sprintf("A box of books has a mass of %d kilograms. All %d books have the same mass. What is the mass of one book, in kilograms?", total*n, n), itoa(total), fmt.Sprintf("%d ÷ %d = %d kilograms.", total*n, n, total))
+			return numeric(fmt.Sprintf("%d books together have a mass of %d kilograms. Each book has the same mass. What is the mass of one book, in kilograms?", n, total*n), itoa(total), fmt.Sprintf("%d ÷ %d = %d kilograms.", total*n, n, total))
 		}},
 		Template{no, "3.MD.3", 2, func(r *rand.Rand) Item {
 			scale := pick(r, []int{2, 5, 10})
@@ -148,14 +148,14 @@ func init() {
 			n := between(r, 1, d-1)
 			os := otherDenominators(r, d)
 			return figure(choices(r, fmt.Sprintf("A pizza is cut into %d equal slices. %s eats %d slices. What fraction of the pizza is that?", d, pick(r, names), n),
-				frac(n, d), []string{frac(d-n, d), frac(n, os[0]), frac(n, os[1]), frac(n+1, d)}, fmt.Sprintf("%d of %d equal parts is %s.", n, d, frac(n, d))), Figure{Kind: "parts", A: d, B: n})
+				frac(n, d), []string{frac(d-n, d), frac(n, os[0]), frac(n, os[1]), frac(n, os[2]), frac(n, os[3]), frac(n+1, d)}, fmt.Sprintf("%d of %d equal parts is %s.", n, d, frac(n, d))), Figure{Kind: "parts", A: d, B: n})
 		}},
 		Template{fr, "3.NF.2", 2, func(r *rand.Rand) Item {
 			d := pick(r, []int{2, 3, 4, 6, 8})
 			n := between(r, 1, d-1)
 			os := otherDenominators(r, d)
 			return figure(choices(r, fmt.Sprintf("This number line goes from 0 to 1. It is cut into %d equal parts. What fraction is the dot on?", d),
-				frac(n, d), []string{frac(n, os[0]), frac(d-n, d), frac(n+1, d), frac(n, os[1])}, "Count the equal parts from 0 to the dot."), Figure{Kind: "numberline", A: d, B: n})
+				frac(n, d), []string{frac(n, os[0]), frac(d-n, d), frac(n+1, d), frac(n, os[1]), frac(n, os[2]), frac(n, os[3])}, "Count the equal parts from 0 to the dot."), Figure{Kind: "numberline", A: d, B: n})
 		}},
 		Template{fr, "3.NF.3", 2, func(r *rand.Rand) Item {
 			// Equivalent pairs whose denominators stay within 2, 3, 4, 6, 8.
@@ -163,7 +163,7 @@ func init() {
 			pr := pairs[r.IntN(len(pairs))]
 			n, d, n2, d2 := pr[0], pr[1], pr[2], pr[3]
 			return figure(choices(r, fmt.Sprintf("Which fraction is the same amount as %s? (The same amount is called equivalent.)", frac(n, d)),
-				frac(n2, d2), []string{frac(n2+1, d2), frac(n, d2), frac(n2, d), frac(d2-n2, d2)}, "Multiply the top and bottom by the same number."), Figure{Kind: "parts", A: d, B: n})
+				frac(n2, d2), []string{frac(n2+1, d2), frac(n, d2), frac(n2, d), frac(d2-n2, d2), frac(n+1, d2), frac(n2-1, d2)}, "Multiply the top and bottom by the same number."), Figure{Kind: "parts", A: d, B: n})
 		}},
 		Template{fr, "3.NF.3", 2, func(r *rand.Rand) Item {
 			d := pick(r, []int{3, 4, 6, 8})
@@ -178,7 +178,8 @@ func init() {
 		}},
 		Template{fr, "3.NF.3", 1, func(r *rand.Rand) Item {
 			d := pick(r, []int{3, 4, 6, 8})
-			return choices(r, "Which fraction is the same as 1 whole?", frac(d, d), []string{frac(1, d), frac(d, 1), frac(d-1, d)}, "When the top and bottom numbers match, you have all the parts: 1 whole.")
+			os := otherDenominators(r, d)
+			return choices(r, "Which fraction is the same as 1 whole?", frac(d, d), []string{frac(1, d), frac(d-1, d), frac(d, os[0]), frac(1, os[1]), frac(d, os[2]), frac(1, os[3])}, "When the top and bottom numbers match, you have all the parts: 1 whole.")
 		}},
 		Template{fr, "3.NF.3", 2, func(r *rand.Rand) Item {
 			sets := []struct {
@@ -189,7 +190,7 @@ func init() {
 				{"1/2", []string{"2/4", "3/6", "1/3", "4/8", "2/3"}, []int{0, 1, 3}},
 				{"1/3", []string{"2/6", "1/4", "3/6", "2/8", "3/4"}, nil},
 				{"1/4", []string{"2/8", "2/4", "1/2", "3/8", "1/3"}, nil},
-				{"2/3", []string{"4/6", "3/4", "2/4", "6/8", "1/3"}, nil},
+				{"2/3", []string{"4/6", "3/4", "2/4", "5/8", "1/3"}, nil},
 				{"3/4", []string{"6/8", "3/8", "4/6", "2/3", "1/2"}, nil},
 			}
 			st := sets[r.IntN(len(sets))]
@@ -280,7 +281,8 @@ func init() {
 		}},
 		Template{ge, "3.G.2", 2, func(r *rand.Rand) Item {
 			d := pick(r, []int{2, 3, 4, 6, 8})
-			return figure(choices(r, fmt.Sprintf("This rectangle is cut into %d equal parts. What fraction of the rectangle is one part?", d), frac(1, d), []string{frac(d, 1), frac(1, otherDenominator(r, d)), frac(2, d), frac(d-1, d)}, fmt.Sprintf("Each of %d equal parts is 1/%d of the whole.", d, d)), Figure{Kind: "parts", A: d, B: 1})
+			os := otherDenominators(r, d)
+			return figure(choices(r, fmt.Sprintf("This rectangle is cut into %d equal parts. What fraction of the rectangle is one part?", d), frac(1, d), []string{frac(d, d), frac(1, os[0]), frac(1, os[1]), frac(1, os[2]), frac(1, os[3]), frac(2, d), frac(d-1, d)}, fmt.Sprintf("Each of %d equal parts is 1/%d of the whole.", d, d)), Figure{Kind: "parts", A: d, B: 1})
 		}},
 		Template{ge, "3.MD.8", 3, func(r *rand.Rand) Item {
 			l := between(r, 6, 9)

@@ -293,9 +293,14 @@ func Build(grade int, seed uint64) ([]Item, error) {
 		for k := 0; k < counts[i]; k++ {
 			t := ts[order[k%len(order)]]
 			it := t.Gen(r)
-			// A test must not ask the same question twice; try a few more
-			// draws before accepting a repeat.
+			// A test must not ask the same question twice: redraw a few
+			// times, then fall back to another template in the category
+			// (a fixed-text template cannot vary on its own).
 			for tries := 0; tries < 8 && sameItem(items, it); tries++ {
+				it = t.Gen(r)
+			}
+			for alt := 1; alt < len(ts) && sameItem(items, it); alt++ {
+				t = ts[order[(k+alt)%len(order)]]
 				it = t.Gen(r)
 			}
 			it.Category, it.Standard, it.DOK = w.Name, t.Standard, t.DOK
@@ -308,6 +313,21 @@ func Build(grade int, seed uint64) ([]Item, error) {
 		items[i].ID = fmt.Sprintf("q%02d", i+1)
 	}
 	return items, nil
+}
+
+// sameValueAsAny reports whether a choice that reads as a number equals
+// any kept choice in value (2/4 is 1/2), so no item offers the same
+// answer twice in different clothes.
+func sameValueAsAny(d string, kept []string) bool {
+	if _, ok := parseNumber(d); !ok {
+		return false
+	}
+	for _, k := range kept {
+		if _, ok := parseNumber(k); ok && sameNumber(d, k) {
+			return true
+		}
+	}
+	return false
 }
 
 // sameItem reports whether an equal question (prompt and choices) is
@@ -454,12 +474,15 @@ func between(r *rand.Rand, lo, hi int) int { return lo + r.IntN(hi-lo+1) }
 // distractors can collide at edge values may pass extra candidates.
 func choices(r *rand.Rand, prompt, correct string, distractors []string, explanation string) Item {
 	seen := map[string]bool{correct: true}
+	kept := []string{correct}
 	var ds []string
 	for _, d := range distractors {
-		if !seen[d] {
-			seen[d] = true
-			ds = append(ds, d)
+		if seen[d] || sameValueAsAny(d, kept) {
+			continue
 		}
+		seen[d] = true
+		kept = append(kept, d)
+		ds = append(ds, d)
 	}
 	if len(ds) < 3 {
 		// Templates must supply three distinct distractors; the tests

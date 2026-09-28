@@ -31,7 +31,7 @@ func init() {
 			for n%d == 0 {
 				n = between(r, 2, 9)
 			}
-			return choices(r, fmt.Sprintf("%d friends share %d sandwiches equally. How much does each friend get?", d, n), simplify(n, d), []string{simplify(d, n), frac(n, d+1), frac(n-1, d)}, fmt.Sprintf("%d ÷ %d = %s.", n, d, frac(n, d)))
+			return choices(r, fmt.Sprintf("%d friends share %d sandwiches equally. How much does each friend get?", d, n), simplify(n, d), []string{simplify(d, n), frac(n, d+1), frac(n-1, d), frac(n+1, d), frac(d, n+1), frac(n, d*2)}, fmt.Sprintf("%d ÷ %d = %s.", n, d, frac(n, d)))
 		}},
 		Template{fr, "5.NF.4", 2, func(r *rand.Rand) Item {
 			a, b, c, d := between(r, 1, 3), between(r, 4, 5), between(r, 1, 3), between(r, 4, 6)

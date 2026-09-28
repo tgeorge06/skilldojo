@@ -217,17 +217,50 @@ func TestGrade3FollowsOhioBlueprint(t *testing.T) {
 			t.Errorf("no template covers %s", std)
 		}
 	}
-	allowed := map[string]bool{"2": true, "3": true, "4": true, "6": true, "8": true, "1": true}
+	allowed := map[string]bool{"2": true, "3": true, "4": true, "6": true, "8": true}
 	fracRE := regexp.MustCompile(`\b\d+/(\d+)\b`)
+	for grade := 3; grade <= 5; grade++ {
+		for seed := uint64(1); seed <= 200; seed++ {
+			items, _ := Build(grade, seed)
+			seen := map[string]bool{}
+			for _, it := range items {
+				key := it.Prompt + "|" + strings.Join(it.Choices, "|") + "|" + figureKey(it.Figure)
+				if seen[key] {
+					t.Fatalf("grade %d seed %d repeats a question: %s", grade, seed, it.Prompt)
+				}
+				seen[key] = true
+			}
+		}
+	}
 	for seed := uint64(1); seed <= 200; seed++ {
 		items, _ := Build(3, seed)
-		seen := map[string]bool{}
 		for _, it := range items {
-			key := it.Prompt + "|" + strings.Join(it.Choices, "|") + "|" + figureKey(it.Figure)
-			if seen[key] {
-				t.Fatalf("seed %d repeats a question: %s", seed, it.Prompt)
+			if strings.Contains(it.Prompt, "milliliter") {
+				t.Fatalf("milliliters are not a grade 3 unit: %s", it.Prompt)
 			}
-			seen[key] = true
+			// Picture answers agree with the pictures.
+			if f := it.Figure; f != nil && f.Kind == "bars" && strings.Contains(it.Prompt, "How many more") {
+				lo, hi := 1<<30, 0
+				for _, v := range f.Values {
+					lo, hi = min(lo, v), max(hi, v)
+				}
+				if n, _ := parseNumber(it.Numeric); int(n) > hi-lo || int(n) <= 0 {
+					t.Fatalf("bar graph key %s does not fit values %v", it.Numeric, f.Values)
+				}
+			}
+			if f := it.Figure; f != nil && f.Kind == "lineplot" {
+				cut := 4
+				if strings.Contains(it.Prompt, "1 1/2") {
+					cut = 6
+				}
+				want := 0
+				for i := cut + 1; i < len(f.Values); i++ {
+					want += f.Values[i]
+				}
+				if it.Numeric != itoa(want) {
+					t.Fatalf("line plot key %s, but %d marks lie past the cut in %v", it.Numeric, want, f.Values)
+				}
+			}
 			if it.Category != "Fractions" && it.Standard != "3.G.2" {
 				continue
 			}
@@ -238,8 +271,17 @@ func TestGrade3FollowsOhioBlueprint(t *testing.T) {
 					}
 				}
 			}
-			if strings.Contains(it.Prompt, "milliliter") {
-				t.Fatalf("milliliters are not a grade 3 unit: %s", it.Prompt)
+			// No two choices are the same amount in different clothes
+			// (a choose-all item is allowed equal correct answers by design).
+			for i := range it.Choices {
+				if it.Type == TypeMulti {
+					break
+				}
+				for j := i + 1; j < len(it.Choices); j++ {
+					if _, ok := parseNumber(it.Choices[i]); ok && sameNumber(it.Choices[i], it.Choices[j]) {
+						t.Fatalf("seed %d %s offers %s and %s, the same value", seed, it.Standard, it.Choices[i], it.Choices[j])
+					}
+				}
 			}
 		}
 	}

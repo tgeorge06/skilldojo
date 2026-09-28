@@ -54,6 +54,13 @@ test("figures escape labels and describe themselves to read-aloud", () => {
   assert.ok(svg.includes("currentColor") && !svg.includes("#16302b"), "figure text follows the theme");
   assert.ok(t.figureSVG({ kind: "numberline", a: 4, b: 1 }).includes("<circle"));
   assert.equal(t.figureSVG({ kind: "nope", a: 1, b: 1 }), "");
+  const bars = t.figureSVG({ kind: "bars", a: 5, names: ["Dogs", "<b>Cats</b>", "Fish"], values: [10, 0, 25] });
+  assert.ok(bars.includes("&lt;b&gt;Cats") && !bars.includes("<b>"), "bar names are escaped");
+  assert.equal((bars.match(/<rect /g) || []).length, 3, "one bar per category, even a zero bar");
+  assert.ok(bars.includes(">25<"), "the axis reaches the tallest bar");
+  const plot = t.figureSVG({ kind: "lineplot", a: 8, values: [0, 0, 2, 0, 3, 0, 0, 1, 0] });
+  assert.equal((plot.match(/>X</g) || []).length, 6, "one X per pencil");
+  assert.ok(plot.includes(">1½<"), "quarter-inch labels are drawn");
   const spoken = [];
   context.window.speechSynthesis = { cancel() {}, speak(u) { spoken.push(u.text); } };
   context.SpeechSynthesisUtterance = function (text) { this.text = text; };
