@@ -84,7 +84,7 @@ function dojo() {
       if (this.hashStart) {
         this.hashStart = false;
         // Consume the hash so a reload or back does not start another round.
-        if (window.history && window.history.replaceState) window.history.replaceState(null, "", window.location.pathname);
+        if (window.history && window.history.replaceState) window.history.replaceState(null, "", window.location.pathname + window.location.search);
         if (this.hashTables) this.openTables();
         else if (this.subject === "spelling") this.openSpelling();
         else this.startSheet();
@@ -217,7 +217,7 @@ function dojo() {
     },
     // Keep the count on the current mode's list after any mode change.
     normalizeCount() {
-      if (!this.countChoices().includes(this.count)) this.count = this.countChoices()[0];
+      if (!this.countChoices().includes(this.count)) this.count = this.tablesMode() ? 12 : defaultRoundLen();
     },
     tablesMode() {
       return this.ops.length === 1 && this.ops[0] === "tables";

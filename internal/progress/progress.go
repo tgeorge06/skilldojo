@@ -206,6 +206,11 @@ func (s *Store) Start(ctx context.Context, child Child, req StartRequest, now ti
 	if req.Grade < 1 || req.Grade > 5 {
 		return StartResponse{}, fmt.Errorf("%w: grade must be 1-5", ErrBadRequest)
 	}
+	if existing, err := s.existingStart(ctx, child, req.RoundID); err == nil {
+		return existing, nil // a retry replays even if the profile changed since
+	} else if !errors.Is(err, ErrNotFound) {
+		return StartResponse{}, err
+	}
 	// The parent's round length is a rule, not a suggestion: the client
 	// cannot ask for a longer or shorter round than the profile allows.
 	// Times tables are always a full table (12 or 24).
@@ -218,11 +223,6 @@ func (s *Store) Start(ctx context.Context, child Child, req StartRequest, now ti
 		if !tables && req.Count != want {
 			return StartResponse{}, fmt.Errorf("%w: this profile plays rounds of %d", ErrBadRequest, want)
 		}
-	}
-	if existing, err := s.existingStart(ctx, child, req.RoundID); err == nil {
-		return existing, nil
-	} else if !errors.Is(err, ErrNotFound) {
-		return StartResponse{}, err
 	}
 	var resp StartResponse
 	var err error
