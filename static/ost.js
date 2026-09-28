@@ -81,7 +81,7 @@ function ostTest() {
     padPress(k) {
       const cur = this.numberText();
       if (cur.length >= 8) return;
-      if ((k === "/" || k === ".") && (cur === "" || cur.includes("/") || (k === "." && cur.includes(".")))) return;
+      if ((k === "/" || k === ".") && (cur === "" || cur.includes("/") || cur.includes("."))) return; // one bar or one point, never both
       this.typeNumber(cur + k);
     },
     padDelete() {
@@ -143,8 +143,8 @@ function ostTest() {
       if (f.kind === "rect") {
         const w = 200, h = Math.max(60, Math.min(140, Math.round((200 * f.b) / Math.max(f.a, 1))));
         return `<svg width="300" height="${h + 44}" viewBox="0 0 300 ${h + 44}"><rect x="20" y="8" width="${w}" height="${h}" fill="#d7f5ea" stroke="#218a68" stroke-width="3" rx="4"/>` +
-          `<text x="${20 + w / 2}" y="${h + 34}" text-anchor="middle" font-size="18" font-weight="700" fill="#16302b">${esc(f.label_a || f.a)}</text>` +
-          `<text x="${20 + w + 10}" y="${8 + h / 2 + 6}" text-anchor="start" font-size="18" font-weight="700" fill="#16302b">${esc(f.label_b || f.b)}</text></svg>`;
+          `<text x="${20 + w / 2}" y="${h + 34}" text-anchor="middle" font-size="18" font-weight="700" fill="currentColor">${esc(f.label_a || f.a)}</text>` +
+          `<text x="${20 + w + 10}" y="${8 + h / 2 + 6}" text-anchor="start" font-size="18" font-weight="700" fill="currentColor">${esc(f.label_b || f.b)}</text></svg>`;
       }
       if (f.kind === "grid") {
         const cell = Math.min(24, Math.floor(240 / Math.max(f.a, f.b)));
@@ -161,9 +161,9 @@ function ostTest() {
       if (f.kind === "numberline") {
         const w = 240, step = w / f.a;
         let ticks = "";
-        for (let i = 0; i <= f.a; i += 1) ticks += `<line x1="${20 + i * step}" y1="18" x2="${20 + i * step}" y2="38" stroke="#16302b" stroke-width="2"/>`;
-        return `<svg width="280" height="60" viewBox="0 0 280 60"><line x1="20" y1="28" x2="${20 + w}" y2="28" stroke="#16302b" stroke-width="3"/>${ticks}` +
-          `<circle cx="${20 + f.b * step}" cy="28" r="8" fill="#ef476f"/><text x="20" y="56" text-anchor="middle" font-size="16" font-weight="700">0</text><text x="${20 + w}" y="56" text-anchor="middle" font-size="16" font-weight="700">1</text></svg>`;
+        for (let i = 0; i <= f.a; i += 1) ticks += `<line x1="${20 + i * step}" y1="18" x2="${20 + i * step}" y2="38" stroke="currentColor" stroke-width="2"/>`;
+        return `<svg width="280" height="60" viewBox="0 0 280 60"><line x1="20" y1="28" x2="${20 + w}" y2="28" stroke="currentColor" stroke-width="3"/>${ticks}` +
+          `<circle cx="${20 + f.b * step}" cy="28" r="8" fill="#ef476f"/><text x="20" y="56" text-anchor="middle" font-size="16" font-weight="700" fill="currentColor">0</text><text x="${20 + w}" y="56" text-anchor="middle" font-size="16" font-weight="700" fill="currentColor">1</text></svg>`;
       }
       return "";
     },

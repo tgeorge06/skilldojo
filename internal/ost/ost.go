@@ -162,9 +162,28 @@ type PublicItem struct {
 	Figure   *Figure  `json:"figure,omitempty"`
 }
 
-// Public strips the answer.
+// Public strips the answer, including any dimension a picture would give away.
 func (it Item) Public() PublicItem {
-	return PublicItem{ID: it.ID, Category: it.Category, Type: it.Type, Prompt: it.Prompt, Choices: it.Choices, Figure: it.Figure}
+	var f *Figure
+	if it.Figure != nil {
+		pf := it.Figure.Public()
+		f = &pf
+	}
+	return PublicItem{ID: it.ID, Category: it.Category, Type: it.Type, Prompt: it.Prompt, Choices: it.Choices, Figure: f}
+}
+
+// Public hides a rectangle side that is labeled "?": the drawing keeps a
+// plausible shape, but the keyed number never reaches the client.
+func (f Figure) Public() Figure {
+	if f.Kind == "rect" {
+		if f.LabelB == "?" {
+			f.B = max(2, f.A*3/5)
+		}
+		if f.LabelA == "?" {
+			f.A = max(3, f.B*5/3)
+		}
+	}
+	return f
 }
 
 // Template makes items for one standard.

@@ -36,6 +36,7 @@ test("the pad builds numbers, decimals and fractions, and refuses nonsense", () 
   t.padPress("."); assert.equal(t.numberText(), "3/4", "no decimal inside a fraction");
   t.padDelete(); t.padDelete(); t.padPress("."); t.padPress("5"); assert.equal(t.numberText(), "3.5");
   t.padPress("."); assert.equal(t.numberText(), "3.5", "one decimal point");
+  t.padPress("/"); assert.equal(t.numberText(), "3.5", "no fraction bar after a decimal point");
   assert.ok(saved.length > 0, "every change queues a save");
   const ev = (key, extra = {}) => Object.assign({ key, preventDefault() { this.prevented = true; } }, extra);
   for (const mod of ["metaKey", "ctrlKey", "altKey"]) { t.padKey(ev("1", { [mod]: true })); }
@@ -50,6 +51,7 @@ test("figures escape labels and describe themselves to read-aloud", () => {
   const svg = t.figureSVG({ kind: "rect", a: 8, b: 3, label_a: "<img src=x onerror=alert(1)>", label_b: "3 ft" });
   assert.ok(svg.includes("&lt;img"), "labels are escaped");
   assert.ok(!svg.includes("<img"));
+  assert.ok(svg.includes("currentColor") && !svg.includes("#16302b"), "figure text follows the theme");
   assert.ok(t.figureSVG({ kind: "numberline", a: 4, b: 1 }).includes("<circle"));
   assert.equal(t.figureSVG({ kind: "nope", a: 1, b: 1 }), "");
   const spoken = [];

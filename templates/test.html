@@ -52,7 +52,7 @@
             </div>
             <p id="test-prompt" class="text-xl font-semibold leading-relaxed"><template x-for="(part, i) in promptParts(current().prompt)" :key="i"><span><template x-if="part.term"><button type="button" @click="explain(part.term)" class="term" :aria-expanded="explained === part.term" x-text="part.text"></button></template><template x-if="!part.term"><span x-text="part.text"></span></template></span></template></p>
             <p x-show="explained" x-cloak class="kid-row text-base" role="status"><strong x-text="explained"></strong>: <span x-text="explained ? (terms[explained] || '') : ''"></span></p>
-            <div x-show="current().figure" x-cloak class="flex justify-center" role="img" :aria-label="current().figure ? current().figure.alt : ''" x-html="current().figure ? figureSVG(current().figure) : ''"></div>
+            <div x-show="current().figure" x-cloak class="flex justify-center text-slate-900 dark:text-slate-100" role="img" :aria-label="current().figure ? current().figure.alt : ''" x-html="current().figure ? figureSVG(current().figure) : ''"></div>
 
             <template x-if="current().type === 'choice'">
               <div class="space-y-2" role="radiogroup" aria-labelledby="test-prompt">

@@ -167,6 +167,14 @@ func TestFiguresAndGlossary(t *testing.T) {
 	if figures == 0 {
 		t.Fatal("no figures generated")
 	}
+	// A picture with a "?" side never carries the keyed number.
+	hidden := Item{Type: TypeNumber, Numeric: "4", Figure: &Figure{Kind: "rect", A: 9, B: 4, LabelA: "9 ft", LabelB: "?"}}
+	if pub := hidden.Public().Figure; pub.B == 4 || pub.A != 9 || pub.LabelB != "?" {
+		t.Fatalf("public figure leaks the unknown side: %+v", pub)
+	}
+	if hidden.Figure.B != 4 {
+		t.Fatal("the stored figure must keep the real value for the report")
+	}
 	for word, def := range Terms {
 		if word != strings.ToLower(word) || strings.TrimSpace(def) == "" || len(def) > 90 {
 			t.Fatalf("glossary entry %q: keys are lowercase, definitions short and present", word)

@@ -20,7 +20,7 @@ func init() {
 		}},
 		Template{md, "3.OA.2", 2, func(r *rand.Rand) Item {
 			g, n := between(r, 2, 9), between(r, 2, 9)
-			return numeric(fmt.Sprintf("%s has %d %s and shares them fairly with %d friends. Everyone gets the same amount. How many does each friend get?", pick(r, names), g*n, pick(r, things), g),
+			return numeric(fmt.Sprintf("%d friends share %d %s. Each friend gets the same amount. How many does each friend get?", g, g*n, pick(r, things)),
 				itoa(n), fmt.Sprintf("%d ÷ %d = %d.", g*n, g, n))
 		}},
 		Template{md, "3.OA.3", 2, func(r *rand.Rand) Item {
