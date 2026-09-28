@@ -96,7 +96,7 @@ func init() {
 		}},
 		Template{md, "4.MD.3", 2, func(r *rand.Rand) Item {
 			l, w := between(r, 12, 40), between(r, 5, 20)
-			return numeric(fmt.Sprintf("A rectangular field is %d meters by %d meters. What is its area in square meters?", l, w), itoa(l*w), fmt.Sprintf("%d × %d = %d.", l, w, l*w))
+			return figure(numeric(fmt.Sprintf("A field is shaped like a rectangle. It is %d meters long and %d meters wide. What is its area, in square meters?", l, w), itoa(l*w), fmt.Sprintf("%d × %d = %d.", l, w, l*w)), Figure{Kind: "rect", A: l, B: w, LabelA: fmt.Sprintf("%d m", l), LabelB: fmt.Sprintf("%d m", w)})
 		}},
 		Template{fr, "4.NF.1", 2, func(r *rand.Rand) Item {
 			n, d := between(r, 1, 4), between(r, 5, 8)
@@ -179,7 +179,7 @@ func init() {
 		Template{ge, "4.MD.3", 3, func(r *rand.Rand) Item {
 			w := between(r, 4, 12)
 			l := w + between(r, 2, 10)
-			return numeric(fmt.Sprintf("A rectangle has an area of %d square units and a width of %d units. What is its perimeter in units?", l*w, w), itoa(2*(l+w)), fmt.Sprintf("Length = %d ÷ %d = %d; perimeter = 2 × (%d + %d) = %d.", l*w, w, l, l, w, 2*(l+w)))
+			return figure(numeric(fmt.Sprintf("A rectangle has an area of %d square units. Its short side is %d units. What is its perimeter, in units? (First find the long side.)", l*w, w), itoa(2*(l+w)), fmt.Sprintf("Long side = %d ÷ %d = %d; perimeter = %d + %d + %d + %d = %d.", l*w, w, l, l, w, l, w, 2*(l+w))), Figure{Kind: "rect", A: l, B: w, LabelA: "?", LabelB: fmt.Sprintf("%d", w)})
 		}},
 	)
 }

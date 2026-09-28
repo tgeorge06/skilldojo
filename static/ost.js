@@ -17,6 +17,9 @@ function ostTest() {
     saveState: "",
     busy: false,
     error: "",
+    terms: {},
+    explained: "",
+    canSpeak: "speechSynthesis" in window && "SpeechSynthesisUtterance" in window,
     // One debounce timer per item, so moving on to the next question
     // never cancels the previous answer's save.
     saveTimers: {},
@@ -33,6 +36,8 @@ function ostTest() {
       this.attemptId = a.id;
       this.items = a.items || [];
       this.answers = a.answers || {};
+      this.terms = a.terms || {};
+      this.explained = "";
       if (a.report) {
         this.report = a.report;
         this.view = "done";
@@ -71,6 +76,89 @@ function ostTest() {
     },
     typeNumber(text) {
       this.setAnswer({ text: text.slice(0, 20) });
+    },
+    // Number pad, matching the dojo: digits, a decimal point, a fraction bar.
+    padPress(k) {
+      const cur = this.numberText();
+      if (cur.length >= 8) return;
+      if ((k === "/" || k === ".") && (cur === "" || cur.includes("/") || (k === "." && cur.includes(".")))) return;
+      this.typeNumber(cur + k);
+    },
+    padDelete() {
+      this.typeNumber(this.numberText().slice(0, -1));
+    },
+    padKey(event) {
+      if (this.view !== "question" || !this.current() || this.current().type !== "number" || event.defaultPrevented) return;
+      const tag = document.activeElement ? document.activeElement.tagName : "";
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "A") return;
+      if (tag === "BUTTON" && (event.key === "Enter" || event.key === " ")) return;
+      if (/^[0-9./]$/.test(event.key)) this.padPress(event.key);
+      else if (event.key === "Backspace") this.padDelete();
+      else return;
+      event.preventDefault();
+    },
+    // Glossary: split a prompt into plain text and tappable test words.
+    // Longest terms first so "line plot" wins over "line".
+    promptParts(text) {
+      const words = Object.keys(this.terms).sort((a, b) => b.length - a.length);
+      if (!words.length || !text) return [{ text: text || "" }];
+      const re = new RegExp("\\b(" + words.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|") + ")\\b", "gi");
+      const parts = [];
+      let last = 0;
+      for (const m of text.matchAll(re)) {
+        if (m.index > last) parts.push({ text: text.slice(last, m.index) });
+        parts.push({ text: m[0], term: m[0].toLowerCase() });
+        last = m.index + m[0].length;
+      }
+      if (last < text.length) parts.push({ text: text.slice(last) });
+      return parts;
+    },
+    explain(term) {
+      this.explained = this.explained === term ? "" : term;
+    },
+    // Read the question and its choices with the browser voice.
+    readAloud() {
+      if (!this.canSpeak || !this.current()) return;
+      const it = this.current();
+      let text = it.prompt;
+      if (it.choices && it.choices.length) {
+        text += " " + it.choices.map((c, i) => `Choice ${"ABCD"[i] || i + 1}: ${c}.`).join(" ");
+      }
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text.replace(/×/g, " times ").replace(/÷/g, " divided by ").replace(/−/g, " minus ").replace(/(\d+)\/(\d+)/g, "$1 over $2"));
+      u.lang = "en-US";
+      u.rate = 0.9;
+      window.speechSynthesis.speak(u);
+    },
+    // Small pictures, drawn where the real test would show one.
+    figureSVG(f) {
+      const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+      if (f.kind === "rect") {
+        const w = 200, h = Math.max(60, Math.min(140, Math.round((200 * f.b) / Math.max(f.a, 1))));
+        return `<svg width="300" height="${h + 44}" viewBox="0 0 300 ${h + 44}"><rect x="20" y="8" width="${w}" height="${h}" fill="#d7f5ea" stroke="#218a68" stroke-width="3" rx="4"/>` +
+          `<text x="${20 + w / 2}" y="${h + 34}" text-anchor="middle" font-size="18" font-weight="700" fill="#16302b">${esc(f.label_a || f.a)}</text>` +
+          `<text x="${20 + w + 10}" y="${8 + h / 2 + 6}" text-anchor="start" font-size="18" font-weight="700" fill="#16302b">${esc(f.label_b || f.b)}</text></svg>`;
+      }
+      if (f.kind === "grid") {
+        const cell = Math.min(24, Math.floor(240 / Math.max(f.a, f.b)));
+        let cells = "";
+        for (let y = 0; y < f.b; y += 1) for (let x = 0; x < f.a; x += 1) cells += `<rect x="${x * cell}" y="${y * cell}" width="${cell}" height="${cell}" fill="#d7f5ea" stroke="#218a68" stroke-width="1.5"/>`;
+        return `<svg width="${f.a * cell + 2}" height="${f.b * cell + 2}" viewBox="-1 -1 ${f.a * cell + 2} ${f.b * cell + 2}">${cells}</svg>`;
+      }
+      if (f.kind === "parts") {
+        const w = 240, pw = w / f.a;
+        let bars = "";
+        for (let i = 0; i < f.a; i += 1) bars += `<rect x="${i * pw}" y="0" width="${pw}" height="48" fill="${i < f.b ? "#7c3aed" : "#ffffff"}" stroke="#4c1d95" stroke-width="2"/>`;
+        return `<svg width="${w + 4}" height="52" viewBox="-2 -2 ${w + 4} 52">${bars}</svg>`;
+      }
+      if (f.kind === "numberline") {
+        const w = 240, step = w / f.a;
+        let ticks = "";
+        for (let i = 0; i <= f.a; i += 1) ticks += `<line x1="${20 + i * step}" y1="18" x2="${20 + i * step}" y2="38" stroke="#16302b" stroke-width="2"/>`;
+        return `<svg width="280" height="60" viewBox="0 0 280 60"><line x1="20" y1="28" x2="${20 + w}" y2="28" stroke="#16302b" stroke-width="3"/>${ticks}` +
+          `<circle cx="${20 + f.b * step}" cy="28" r="8" fill="#ef476f"/><text x="20" y="56" text-anchor="middle" font-size="16" font-weight="700">0</text><text x="${20 + w}" y="56" text-anchor="middle" font-size="16" font-weight="700">1</text></svg>`;
+      }
+      return "";
     },
     setAnswer(a) {
       const id = this.current().id;
@@ -122,10 +210,14 @@ function ostTest() {
     },
     prev() {
       if (this.index > 0) this.index -= 1;
+      this.explained = "";
+      if (this.canSpeak) window.speechSynthesis.cancel();
       window.scrollTo({ top: 0 });
     },
     next() {
       if (this.index < this.items.length - 1) this.index += 1;
+      this.explained = "";
+      if (this.canSpeak) window.speechSynthesis.cancel();
       window.scrollTo({ top: 0 });
     },
     async submit() {

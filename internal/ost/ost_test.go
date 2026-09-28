@@ -133,3 +133,43 @@ func TestCheckAndNumbers(t *testing.T) {
 		}
 	}
 }
+
+func TestFiguresAndGlossary(t *testing.T) {
+	kinds := map[string]bool{"rect": true, "grid": true, "parts": true, "numberline": true}
+	figures := 0
+	for grade := 3; grade <= 5; grade++ {
+		for seed := uint64(1); seed <= 40; seed++ {
+			items, _ := Build(grade, seed)
+			for _, it := range items {
+				if it.Figure == nil {
+					continue
+				}
+				figures++
+				f := it.Figure
+				if !kinds[f.Kind] || f.A < 1 || f.B < 0 || f.A > 60 || f.B > 60 {
+					t.Fatalf("bad figure on %s: %+v", it.Standard, f)
+				}
+				if (f.Kind == "parts" || f.Kind == "numberline") && f.B > f.A {
+					t.Fatalf("shaded/point past the end on %s: %+v", it.Standard, f)
+				}
+				if it.Public().Figure == nil {
+					t.Fatal("figures must reach the child")
+				}
+			}
+		}
+	}
+	if figures == 0 {
+		t.Fatal("no figures generated")
+	}
+	for word, def := range Terms {
+		if word != strings.ToLower(word) || strings.TrimSpace(def) == "" || len(def) > 90 {
+			t.Fatalf("glossary entry %q: keys are lowercase, definitions short and present", word)
+		}
+	}
+	// The words a nine-year-old stumbled on are in the glossary.
+	for _, w := range []string{"perimeter", "rectangle", "area", "equivalent", "quadrilateral"} {
+		if _, ok := Terms[w]; !ok {
+			t.Fatalf("glossary is missing %q", w)
+		}
+	}
+}

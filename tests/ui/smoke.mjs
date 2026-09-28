@@ -208,9 +208,9 @@ try {
   await parent.locator("text=No practice tests yet").waitFor({ timeout: 5000 });
   await parent.getByRole("button", { name: /Start a practice test/ }).click();
   await parent.locator("#test-prompt").waitFor({ timeout: 5000 });
-  const testInput = parent.locator("#test-number");
-  if (await testInput.count()) {
-    await testInput.fill("7");
+  await expect(await parent.getByRole("button", { name: /Read this question/ }).count() === 1, "every question should offer read-aloud");
+  if (await parent.locator(".kid-pad:visible").count()) {
+    await parent.getByRole("group", { name: "Number pad" }).getByRole("button", { name: "7", exact: true }).click();
   } else {
     await parent.locator("input[type=radio], input[type=checkbox]").first().check();
   }
