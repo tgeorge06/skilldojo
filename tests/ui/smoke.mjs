@@ -94,11 +94,11 @@ try {
     await page.locator("button.letter-key", { hasText: new RegExp(`^${letter}$`) }).click();
   }
   await expect(await page.locator("button.letter-key[disabled]").count() === 3, "guessed letters should be disabled");
+  await page.getByRole("button", { name: /I know the whole word/ }).click();
   const wholeWord = page.locator("#whole-word");
-  if (await wholeWord.isVisible() && await wholeWord.isEnabled()) {
-    await wholeWord.fill("zzzz");
-    await page.getByRole("button", { name: /Rescue word/ }).click();
-  }
+  await wholeWord.waitFor({ timeout: 5000 });
+  await wholeWord.fill("zzzz");
+  await page.getByRole("button", { name: /Rescue word/ }).click();
   await expect(await page.locator("#next-spelling-button, button.letter-key").count() > 0, "spelling view should still be rendered");
   // The parent gate needs a real hold: a tap does nothing.
   await page.getByRole("button", { name: /Parents/ }).click();
@@ -132,6 +132,7 @@ try {
     // Read the answer from component state (a test harness privilege) and
     // rescue it, so the reward is deterministic.
     const word = await parent.evaluate(() => document.querySelector("[x-data]")._x_dataStack[0].currentWord.word);
+    if (!(await parent.locator("#whole-word").isVisible())) await parent.getByRole("button", { name: /I know the whole word/ }).click();
     await parent.fill("#whole-word", word);
     await parent.getByRole("button", { name: /Rescue word/ }).click();
     await parent.locator("#next-spelling-button").waitFor({ timeout: 5000 });
@@ -186,6 +187,7 @@ try {
   await parent.locator("#spelling-word-heading").waitFor({ timeout: 5000 });
   for (let i = 0; i < 5; i += 1) {
     for (let k = 0; k < 6; k += 1) {
+      if (!(await parent.locator("#whole-word").isVisible())) await parent.getByRole("button", { name: /I know the whole word/ }).click();
       await parent.fill("#whole-word", "zzzz");
       await parent.getByRole("button", { name: /Rescue word/ }).click();
     }

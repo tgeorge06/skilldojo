@@ -59,6 +59,7 @@ function dojo() {
     guessedLetters: [],
     mistakes: 0,
     wholeWordGuess: "",
+    showWholeWord: false, // the typing step is hidden until asked for
     roundDone: false,
     roundWon: false,
     statusMessage: "",
@@ -473,6 +474,7 @@ function dojo() {
       this.guessedLetters = [];
       this.mistakes = 0;
       this.wholeWordGuess = "";
+      this.showWholeWord = false; // each word starts on the tiles
       this.roundDone = false;
       this.roundWon = false;
       this.statusMessage = "New word ready. Choose a letter or hear the word.";
@@ -526,6 +528,11 @@ function dojo() {
         if (this.mistakes >= 6) this.finishSpellingRound(false);
         else this.statusMessage = `No ${letter} this time. ${this.triesLeft()} tries left.`;
       }
+    },
+    // The typing step: the only place the system keyboard is welcome.
+    openWholeWord() {
+      this.showWholeWord = true;
+      this.$nextTick(() => { const el = document.getElementById("whole-word"); if (el) el.focus(); });
     },
     guessWholeWord() {
       if (this.roundDone || !this.wholeWordGuess.trim()) return;
