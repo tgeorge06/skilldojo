@@ -59,6 +59,7 @@ function dojo() {
     guessedLetters: [],
     mistakes: 0,
     wholeWordGuess: "",
+    showWholeWord: false, // the typing step is hidden until asked for
     roundDone: false,
     roundWon: false,
     statusMessage: "",
@@ -473,6 +474,7 @@ function dojo() {
       this.guessedLetters = [];
       this.mistakes = 0;
       this.wholeWordGuess = "";
+      this.showWholeWord = false; // each word starts on the tiles
       this.roundDone = false;
       this.roundWon = false;
       this.statusMessage = "New word ready. Choose a letter or hear the word.";
@@ -526,6 +528,11 @@ function dojo() {
         if (this.mistakes >= 6) this.finishSpellingRound(false);
         else this.statusMessage = `No ${letter} this time. ${this.triesLeft()} tries left.`;
       }
+    },
+    // The typing step: the only place the system keyboard is welcome.
+    openWholeWord() {
+      this.showWholeWord = true;
+      this.$nextTick(() => { const el = document.getElementById("whole-word"); if (el) el.focus(); });
     },
     guessWholeWord() {
       if (this.roundDone || !this.wholeWordGuess.trim()) return;
@@ -626,7 +633,8 @@ function dojo() {
         : `${letter}, guessed, not in the word`;
     },
     handleKey(event) {
-      if (this.view !== "spelling-game" || this.roundDone || event.metaKey || event.ctrlKey || event.altKey) return;
+      // While the typing step is open, every key belongs to the word field.
+      if (this.view !== "spelling-game" || this.roundDone || this.showWholeWord || event.metaKey || event.ctrlKey || event.altKey) return;
       const tag = document.activeElement ? document.activeElement.tagName : "";
       if (tag === "INPUT" || tag === "TEXTAREA") return;
       const letter = event.key.toUpperCase();

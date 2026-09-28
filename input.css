@@ -400,15 +400,16 @@
 
   .letter-grid {
     display: grid;
-    grid-template-columns: repeat(9, minmax(0, 1fr));
+    grid-template-columns: repeat(7, minmax(0, 1fr));
     gap: 0.45rem;
   }
 
   .letter-key {
     min-width: 0;
-    min-height: 2.75rem;
+    min-height: 3.25rem;
     border-width: 2px;
-    border-radius: 0.65rem;
+    border-radius: 0.9rem;
+    font-size: 1.35rem;
     font-weight: 800;
     transition: transform 100ms, border-color 100ms, background-color 100ms;
   }
