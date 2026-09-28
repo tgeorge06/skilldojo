@@ -476,3 +476,36 @@ test("home resets grade and round length to the profile after training another g
   assert.equal(game.count, 10);
   assert.equal(game.view, "home");
 });
+
+test("the number pad builds one answer at a time and finishes on the first blank", async () => {
+  const { game } = loadGame();
+  game.questions = [{ prompt: "1 + 1", op: "addsub" }, { prompt: "1/2 + 1/4", op: "frac" }, { prompt: "2 + 2", op: "addsub" }];
+  game.answers = ["", "", ""];
+  game.qIndex = 0;
+  game.view = "math-play";
+  let graded = 0;
+  game.submitSheet = async () => { graded += 1; };
+  game.padPress("1"); game.padPress("2");
+  assert.equal(game.answers[0], "12");
+  game.padDelete();
+  assert.equal(game.answers[0], "1");
+  await game.padGo();
+  assert.equal(game.qIndex, 1, "a typed answer advances");
+  game.padPress("/");
+  assert.equal(game.answers[1], "", "a fraction bar cannot start an answer");
+  game.padPress("3"); game.padPress("/"); game.padPress("/"); game.padPress("4");
+  assert.equal(game.answers[1], "3/4", "only one fraction bar");
+  await game.skipQuestion();
+  assert.equal(game.qIndex, 2);
+  await game.padGo();
+  assert.equal(graded, 0, "an empty answer does not finish");
+  game.padPress("4");
+  await game.padGo();
+  assert.equal(graded, 1, "the last answered question grades the round");
+  game.answers = ["", "3/4", "4"]; game.qIndex = 2;
+  await game.padGo();
+  assert.equal(game.qIndex, 0, "finishing with a blank returns to the first blank instead of grading");
+  assert.equal(graded, 1);
+  for (let i = 0; i < 12; i += 1) game.padPress("9");
+  assert.equal(game.answers[0].length, 7, "answers are capped");
+});

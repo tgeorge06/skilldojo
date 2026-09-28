@@ -29,6 +29,7 @@ function dojo() {
     sheetId: "",
     questions: [],
     answers: [],
+    qIndex: 0,
     report: { results: [], score: 0, total: 0, percent: 0 },
     opChoices: [
       { id: "addsub", label: "Add & Subtract", emoji: "➕", hint: "big numbers!" },
@@ -243,9 +244,9 @@ function dojo() {
     gradeMessage() {
       const p = this.report.percent;
       if (p === 100) return "PERFECT! A true SkillDojo master!";
-      if (p >= 90) return "Amazing work — almost perfect!";
+      if (p >= 90) return "Amazing! Almost perfect!";
       if (p >= 80) return "Great job! Keep training!";
-      if (p >= 60) return "Good effort — practice makes perfect!";
+      if (p >= 60) return "Good effort! Practice makes perfect!";
       return "Every ninja starts somewhere. Try again!";
     },
     async post(url, body) {
@@ -280,7 +281,8 @@ function dojo() {
         this.sheetId = data.id;
         this.questions = data.questions;
         this.answers = data.questions.map(() => "");
-        this.view = "math-sheet";
+        this.qIndex = 0;
+        this.view = "math-play";
         this.moveToTop();
       } catch (e) {
         this.error = e.message;
@@ -288,11 +290,56 @@ function dojo() {
         this.busy = false;
       }
     },
-    async submitSheet() {
-      if (this.answeredCount() < this.questions.length &&
-          !window.confirm("Some questions are blank — grade anyway?")) {
+    // Number pad. Answers are strings, as the sheet API expects; a fraction
+    // question gets a "/" key. Up to 7 characters keeps 5-digit sums and
+    // fractions like 12/100 typeable without runaway input.
+    padPress(k) {
+      const cur = this.answers[this.qIndex] || "";
+      if (cur.length >= 7) return;
+      if (k === "/" && (cur === "" || cur.includes("/"))) return;
+      this.answers[this.qIndex] = cur + k;
+    },
+    padDelete() {
+      const cur = this.answers[this.qIndex] || "";
+      this.answers[this.qIndex] = cur.slice(0, -1);
+    },
+    async padGo() {
+      if (!this.answers[this.qIndex]) return; // nothing typed: Skip is the way past
+      await this.advance();
+    },
+    async skipQuestion() {
+      await this.advance();
+    },
+    prevQuestion() {
+      if (this.qIndex > 0) this.qIndex -= 1;
+    },
+    async advance() {
+      if (this.qIndex + 1 < this.questions.length) {
+        this.qIndex += 1;
         return;
       }
+      // Last one: go back to the first blank, else grade.
+      const blank = this.answers.findIndex((a) => !a);
+      if (blank >= 0 && blank !== this.qIndex) {
+        this.qIndex = blank;
+        return;
+      }
+      await this.submitSheet();
+    },
+    // Physical keyboard on a laptop: digits, slash, backspace, enter.
+    mathKey(event) {
+      if (this.view !== "math-play" || event.metaKey || event.ctrlKey || event.altKey) return;
+      const tag = document.activeElement ? document.activeElement.tagName : "";
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (/^[0-9]$/.test(event.key)) this.padPress(event.key);
+      else if (event.key === "/") this.padPress("/");
+      else if (event.key === "Backspace") this.padDelete();
+      else if (event.key === "Enter") this.padGo();
+      else return;
+      event.preventDefault();
+    },
+    async submitSheet() {
+      if (this.busy) return;
       this.busy = true;
       this.error = "";
       try {
@@ -305,7 +352,7 @@ function dojo() {
           this.report = await this.post("/api/grade", { id: this.sheetId, answers: this.answers });
         }
         this.view = "math-results";
-        this.moveToTop();
+        this.moveToTop("#math-results-heading");
         if (this.report.percent === 100) confettiBurst();
       } catch (e) {
         this.error = e.message;
