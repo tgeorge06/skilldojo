@@ -96,6 +96,9 @@ func init() {
 		}},
 		Template{md, "4.MD.3", 2, func(r *rand.Rand) Item {
 			l, w := between(r, 12, 40), between(r, 5, 20)
+			if w > l {
+				l, w = w, l // "long" is never the shorter side
+			}
 			return figure(numeric(fmt.Sprintf("A field is shaped like a rectangle. It is %d meters long and %d meters wide. What is its area, in square meters?", l, w), itoa(l*w), fmt.Sprintf("%d × %d = %d.", l, w, l*w)), Figure{Kind: "rect", A: l, B: w, LabelA: fmt.Sprintf("%d m", l), LabelB: fmt.Sprintf("%d m", w)})
 		}},
 		Template{fr, "4.NF.1", 2, func(r *rand.Rand) Item {

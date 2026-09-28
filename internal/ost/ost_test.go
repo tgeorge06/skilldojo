@@ -155,6 +155,12 @@ func TestFiguresAndGlossary(t *testing.T) {
 				if it.Public().Figure == nil {
 					t.Fatal("figures must reach the child")
 				}
+				if f.Alt == "" || !strings.Contains(f.Alt, "picture") {
+					t.Fatalf("figure without a spoken description on %s: %+v", it.Standard, f)
+				}
+				if f.Kind == "rect" && f.LabelA != "?" && f.LabelB != "?" && f.A < f.B {
+					t.Fatalf("rect drawn with the short side long on %s: %+v", it.Standard, f)
+				}
 			}
 		}
 	}

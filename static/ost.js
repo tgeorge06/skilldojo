@@ -88,7 +88,7 @@ function ostTest() {
       this.typeNumber(this.numberText().slice(0, -1));
     },
     padKey(event) {
-      if (this.view !== "question" || !this.current() || this.current().type !== "number" || event.defaultPrevented) return;
+      if (this.view !== "question" || !this.current() || this.current().type !== "number" || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
       const tag = document.activeElement ? document.activeElement.tagName : "";
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "A") return;
       if (tag === "BUTTON" && (event.key === "Enter" || event.key === " ")) return;
@@ -121,6 +121,7 @@ function ostTest() {
       if (!this.canSpeak || !this.current()) return;
       const it = this.current();
       let text = it.prompt;
+      if (it.figure && it.figure.alt) text += " " + it.figure.alt;
       if (it.choices && it.choices.length) {
         text += " " + it.choices.map((c, i) => `Choice ${"ABCD"[i] || i + 1}: ${c}.`).join(" ");
       }

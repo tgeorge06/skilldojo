@@ -149,10 +149,16 @@ func init() {
 		}},
 		Template{ge, "3.MD.7", 2, func(r *rand.Rand) Item {
 			l, w := between(r, 3, 9), between(r, 2, 8)
+			if w > l {
+				l, w = w, l // "long" is never the shorter side
+			}
 			return figure(numeric(fmt.Sprintf("This rectangle is %d squares long and %d squares wide. How many squares fit inside it? (That is its area.)", l, w), itoa(l*w), fmt.Sprintf("Area = %d × %d = %d squares.", l, w, l*w)), Figure{Kind: "grid", A: l, B: w})
 		}},
 		Template{ge, "3.MD.8", 2, func(r *rand.Rand) Item {
 			l, w := between(r, 3, 12), between(r, 2, 9)
+			if w > l {
+				l, w = w, l // "long" is never the shorter side
+			}
 			return figure(numeric(fmt.Sprintf("A garden is shaped like a rectangle. It is %d feet long and %d feet wide. How many feet of fence go all the way around it? (That distance is the perimeter.)", l, w), itoa(2*(l+w)), fmt.Sprintf("Perimeter = %d + %d + %d + %d = %d.", l, w, l, w, 2*(l+w))), Figure{Kind: "rect", A: l, B: w, LabelA: fmt.Sprintf("%d ft", l), LabelB: fmt.Sprintf("%d ft", w)})
 		}},
 		Template{ge, "3.MD.5", 1, func(r *rand.Rand) Item {
@@ -170,8 +176,8 @@ func init() {
 			return figure(choices(r, fmt.Sprintf("This rectangle is cut into %d equal parts. What fraction of the rectangle is one part?", d), frac(1, d), []string{frac(d, 1), frac(1, d+1), frac(2, d)}, fmt.Sprintf("Each of %d equal parts is 1/%d of the whole.", d, d)), Figure{Kind: "parts", A: d, B: 1})
 		}},
 		Template{ge, "3.MD.8", 3, func(r *rand.Rand) Item {
-			l := between(r, 5, 9)
-			w := between(r, 2, 5)
+			l := between(r, 6, 9)
+			w := between(r, 2, 5) // always shorter than l, so "long" and "short" are true
 			p := 2 * (l + w)
 			return figure(numeric(fmt.Sprintf("A fence goes all the way around a rectangle-shaped yard. The whole fence is %d feet long. (That is the perimeter.) The long side is %d feet. How long is the short side, in feet?", p, l), itoa(w), fmt.Sprintf("Two long sides use %d feet. %d − %d = %d feet for the two short sides, so each short side is %d.", 2*l, p, 2*l, p-2*l, w)), Figure{Kind: "rect", A: l, B: w, LabelA: fmt.Sprintf("%d ft", l), LabelB: "?"})
 		}},

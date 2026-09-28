@@ -52,6 +52,31 @@ type Figure struct {
 	B      int    `json:"b"`
 	LabelA string `json:"label_a,omitempty"`
 	LabelB string `json:"label_b,omitempty"`
+	// Alt says what the picture shows, for read-aloud and screen readers.
+	Alt string `json:"alt"`
+}
+
+// Describe writes the picture in words, so nothing the child needs is
+// only visible.
+func (f Figure) Describe() string {
+	switch f.Kind {
+	case "rect":
+		a, b := f.LabelA, f.LabelB
+		if a == "" {
+			a = itoa(f.A)
+		}
+		if b == "" {
+			b = itoa(f.B)
+		}
+		return fmt.Sprintf("A picture of a rectangle. The long side is labeled %s and the short side is labeled %s.", a, b)
+	case "grid":
+		return fmt.Sprintf("A picture of a rectangle made of small squares: %d squares across and %d squares down.", f.A, f.B)
+	case "parts":
+		return fmt.Sprintf("A picture of a bar cut into %d equal parts. %d of the parts are colored in.", f.A, f.B)
+	case "numberline":
+		return fmt.Sprintf("A picture of a number line from 0 to 1, cut into %d equal parts. The dot is %d parts from 0.", f.A, f.B)
+	}
+	return ""
 }
 
 // Terms is the kid glossary: a test word and how to say it in plain words.
@@ -110,8 +135,9 @@ var Terms = map[string]string{
 	"expanded form":  "a number written as its pieces, like 300 + 40 + 2",
 }
 
-// figure attaches a picture to an item.
+// figure attaches a picture to an item, with its description filled in.
 func figure(it Item, f Figure) Item {
+	f.Alt = f.Describe()
 	it.Figure = &f
 	return it
 }
