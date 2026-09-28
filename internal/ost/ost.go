@@ -334,11 +334,18 @@ func sameValueAsAny(d string, kept []string) bool {
 // already on the test.
 func sameItem(items []Item, it Item) bool {
 	for _, o := range items {
-		if o.Prompt == it.Prompt && strings.Join(o.Choices, "|") == strings.Join(it.Choices, "|") && figureKey(o.Figure) == figureKey(it.Figure) {
+		if o.Prompt == it.Prompt && choiceKey(o.Choices) == choiceKey(it.Choices) && figureKey(o.Figure) == figureKey(it.Figure) {
 			return true
 		}
 	}
 	return false
+}
+
+// choiceKey is order-free: the same choices shuffled are the same question.
+func choiceKey(choices []string) string {
+	c := append([]string(nil), choices...)
+	sort.Strings(c)
+	return strings.Join(c, "|")
 }
 
 func figureKey(f *Figure) string {

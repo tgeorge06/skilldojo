@@ -224,11 +224,23 @@ func TestGrade3FollowsOhioBlueprint(t *testing.T) {
 			items, _ := Build(grade, seed)
 			seen := map[string]bool{}
 			for _, it := range items {
-				key := it.Prompt + "|" + strings.Join(it.Choices, "|") + "|" + figureKey(it.Figure)
+				key := it.Prompt + "|" + choiceKey(it.Choices) + "|" + figureKey(it.Figure)
 				if seen[key] {
 					t.Fatalf("grade %d seed %d repeats a question: %s", grade, seed, it.Prompt)
 				}
 				seen[key] = true
+				// No two choices are the same amount in different clothes
+				// (a choose-all item is allowed equal correct answers by design).
+				if it.Type == TypeMulti {
+					continue
+				}
+				for i := range it.Choices {
+					for j := i + 1; j < len(it.Choices); j++ {
+						if _, ok := parseNumber(it.Choices[i]); ok && sameNumber(it.Choices[i], it.Choices[j]) {
+							t.Fatalf("grade %d seed %d %s offers %s and %s, the same value", grade, seed, it.Standard, it.Choices[i], it.Choices[j])
+						}
+					}
+				}
 			}
 		}
 	}
@@ -239,13 +251,29 @@ func TestGrade3FollowsOhioBlueprint(t *testing.T) {
 				t.Fatalf("milliliters are not a grade 3 unit: %s", it.Prompt)
 			}
 			// Picture answers agree with the pictures.
-			if f := it.Figure; f != nil && f.Kind == "bars" && strings.Contains(it.Prompt, "How many more") {
-				lo, hi := 1<<30, 0
-				for _, v := range f.Values {
-					lo, hi = min(lo, v), max(hi, v)
+			if f := it.Figure; f != nil && f.Kind == "bars" {
+				want := -1
+				if strings.Contains(it.Prompt, "How many more") {
+					// "How many more cats than dogs": the two named bars.
+					var named []int
+					for _, w := range strings.Fields(strings.ToLower(strings.TrimSuffix(it.Prompt[strings.Index(it.Prompt, "How many more"):], "?"))) {
+						for i, n := range f.Names {
+							if strings.ToLower(n) == w {
+								named = append(named, i)
+							}
+						}
+					}
+					if len(named) == 2 {
+						want = f.Values[named[0]] - f.Values[named[1]]
+					}
+				} else {
+					want = 0
+					for _, v := range f.Values {
+						want += v
+					}
 				}
-				if n, _ := parseNumber(it.Numeric); int(n) > hi-lo || int(n) <= 0 {
-					t.Fatalf("bar graph key %s does not fit values %v", it.Numeric, f.Values)
+				if it.Numeric != itoa(want) {
+					t.Fatalf("bar graph key %s, but the picture %v says %d for %q", it.Numeric, f.Values, want, it.Prompt)
 				}
 			}
 			if f := it.Figure; f != nil && f.Kind == "lineplot" {
@@ -268,18 +296,6 @@ func TestGrade3FollowsOhioBlueprint(t *testing.T) {
 				for _, m := range fracRE.FindAllStringSubmatch(text, -1) {
 					if !allowed[m[1]] {
 						t.Fatalf("seed %d %s uses denominator %s (%s)", seed, it.Standard, m[1], text)
-					}
-				}
-			}
-			// No two choices are the same amount in different clothes
-			// (a choose-all item is allowed equal correct answers by design).
-			for i := range it.Choices {
-				if it.Type == TypeMulti {
-					break
-				}
-				for j := i + 1; j < len(it.Choices); j++ {
-					if _, ok := parseNumber(it.Choices[i]); ok && sameNumber(it.Choices[i], it.Choices[j]) {
-						t.Fatalf("seed %d %s offers %s and %s, the same value", seed, it.Standard, it.Choices[i], it.Choices[j])
 					}
 				}
 			}
