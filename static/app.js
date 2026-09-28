@@ -30,6 +30,8 @@ function dojo() {
     questions: [],
     answers: [],
     qIndex: 0,
+    revisited: false, // Finish already sent the child back to a blank once
+    roundSeq: 0, // bumped on every start and on Home, so a late response is ignored
     report: { results: [], score: 0, total: 0, percent: 0 },
     opChoices: [
       { id: "addsub", label: "Add & Subtract", emoji: "➕", hint: "big numbers!" },
@@ -268,6 +270,7 @@ function dojo() {
       this.busy = true;
       this.error = "";
       this.reward = null;
+      const seq = ++this.roundSeq;
       try {
         let data;
         if (this.child) {
@@ -278,10 +281,12 @@ function dojo() {
           this.roundId = "";
           data = await this.post("/api/sheet", this.sheetRequest());
         }
+        if (seq !== this.roundSeq) return; // the child went Home while this loaded
         this.sheetId = data.id;
         this.questions = data.questions;
         this.answers = data.questions.map(() => "");
         this.qIndex = 0;
+        this.revisited = false;
         this.view = "math-play";
         this.moveToTop();
       } catch (e) {
@@ -318,9 +323,12 @@ function dojo() {
         this.qIndex += 1;
         return;
       }
-      // Last one: go back to the first blank, else grade.
+      // Last one: the first Finish with blanks goes back to the first
+      // blank; a second Finish grades anyway so a child who wants to skip
+      // a question is never trapped.
       const blank = this.answers.findIndex((a) => !a);
-      if (blank >= 0 && blank !== this.qIndex) {
+      if (blank >= 0 && blank !== this.qIndex && !this.revisited) {
+        this.revisited = true;
         this.qIndex = blank;
         return;
       }
@@ -328,9 +336,11 @@ function dojo() {
     },
     // Physical keyboard on a laptop: digits, slash, backspace, enter.
     mathKey(event) {
-      if (this.view !== "math-play" || event.metaKey || event.ctrlKey || event.altKey) return;
+      if (this.view !== "math-play" || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
       const tag = document.activeElement ? document.activeElement.tagName : "";
-      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      // A focused button or link keeps its own Enter/Space; only typing
+      // with nothing focused drives the pad.
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "BUTTON" || tag === "A") return;
       if (/^[0-9]$/.test(event.key)) this.padPress(event.key);
       else if (event.key === "/") this.padPress("/");
       else if (event.key === "Backspace") this.padDelete();
@@ -342,14 +352,18 @@ function dojo() {
       if (this.busy) return;
       this.busy = true;
       this.error = "";
+      const seq = this.roundSeq;
       try {
         if (this.roundId) {
           const data = await this.post("/api/round/finish", { round_id: this.roundId, answers: this.answers });
+          if (seq !== this.roundSeq) return; // quit while grading: stay Home
           this.report = { results: data.results, score: data.score, total: data.total, percent: data.percent };
           this.reward = data.reward;
           if (typeof this.loadBattleCredits === "function") this.loadBattleCredits();
         } else {
-          this.report = await this.post("/api/grade", { id: this.sheetId, answers: this.answers });
+          const report = await this.post("/api/grade", { id: this.sheetId, answers: this.answers });
+          if (seq !== this.roundSeq) return;
+          this.report = report;
         }
         this.view = "math-results";
         this.moveToTop("#math-results-heading");
@@ -679,6 +693,8 @@ function dojo() {
       window.speechSynthesis?.cancel();
       this.view = "home";
       this.error = "";
+      this.roundSeq += 1; // anything still loading belongs to the old round
+      this.busy = false;
       this.questions = [];
       this.answers = [];
       // Training a kata from another grade must not change the child's
