@@ -10,6 +10,9 @@
   <style>
     .term { text-decoration: underline dotted #7c3aed 2px; text-underline-offset: 4px; font: inherit; color: inherit; background: none; border: 0; padding: 0; border-radius: 4px; }
     .term[aria-expanded="true"] { background: #ede4ff; color: #4c1d95; }
+    .term-chip { min-width: 2.75rem; min-height: 2.75rem; border-radius: 9999px; border: 2px dotted #7c3aed; background: #fff; color: #4c1d95; font-weight: 800; font-size: 1.1rem; }
+    .term-chip[aria-expanded="true"] { background: #ede4ff; }
+    @media (prefers-color-scheme: dark) { .term-chip { background: #171c26; color: #ddd6fe; } .term-chip[aria-expanded="true"] { background: #33245a; } }
   </style>
 </head>
 <body class="min-h-full bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 antialiased">
@@ -54,11 +57,14 @@
             <template x-if="current().type === 'choice'">
               <div class="space-y-2" role="radiogroup" aria-labelledby="test-prompt">
                 <template x-for="(c, i) in current().choices" :key="i">
-                  <label class="flex cursor-pointer items-center gap-3 rounded-2xl border-2 p-4 text-lg font-semibold transition"
-                         :class="isChosen(i) ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-950 dark:border-emerald-400' : 'border-slate-200 dark:border-slate-800'">
-                    <input type="radio" :name="'q-' + current().id" :value="i" :checked="isChosen(i)" @change="choose([i])" class="h-5 w-5 accent-emerald-600">
-                    <span><template x-for="(part, j) in promptParts(c)" :key="j"><span><template x-if="part.term"><button type="button" @click.prevent="explain(part.term)" class="term" :aria-expanded="explained === part.term" x-text="part.text"></button></template><template x-if="!part.term"><span x-text="part.text"></span></template></span></template></span>
-                  </label>
+                  <div class="flex items-center gap-2">
+                    <label class="flex flex-1 cursor-pointer items-center gap-3 rounded-2xl border-2 p-4 text-lg font-semibold transition"
+                           :class="isChosen(i) ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-950 dark:border-emerald-400' : 'border-slate-200 dark:border-slate-800'">
+                      <input type="radio" :name="'q-' + current().id" :value="i" :checked="isChosen(i)" @change="choose([i])" class="h-5 w-5 accent-emerald-600">
+                      <span x-text="c"></span>
+                    </label>
+                    <template x-for="term in choiceTerms(c)" :key="term"><button type="button" @click="explain(term)" class="term-chip" :aria-expanded="explained === term" :aria-label="'What does ' + term + ' mean?'">?</button></template>
+                  </div>
                 </template>
               </div>
             </template>
@@ -66,11 +72,14 @@
             <template x-if="current().type === 'multi'">
               <div class="space-y-2" role="group" aria-labelledby="test-prompt">
                 <template x-for="(c, i) in current().choices" :key="i">
-                  <label class="flex cursor-pointer items-center gap-3 rounded-2xl border-2 p-4 text-lg font-semibold transition"
-                         :class="isChosen(i) ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-950 dark:border-emerald-400' : 'border-slate-200 dark:border-slate-800'">
-                    <input type="checkbox" :value="i" :checked="isChosen(i)" @change="toggleChoice(i)" class="h-5 w-5 accent-emerald-600">
-                    <span><template x-for="(part, j) in promptParts(c)" :key="j"><span><template x-if="part.term"><button type="button" @click.prevent="explain(part.term)" class="term" :aria-expanded="explained === part.term" x-text="part.text"></button></template><template x-if="!part.term"><span x-text="part.text"></span></template></span></template></span>
-                  </label>
+                  <div class="flex items-center gap-2">
+                    <label class="flex flex-1 cursor-pointer items-center gap-3 rounded-2xl border-2 p-4 text-lg font-semibold transition"
+                           :class="isChosen(i) ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-950 dark:border-emerald-400' : 'border-slate-200 dark:border-slate-800'">
+                      <input type="checkbox" :value="i" :checked="isChosen(i)" @change="toggleChoice(i)" class="h-5 w-5 accent-emerald-600">
+                      <span x-text="c"></span>
+                    </label>
+                    <template x-for="term in choiceTerms(c)" :key="term"><button type="button" @click="explain(term)" class="term-chip" :aria-expanded="explained === term" :aria-label="'What does ' + term + ' mean?'">?</button></template>
+                  </div>
                 </template>
               </div>
             </template>

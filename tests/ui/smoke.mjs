@@ -209,6 +209,14 @@ try {
   await parent.getByRole("button", { name: /Start a practice test/ }).click();
   await parent.locator("#test-prompt").waitFor({ timeout: 5000 });
   await expect(await parent.getByRole("button", { name: /Read this question/ }).count() === 1, "every question should offer read-aloud");
+  // A glossary tap explains without selecting anything.
+  await parent.evaluate(() => { const s = document.querySelector("[x-data]")._x_dataStack[0]; const i = s.items.findIndex((it) => it.choices && it.choices.some((c) => /rectangle|rhombus|square|triangle/i.test(c))); if (i >= 0) s.index = i; });
+  if (await parent.locator(".term-chip").count()) {
+    await parent.locator(".term-chip").first().click();
+    await parent.locator("p[role=status]").waitFor({ timeout: 5000 });
+    await expect(await parent.locator("label input:checked").count() === 0, "a glossary tap must not select a choice");
+    await parent.evaluate(() => { document.querySelector("[x-data]")._x_dataStack[0].index = 0; });
+  }
   if (await parent.locator(".kid-pad:visible").count()) {
     await parent.getByRole("group", { name: "Number pad" }).getByRole("button", { name: "7", exact: true }).click();
   } else {

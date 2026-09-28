@@ -113,6 +113,12 @@ function ostTest() {
       if (last < text.length) parts.push({ text: text.slice(last) });
       return parts;
     },
+    // Glossary words inside an answer choice, for a "?" chip beside it
+    // (a button cannot live inside the choice's label).
+    choiceTerms(text) {
+      const seen = new Set();
+      return this.promptParts(text).filter((p) => p.term && !seen.has(p.term) && seen.add(p.term)).map((p) => p.term);
+    },
     explain(term) {
       this.explained = this.explained === term ? "" : term;
     },

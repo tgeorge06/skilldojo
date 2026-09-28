@@ -200,6 +200,7 @@ func (s *Store) load(ctx context.Context, child Child, id string) (row, error) {
 	if err := json.Unmarshal([]byte(itemsJSON), &rw.items); err != nil {
 		return rw, fmt.Errorf("ost: stored items: %w", err)
 	}
+	fillAlts(rw.items)
 	rw.answers = map[string]Answer{}
 	if err := json.Unmarshal([]byte(answersJSON), &rw.answers); err != nil {
 		return rw, fmt.Errorf("ost: stored answers: %w", err)
@@ -265,6 +266,7 @@ func (s *Store) SaveAnswer(ctx context.Context, child Child, id, itemID string, 
 	if err := json.Unmarshal([]byte(itemsJSON), &items); err != nil {
 		return err
 	}
+	fillAlts(items)
 	var it *Item
 	for i := range items {
 		if items[i].ID == itemID {
@@ -367,6 +369,7 @@ func (s *Store) Submit(ctx context.Context, child Child, id string, now time.Tim
 	if err := json.Unmarshal([]byte(itemsJSON), &items); err != nil {
 		return Attempt{}, fmt.Errorf("ost: stored items: %w", err)
 	}
+	fillAlts(items)
 	if err := json.Unmarshal([]byte(answersJSON), &answers); err != nil {
 		return Attempt{}, fmt.Errorf("ost: stored answers: %w", err)
 	}

@@ -38,8 +38,9 @@ test("the pad builds numbers, decimals and fractions, and refuses nonsense", () 
   t.padPress("."); assert.equal(t.numberText(), "3.5", "one decimal point");
   assert.ok(saved.length > 0, "every change queues a save");
   const ev = (key, extra = {}) => Object.assign({ key, preventDefault() { this.prevented = true; } }, extra);
-  const meta = ev("1", { metaKey: true }); t.padKey(meta);
+  for (const mod of ["metaKey", "ctrlKey", "altKey"]) { t.padKey(ev("1", { [mod]: true })); }
   assert.equal(t.numberText(), "3.5", "browser shortcuts are not pad keys");
+  assert.equal(t.choiceTerms("a rectangle or a Rectangle, then a line plot").join(","), "rectangle,line plot");
   const digit = ev("7"); t.padKey(digit);
   assert.equal(t.numberText(), "3.57"); assert.equal(digit.prevented, true);
 });

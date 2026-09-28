@@ -93,7 +93,7 @@ var Terms = map[string]string{
 	"triangle":       "a shape with 3 straight sides",
 	"pentagon":       "a shape with 5 straight sides",
 	"hexagon":        "a shape with 6 straight sides",
-	"rhombus":        "a pushed-over square: 4 equal sides, corners not square",
+	"rhombus":        "a shape with 4 sides that are all the same length (a square is one kind of rhombus)",
 	"trapezoid":      "a 4-sided shape with just one pair of sides that run the same way",
 	"parallelogram":  "a 4-sided shape where both pairs of opposite sides run the same way",
 	"parallel":       "running the same way and never meeting, like train tracks",
@@ -133,6 +133,16 @@ var Terms = map[string]string{
 	"line plot":      "a number line with an X for each thing measured",
 	"mixed number":   "a whole number and a fraction together, like 1 1/2",
 	"expanded form":  "a number written as its pieces, like 300 + 40 + 2",
+}
+
+// fillAlts backfills descriptions on items stored before pictures could
+// speak, so a resumed attempt reads aloud like a new one.
+func fillAlts(items []Item) {
+	for i := range items {
+		if items[i].Figure != nil && items[i].Figure.Alt == "" {
+			items[i].Figure.Alt = items[i].Figure.Describe()
+		}
+	}
 }
 
 // figure attaches a picture to an item, with its description filled in.
