@@ -132,61 +132,74 @@
       <p x-show="pageError" x-cloak role="alert" class="text-sm text-rose-700" x-text="pageError"></p>
     </section>
 
-    <section x-show="view === 'math-sheet'" x-cloak class="space-y-6">
-      <div class="flex items-center justify-between rounded-xl bg-white dark:bg-slate-900 px-5 py-3 border border-slate-200 dark:border-slate-800 shadow-sm">
-        <span class="text-sm font-semibold text-slate-500 dark:text-slate-400">Answered <span class="text-emerald-600 dark:text-emerald-400" x-text="answeredCount()"></span> of <span x-text="questions.length"></span></span>
-        <span class="text-sm font-bold text-emerald-600 dark:text-emerald-400">Grade <span x-text="grade"></span> <span aria-hidden="true">🥷</span></span>
+    <!-- Math play: one question at a time on a built-in number pad. The
+         system keyboard never opens; a physical keyboard still works. -->
+    <section x-show="view === 'math-play'" x-cloak class="space-y-4" @keydown.window="mathKey($event)">
+      <div class="flex items-center justify-between gap-3">
+        <button type="button" @click="reset" class="kid-back" aria-label="Quit this round and go home">‹</button>
+        <div class="kid-dots" role="progressbar" :aria-valuenow="qIndex + 1" aria-valuemin="1" :aria-valuemax="questions.length" :aria-label="`Question ${qIndex + 1} of ${questions.length}`">
+          <template x-for="(q, i) in questions" :key="i"><i :class="i < qIndex || (i !== qIndex && answers[i]) ? 'kid-dot-done' : i === qIndex ? 'kid-dot-now' : ''"></i></template>
+        </div>
+        <span class="kid-pill" x-text="`${qIndex + 1}/${questions.length}`"></span>
       </div>
-      <form @submit.prevent="submitSheet" class="space-y-3">
-        <template x-for="(q, i) in questions" :key="i">
-          <label class="flex items-center gap-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-5 py-4 shadow-sm">
-            <span class="w-8 shrink-0 text-sm font-bold text-slate-500" x-text="(i + 1) + '.'"></span>
-            <span class="flex-1 text-xl font-semibold tabular-nums" x-text="q.prompt + ' ='"></span>
-            <input type="text" x-model="answers[i]" inputmode="numeric" autocomplete="off" :aria-label="'Answer for question ' + (i + 1)" class="w-28 rounded-lg border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-center text-xl font-bold focus:border-emerald-600 dark:focus:border-emerald-400" :placeholder="q.op === 'frac' ? 'a/b' : '?'">
-          </label>
-        </template>
-        <p x-show="error" x-cloak role="alert" class="rounded-lg bg-rose-50 dark:bg-rose-950 px-4 py-3 text-sm font-medium text-rose-700 dark:text-rose-300" x-text="error"></p>
-        <button type="submit" :disabled="busy" class="w-full rounded-xl bg-emerald-600 px-6 py-4 text-lg font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-40">Grade my sheet! ✅</button>
-      </form>
+      <template x-if="questions[qIndex]">
+        <div class="kid-hero text-center">
+          <p id="math-prompt" class="kid-prompt tabular-nums" x-text="questions[qIndex].prompt + ' ='"></p>
+          <p class="kid-answer tabular-nums" :class="answers[qIndex] ? '' : 'kid-answer-empty'" aria-live="polite" :aria-label="'Your answer: ' + (answers[qIndex] || 'nothing yet')" x-text="answers[qIndex] || (questions[qIndex].op === 'frac' ? 'a/b' : '?')"></p>
+        </div>
+      </template>
+      <p x-show="error" x-cloak role="alert" class="rounded-lg bg-rose-50 dark:bg-rose-950 px-4 py-3 text-sm font-medium text-rose-700 dark:text-rose-300" x-text="error"></p>
+      <div class="kid-pad" role="group" aria-label="Number pad">
+        <template x-for="k in ['1','2','3','4','5','6','7','8','9']" :key="k"><button type="button" @click="padPress(k)" class="kid-key" x-text="k"></button></template>
+        <button type="button" @click="padDelete" class="kid-key kid-key-del" aria-label="Delete">⌫</button>
+        <button type="button" @click="padPress('0')" class="kid-key">0</button>
+        <button type="button" @click="padGo" :disabled="busy" class="kid-key kid-key-go" :aria-label="qIndex + 1 === questions.length ? 'Finish' : 'Next'" x-text="qIndex + 1 === questions.length ? '🏁' : '✓'"></button>
+        <button x-show="questions[qIndex] && questions[qIndex].op === 'frac'" x-cloak type="button" @click="padPress('/')" class="kid-key kid-key-wide" aria-label="Fraction bar">/</button>
+      </div>
+      <div class="flex justify-between text-sm font-semibold text-slate-500 dark:text-slate-400">
+        <button type="button" @click="prevQuestion" :disabled="qIndex === 0" class="kid-link">‹ Back</button>
+        <button type="button" @click="skipQuestion" class="kid-link">Skip ›</button>
+      </div>
     </section>
 
-    <section x-show="view === 'math-results'" x-cloak class="space-y-6">
-      <div class="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-8 text-center shadow-sm">
-        <div class="text-6xl mb-2" aria-hidden="true" x-text="report.percent === 100 ? '🏆' : report.percent >= 80 ? '🎉' : report.percent >= 60 ? '💪' : '🥋'"></div>
-        <h2 class="text-5xl font-black tabular-nums" :class="report.percent >= 80 ? 'text-emerald-600 dark:text-emerald-400' : report.percent >= 60 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'"><span x-text="report.percent"></span>%</h2>
-        <p class="mt-2 text-lg font-semibold text-slate-600 dark:text-slate-300"><span x-text="report.score"></span> out of <span x-text="report.total"></span> correct</p>
-        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400" x-text="gradeMessage()"></p>
-        <p x-show="rewardSummary()" x-cloak class="mt-3 inline-block rounded-full bg-emerald-100 px-4 py-1 text-sm font-semibold text-emerald-800 dark:bg-emerald-900 dark:text-emerald-100" x-text="rewardSummary()"></p>
-      <div x-show="rewardCreatures().length" x-cloak class="mt-4 grid gap-3 sm:grid-cols-2" role="list" aria-label="Kata touched by this round">
-        <template x-for="t in rewardCreatures()" :key="t.id">
-          <div role="listitem" class="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-left dark:border-slate-800 dark:bg-slate-950">
-            <div class="shrink-0" x-html="revealSVG(t)"></div>
-            <div>
-              <p class="font-bold" x-text="revealLabel(t)"></p>
-              <p class="text-sm text-slate-500 dark:text-slate-400" x-text="`${t.fills} of ${t.regions} regions colored`"></p>
+    <!-- Celebrate: one results screen. Score in words, the kata that grew, Again or Home. -->
+    <section x-show="view === 'math-results'" x-cloak class="space-y-4">
+      <div class="kid-hero text-center space-y-2">
+        <div class="text-6xl" aria-hidden="true" x-text="report.percent === 100 ? '🏆' : report.percent >= 80 ? '🎉' : report.percent >= 60 ? '💪' : '🥋'"></div>
+        <h2 id="math-results-heading" tabindex="-1" class="text-3xl font-black" x-text="`${report.score} out of ${report.total}!`"></h2>
+        <p class="text-slate-600 dark:text-slate-300 font-semibold" x-text="gradeMessage()"></p>
+        <p x-show="rewardSummary()" x-cloak class="inline-block rounded-full bg-emerald-100 px-4 py-1 text-sm font-bold text-emerald-800 dark:bg-emerald-900 dark:text-emerald-100" x-text="rewardSummary()"></p>
+        <div x-show="rewardCreatures().length" x-cloak class="grid gap-3 sm:grid-cols-2 pt-2" role="list" aria-label="Kata touched by this round">
+          <template x-for="t in rewardCreatures()" :key="t.id">
+            <div role="listitem" class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-left dark:border-slate-800 dark:bg-slate-950">
+              <div class="shrink-0" x-html="revealSVG(t)"></div>
+              <div>
+                <p class="font-bold" x-text="revealLabel(t)"></p>
+                <p class="text-sm text-slate-500 dark:text-slate-400" x-text="`${t.fills} of ${t.regions} colors`"></p>
+              </div>
             </div>
-          </div>
-        </template>
+          </template>
+        </div>
+        <p x-show="rewardMosaic()" x-cloak class="text-sm font-semibold text-slate-500 dark:text-slate-400" x-text="rewardMosaic() ? `+${rewardMosaic().added} tiles on this week's mosaic` : ''"></p>
+        <div x-show="canBattle()" x-cloak>
+          <button type="button" @click="startBattle()" :disabled="battleBusy" class="kid-tile kid-tile-battle justify-center"><span class="kid-tile-emoji" aria-hidden="true">⚔️</span><span>Battle!<small x-text="battleCredits ? `${battleCredits.credits} ready` : ''"></small></span></button>
+          <p x-show="battleError" x-cloak role="alert" class="mt-2 text-sm text-rose-700" x-text="battleError"></p>
+        </div>
       </div>
-      <div x-show="rewardMosaic()" x-cloak class="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-left dark:border-slate-800 dark:bg-slate-950">
-        <p class="font-bold" x-text="rewardMosaic() ? `+${rewardMosaic().added} tiles on this week's mosaic` : ''"></p>
-        <p class="text-sm text-slate-500 dark:text-slate-400" x-text="rewardMosaic() ? `${rewardMosaic().revealed} of ${rewardMosaic().total} revealed. See it under My kata.` : ''"></p>
-      </div>
-      <div x-show="canBattle()" x-cloak class="mt-4 text-center">
-        <button type="button" @click="startBattle()" :disabled="battleBusy" class="rounded-xl bg-rose-600 px-6 py-3 text-lg font-bold text-white shadow-sm transition hover:bg-rose-700 disabled:opacity-40">Battle! ⚔️ <span class="text-sm font-semibold opacity-80" x-text="battleCredits ? `(${battleCredits.credits} ready)` : ''"></span></button>
-        <p x-show="battleError" x-cloak role="alert" class="mt-2 text-sm text-rose-700" x-text="battleError"></p>
-      </div>
-      </div>
-      <div class="space-y-2">
-        <template x-for="(r, i) in report.results" :key="i">
-          <div class="flex items-center gap-4 rounded-xl border px-5 py-3 shadow-sm" :class="r.right ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-200 dark:border-emerald-900' : 'bg-rose-50 dark:bg-rose-950 border-rose-200 dark:border-rose-900'">
-            <span class="text-xl" aria-hidden="true" x-text="r.right ? '✅' : '❌'"></span><span class="sr-only" x-text="r.right ? 'Correct:' : 'Incorrect:'"></span>
-            <span class="flex-1 font-semibold tabular-nums" x-text="r.prompt + ' = ' + r.correct"></span>
-            <span x-show="!r.right" class="text-sm font-medium text-rose-700 dark:text-rose-300">you wrote: <span x-text="r.given || '(blank)'"></span></span>
-          </div>
-        </template>
-      </div>
-      <button type="button" @click="reset" class="w-full rounded-xl bg-emerald-600 px-6 py-4 text-lg font-bold text-white shadow-sm transition hover:bg-emerald-700">Home 🏠</button>
+      <button type="button" @click="startSheet" :disabled="busy" class="kid-tile kid-tile-math justify-center"><span class="kid-tile-emoji" aria-hidden="true">🔁</span><span>Again!</span></button>
+      <button type="button" @click="reset" class="kid-tile justify-center bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800"><span class="kid-tile-emoji" aria-hidden="true">🏠</span><span>Home</span></button>
+      <details class="kid-row">
+        <summary class="cursor-pointer font-bold">See my answers</summary>
+        <ul class="mt-3 space-y-2">
+          <template x-for="(r, i) in report.results" :key="i">
+            <li class="flex items-center gap-3 rounded-xl border px-4 py-2" :class="r.right ? 'bg-emerald-50 dark:bg-emerald-950 border-emerald-200 dark:border-emerald-900' : 'bg-rose-50 dark:bg-rose-950 border-rose-200 dark:border-rose-900'">
+              <span aria-hidden="true" x-text="r.right ? '✅' : '❌'"></span><span class="sr-only" x-text="r.right ? 'Correct:' : 'Incorrect:'"></span>
+              <span class="flex-1 font-semibold tabular-nums" x-text="r.prompt + ' = ' + r.correct"></span>
+              <span x-show="!r.right" class="text-sm font-medium text-rose-700 dark:text-rose-300">you wrote: <span x-text="r.given || '(blank)'"></span></span>
+            </li>
+          </template>
+        </ul>
+      </details>
     </section>
 
     <section x-show="view === 'spelling-game'" x-cloak class="space-y-5">
