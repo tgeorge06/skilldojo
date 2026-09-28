@@ -504,6 +504,15 @@ func TestSignedInSpellingRoundIsGradedByTheServer(t *testing.T) {
 	}
 
 	// Math rounds wrap the sheet store.
+	// The profile's round length is enforced: 30 questions for a profile set to 10 is refused.
+	res, page = e.postJSON(t, c, "/api/round/start", `{"round_id":"round-math-0","kind":"math","ops":["addsub"],"grade":2,"count":30}`)
+	if res.StatusCode != http.StatusBadRequest || !strings.Contains(page, "rounds of 10") {
+		t.Fatalf("round length should be fenced: %d %s", res.StatusCode, page)
+	}
+	res, page = e.postJSON(t, c, "/api/round/start", `{"round_id":"round-math-0b","kind":"spelling","focus":"mixed","grade":2,"count":10}`)
+	if res.StatusCode != http.StatusBadRequest || !strings.Contains(page, "rounds of 5") {
+		t.Fatalf("spelling length should be fenced: %d %s", res.StatusCode, page)
+	}
 	res, page = e.postJSON(t, c, "/api/round/start", `{"round_id":"round-math-1","kind":"math","ops":["addsub"],"grade":2,"count":10}`)
 	if res.StatusCode != http.StatusOK || !strings.Contains(page, `"questions"`) {
 		t.Fatalf("math start: %d %s", res.StatusCode, page)

@@ -36,7 +36,7 @@ func (s *server) activeChild(w http.ResponseWriter, r *http.Request) (progress.C
 		writeError(w, http.StatusInternalServerError, errors.New("something went wrong"))
 		return progress.Child{}, false
 	}
-	return progress.Child{AccountID: acct.ID, ChildID: child.ID, Grade: child.Grade, Timezone: acct.Timezone}, true
+	return progress.Child{AccountID: acct.ID, ChildID: child.ID, Grade: child.Grade, Timezone: acct.Timezone, RoundLen: child.RoundLen}, true
 }
 
 func (s *server) handleRoundStart(w http.ResponseWriter, r *http.Request) {

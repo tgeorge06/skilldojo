@@ -141,6 +141,18 @@ type Child struct {
 	ChildID   int64
 	Grade     int
 	Timezone  string
+	// RoundLen is the parent's round-length setting (5, 10, or 20 math
+	// questions). Zero means unset, which leaves the count unfenced.
+	RoundLen int
+}
+
+// SpellingLen is the words per round for a math round length: 5 up to
+// 10 questions, 10 at 20.
+func SpellingLen(roundLen int) int {
+	if roundLen > 10 {
+		return 10
+	}
+	return 5
 }
 
 // tsLayout is fixed width so lexical comparison in SQL is chronological;
@@ -193,6 +205,19 @@ func (s *Store) Start(ctx context.Context, child Child, req StartRequest, now ti
 	}
 	if req.Grade < 1 || req.Grade > 5 {
 		return StartResponse{}, fmt.Errorf("%w: grade must be 1-5", ErrBadRequest)
+	}
+	// The parent's round length is a rule, not a suggestion: the client
+	// cannot ask for a longer or shorter round than the profile allows.
+	// Times tables are always a full table (12 or 24).
+	if child.RoundLen > 0 {
+		tables := req.Kind == KindMath && len(req.Ops) == 1 && req.Ops[0] == "tables"
+		want := child.RoundLen
+		if req.Kind == KindSpelling {
+			want = SpellingLen(child.RoundLen)
+		}
+		if !tables && req.Count != want {
+			return StartResponse{}, fmt.Errorf("%w: this profile plays rounds of %d", ErrBadRequest, want)
+		}
 	}
 	if existing, err := s.existingStart(ctx, child, req.RoundID); err == nil {
 		return existing, nil

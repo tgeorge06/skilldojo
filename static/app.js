@@ -7,6 +7,7 @@ function dojo() {
     holdPct: 0,
     holdTimer: null,
     hashStart: false,
+    hashTables: false,
     // Signed-in child, read from data attributes the server renders on the
     // root element (never interpolated into x-data). Null when anonymous.
     child: readChild(),
@@ -79,9 +80,13 @@ function dojo() {
     // so the home screen can show their creature.
     init() {
       if (this.child && typeof this.loadKata === "function") this.loadKata();
+      window.addEventListener("blur", () => this.holdEnd());
       if (this.hashStart) {
         this.hashStart = false;
-        if (this.subject === "spelling") this.openSpelling();
+        // Consume the hash so a reload or back does not start another round.
+        if (window.history && window.history.replaceState) window.history.replaceState(null, "", window.location.pathname);
+        if (this.hashTables) this.openTables();
+        else if (this.subject === "spelling") this.openSpelling();
         else this.startSheet();
       }
     },
@@ -177,7 +182,7 @@ function dojo() {
         this.holdPct = Math.min(100, ((Date.now() - started) / 3000) * 100);
         if (this.holdPct >= 100) {
           this.holdEnd();
-          window.location.href = this.child ? "/family" : "/login";
+          window.location.href = this.parentsHref();
         }
       }, 50);
     },
@@ -185,6 +190,14 @@ function dojo() {
       clearInterval(this.holdTimer);
       this.holdTimer = null;
       this.holdPct = 0;
+    },
+    // A synthesized click (screen reader, switch control) has no pointer
+    // to hold, so it opens the parent page directly.
+    holdClick(event) {
+      if (event.detail === 0 && !this.holdTimer) window.location.href = this.parentsHref();
+    },
+    parentsHref() {
+      return this.child ? "/family" : "/login";
     },
     async startTraining() {
       if (this.subject === "spelling") await this.startSpelling();
@@ -210,7 +223,7 @@ function dojo() {
       return this.ops.length === 1 && this.ops[0] === "tables";
     },
     countChoices() {
-      return this.tablesMode() ? [12, 24] : [10, 20, 30];
+      return this.tablesMode() ? [12, 24] : [5, 10, 20, 30];
     },
     // The request body for a math sheet, shared by the free and signed-in paths.
     sheetRequest() {
@@ -250,6 +263,7 @@ function dojo() {
       return data;
     },
     async startSheet() {
+      if (this.busy) return; // a double tap must not start two rounds
       this.busy = true;
       this.error = "";
       this.reward = null;
@@ -355,6 +369,7 @@ function dojo() {
       return selected;
     },
     async startSpelling() {
+      if (this.busy) return; // a double tap must not start two rounds
       this.subject = "spelling";
       this.error = "";
       this.reward = null;
@@ -619,6 +634,14 @@ function dojo() {
       this.error = "";
       this.questions = [];
       this.answers = [];
+      // Training a kata from another grade must not change the child's
+      // grade or round length for the next thing they pick.
+      if (this.child) {
+        this.grade = this.child.grade;
+        this.spellingGrade = this.child.grade;
+      }
+      this.count = defaultRoundLen();
+      this.spellingCount = defaultRoundLen() > 10 ? 10 : 5;
       this.moveToTop();
     },
   };
@@ -641,8 +664,11 @@ function applyHash(state) {
   state.subject = m[1];
   if (m[1] === "math" && m[2]) {
     const known = state.opChoices.map((o) => o.id);
-    const ops = m[2].split(",").filter((op) => known.includes(op) && op !== "tables");
-    if (ops.length) {
+    const ops = m[2].split(",").filter((op) => known.includes(op));
+    if (ops.includes("tables")) {
+      state.hashStart = true;
+      state.hashTables = true; // init() opens the table picker
+    } else if (ops.length) {
       state.ops = ops;
       state.hashStart = true; // init() starts the round
     }

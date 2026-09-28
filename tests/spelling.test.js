@@ -458,4 +458,21 @@ test("a URL hash opens the dojo on the recommended math mode", () => {
   assert.equal(unknown.ops.join(","), "addsub", "unknown modes keep the default");
   const junk = loadGame({ hash: "#<script>" }).game;
   assert.equal(junk.subject, "math");
+  assert.equal(junk.hashStart, false, "junk must not start anything");
+  const tables = loadGame({ hash: "#math/tables" }).game;
+  assert.equal(tables.hashStart && tables.hashTables, true, "a tables link opens the table picker");
+  assert.equal(game.hashStart, true, "a known op starts the round on init");
+});
+
+test("home resets grade and round length to the profile after training another grade", () => {
+  const { game } = loadGame();
+  game.child = { id: 1, nickname: "Nova", grade: 2, round: 10 };
+  game.grade = 5;
+  game.spellingGrade = 5;
+  game.count = 12;
+  game.reset();
+  assert.equal(game.grade, 2);
+  assert.equal(game.spellingGrade, 2);
+  assert.equal(game.count, 10);
+  assert.equal(game.view, "home");
 });

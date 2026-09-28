@@ -67,12 +67,12 @@
       </div>
       <h2 id="math-pick-heading" tabindex="-1" class="kid-heading">What today?</h2>
       <div class="grid grid-cols-2 gap-3">
-        <button type="button" @click="pickMath('addsub')" class="kid-card kid-tile-math"><span class="kid-card-emoji" aria-hidden="true">➕</span>Add &amp; take away</button>
-        <button type="button" @click="openTables" class="kid-card kid-tile-math"><span class="kid-card-emoji" aria-hidden="true">✖️</span>Times tables</button>
-        <button type="button" @click="pickMath('mul')" class="kid-card kid-tile-math"><span class="kid-card-emoji" aria-hidden="true">🔢</span>Multiply mix</button>
-        <button type="button" @click="pickMath('div')" class="kid-card kid-tile-math"><span class="kid-card-emoji" aria-hidden="true">➗</span>Sharing</button>
-        <button type="button" @click="pickMath('frac')" class="kid-card kid-tile-math"><span class="kid-card-emoji" aria-hidden="true">🍕</span>Fractions</button>
-        <button type="button" @click="surpriseMath" class="kid-card kid-tile-play"><span class="kid-card-emoji" aria-hidden="true">🎲</span>Surprise me!</button>
+        <button type="button" @click="pickMath('addsub')" :disabled="busy" class="kid-card kid-tile-math"><span class="kid-card-emoji" aria-hidden="true">➕</span>Add &amp; take away</button>
+        <button type="button" @click="openTables" :disabled="busy" class="kid-card kid-tile-math"><span class="kid-card-emoji" aria-hidden="true">✖️</span>Times tables</button>
+        <button type="button" @click="pickMath('mul')" :disabled="busy" class="kid-card kid-tile-math"><span class="kid-card-emoji" aria-hidden="true">🔢</span>Multiply mix</button>
+        <button type="button" @click="pickMath('div')" :disabled="busy" class="kid-card kid-tile-math"><span class="kid-card-emoji" aria-hidden="true">➗</span>Sharing</button>
+        <button type="button" @click="pickMath('frac')" :disabled="busy" class="kid-card kid-tile-math"><span class="kid-card-emoji" aria-hidden="true">🍕</span>Fractions</button>
+        <button type="button" @click="surpriseMath" :disabled="busy" class="kid-card kid-tile-play"><span class="kid-card-emoji" aria-hidden="true">🎲</span>Surprise me!</button>
       </div>
       <p x-show="error" x-cloak role="alert" class="rounded-lg bg-rose-50 dark:bg-rose-950 px-4 py-3 text-sm font-medium text-rose-700 dark:text-rose-300" x-text="error"></p>
       <p x-show="busy" x-cloak class="text-center text-sm font-semibold text-slate-500">Getting ready…</p>
@@ -89,7 +89,7 @@
       <h2 id="tables-pick-heading" tabindex="-1" class="kid-heading">Which table?</h2>
       <div class="grid grid-cols-4 gap-3" role="group" aria-label="Times table">
         <template x-for="n in tables" :key="n">
-          <button type="button" @click="pickTable(n)" class="kid-card kid-tile-math kid-card-num" :aria-label="`${n} times table`"><span x-text="n"></span><small>×</small></button>
+          <button type="button" @click="pickTable(n)" :disabled="busy" class="kid-card kid-tile-math kid-card-num" :aria-label="`${n} times table`"><span x-text="n"></span><small>×</small></button>
         </template>
       </div>
       <p x-show="error" x-cloak role="alert" class="rounded-lg bg-rose-50 dark:bg-rose-950 px-4 py-3 text-sm font-medium text-rose-700 dark:text-rose-300" x-text="error"></p>
@@ -103,14 +103,14 @@
       </div>
       <h2 id="spelling-pick-heading" tabindex="-1" class="kid-heading">Rescue some words!</h2>
       <div class="grid grid-cols-2 gap-3">
-        <button type="button" @click="pickSpelling('mixed')" class="kid-card kid-tile-spell"><span class="kid-card-emoji" aria-hidden="true">🏮</span>Smart mix</button>
-        <button type="button" @click="pickSpelling('sight-words')" class="kid-card kid-tile-spell"><span class="kid-card-emoji" aria-hidden="true">👀</span>Sight words</button>
-        <button x-show="child" x-cloak type="button" @click="pickSpelling('review')" class="kid-card kid-tile-spell"><span class="kid-card-emoji" aria-hidden="true">📖</span>Words I keep missing</button>
+        <button type="button" @click="pickSpelling('mixed')" :disabled="busy" class="kid-card kid-tile-spell"><span class="kid-card-emoji" aria-hidden="true">🏮</span>Smart mix</button>
+        <button type="button" @click="pickSpelling('sight-words')" :disabled="busy" class="kid-card kid-tile-spell"><span class="kid-card-emoji" aria-hidden="true">👀</span>Sight words</button>
+        <button x-show="child" x-cloak type="button" @click="pickSpelling('review')" :disabled="busy" class="kid-card kid-tile-spell"><span class="kid-card-emoji" aria-hidden="true">📖</span>Words I keep missing</button>
         <button type="button" @click="showPatterns = !showPatterns" :aria-expanded="showPatterns" class="kid-card kid-tile-play"><span class="kid-card-emoji" aria-hidden="true">🔍</span>Pick a pattern</button>
       </div>
       <div x-show="showPatterns" x-cloak class="grid gap-2" role="group" aria-label="Spelling patterns">
         <template x-for="skill in spellingPatterns()" :key="skill.id">
-          <button type="button" @click="pickSpelling(skill.id)" class="kid-row"><span class="font-bold" x-text="skill.label"></span><span class="block text-sm text-slate-500 dark:text-slate-400" x-text="skill.tip"></span></button>
+          <button type="button" @click="pickSpelling(skill.id)" :disabled="busy" class="kid-row"><span class="font-bold" x-text="skill.label"></span><span class="block text-sm text-slate-500 dark:text-slate-400" x-text="skill.tip"></span></button>
         </template>
       </div>
       <p x-show="error" x-cloak role="alert" class="rounded-lg bg-rose-50 dark:bg-rose-950 px-4 py-3 text-sm font-medium text-rose-700 dark:text-rose-300" x-text="error"></p>
@@ -419,7 +419,8 @@
   <nav class="kid-nav" aria-label="Main">
     <button type="button" @click="goHome" :aria-current="view === 'home' ? 'page' : null" class="kid-nav-btn" :class="view === 'home' ? 'kid-nav-on' : ''"><span class="kid-nav-ic" aria-hidden="true">🏠</span>Home</button>
     <button x-show="child" x-cloak type="button" @click="openKata" :aria-current="view === 'kata-index' ? 'page' : null" class="kid-nav-btn" :class="view === 'kata-index' ? 'kid-nav-on' : ''"><span class="kid-nav-ic" aria-hidden="true">🐾</span>My kata</button>
-    <button type="button" @pointerdown.prevent="holdStart" @pointerup="holdEnd" @pointercancel="holdEnd" @pointerleave="holdEnd" @keydown.enter.prevent="holdStart" @keyup.enter="holdEnd" @contextmenu.prevent
+    <button type="button" @pointerdown.prevent="holdStart" @pointerup="holdEnd" @pointercancel="holdEnd" @pointerleave="holdEnd"
+            @keydown.enter.prevent="holdStart" @keyup.enter="holdEnd" @keydown.space.prevent="holdStart" @keyup.space="holdEnd" @click="holdClick($event)" @contextmenu.prevent
             class="kid-nav-btn" :class="holdPct > 0 ? 'kid-nav-on' : ''" :aria-label="holdPct > 0 ? `Keep holding, ${Math.round(holdPct)} percent` : 'Parents: press and hold for three seconds'">
       <span class="kid-nav-ic kid-hold" :style="{ '--pct': holdPct + '%' }" aria-hidden="true">🔒</span>Parents
     </button>
