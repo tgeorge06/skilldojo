@@ -578,7 +578,7 @@ test("the buddy suggests the next quest and speaks in its design's vibe", async 
   const { game } = loadGame();
   game.child = { id: 1, nickname: "Nova", grade: 3, round: 10 };
   game.kata = { entries: [{ id: "math-mul-g3", state: "seen", fills: 3, regions: 17, kind: "math" }], review_due: 0 };
-  game.quests = { quests: [{ id: 1, idx: 0, kind: "math", focus: "frac", label: "Fractions", done: true }, { id: 2, idx: 1, kind: "spelling", focus: "review", label: "Words I keep missing", done: false }, { id: 3, idx: 2, kind: "math", focus: "tables", table: 7, label: "Times tables: 7s", done: false }], all_done: false };
+  game.quests = { quests: [{ id: 1, idx: 0, kind: "math", focus: "frac", grade: 2, label: "Fractions", done: true }, { id: 2, idx: 1, kind: "spelling", focus: "review", grade: 2, label: "Words I keep missing", done: false }, { id: 3, idx: 2, kind: "math", focus: "tables", table: 7, grade: 2, label: "Times tables: 7s", done: false }], all_done: false };
   assert.equal(game.nextQuest().id, 2);
   assert.equal(game.questState(game.quests.quests[0]), "done");
   assert.equal(game.questState(game.quests.quests[1]), "now");
@@ -598,7 +598,7 @@ test("the buddy suggests the next quest and speaks in its design's vibe", async 
   game.grade = 5;
   await game.startQuest(game.quests.quests[1]);
   assert.equal(spelled, "review");
-  assert.equal(game.grade, 3, "a quest always runs at the profile grade");
+  assert.equal(game.grade, 2, "a quest runs at the grade it was picked at, even after a regrade");
   await game.startQuest(game.quests.quests[2]);
   assert.equal(started.table, 7, "the next quest unlocks once the one before is done");
   // A finish that lands after Home still refreshes the quests.

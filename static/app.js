@@ -131,10 +131,11 @@ function dojo() {
       // Quests go in order: only the glowing one starts.
       if (!q || this.busy || this.questState(q) !== "now") return;
       this.error = "";
-      if (this.child) {
-        this.grade = this.child.grade;
-        this.spellingGrade = this.child.grade;
-      }
+      // The quest was picked at a grade; play it there even if the profile
+      // grade changed today, since only a round at that grade completes it.
+      const grade = q.grade || (this.child ? this.child.grade : this.grade);
+      this.grade = grade;
+      this.spellingGrade = grade;
       if (q.kind === "math" && q.focus === "tables") {
         this.tableOrdered = true;
         await this.pickTable(q.table);
