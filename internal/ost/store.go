@@ -52,6 +52,7 @@ type Attempt struct {
 	StartedAt  string            `json:"started_at"`
 	FinishedAt string            `json:"finished_at,omitempty"`
 	Report     *Report           `json:"report,omitempty"`
+	Terms      map[string]string `json:"terms"` // kid glossary for tappable words
 }
 
 // ItemResult is one graded item for the review screen.
@@ -65,6 +66,7 @@ type ItemResult struct {
 	Choices     []string `json:"choices,omitempty"`
 	Answer      []int    `json:"answer,omitempty"`
 	Numeric     string   `json:"numeric,omitempty"`
+	Figure      *Figure  `json:"figure,omitempty"`
 	Given       Answer   `json:"given"`
 	Answered    bool     `json:"answered"`
 	Right       bool     `json:"right"`
@@ -198,6 +200,7 @@ func (s *Store) load(ctx context.Context, child Child, id string) (row, error) {
 	if err := json.Unmarshal([]byte(itemsJSON), &rw.items); err != nil {
 		return rw, fmt.Errorf("ost: stored items: %w", err)
 	}
+	fillAlts(rw.items)
 	rw.answers = map[string]Answer{}
 	if err := json.Unmarshal([]byte(answersJSON), &rw.answers); err != nil {
 		return rw, fmt.Errorf("ost: stored answers: %w", err)
@@ -211,7 +214,7 @@ func (s *Store) Attempt(ctx context.Context, child Child, id string) (Attempt, e
 	if err != nil {
 		return Attempt{}, err
 	}
-	a := Attempt{ID: rw.id, Subject: rw.subject, Grade: rw.grade, Answers: rw.answers, StartedAt: rw.started.String}
+	a := Attempt{ID: rw.id, Subject: rw.subject, Grade: rw.grade, Answers: rw.answers, StartedAt: rw.started.String, Terms: Terms}
 	for _, it := range rw.items {
 		a.Items = append(a.Items, it.Public())
 	}
@@ -263,6 +266,7 @@ func (s *Store) SaveAnswer(ctx context.Context, child Child, id, itemID string, 
 	if err := json.Unmarshal([]byte(itemsJSON), &items); err != nil {
 		return err
 	}
+	fillAlts(items)
 	var it *Item
 	for i := range items {
 		if items[i].ID == itemID {
@@ -365,6 +369,7 @@ func (s *Store) Submit(ctx context.Context, child Child, id string, now time.Tim
 	if err := json.Unmarshal([]byte(itemsJSON), &items); err != nil {
 		return Attempt{}, fmt.Errorf("ost: stored items: %w", err)
 	}
+	fillAlts(items)
 	if err := json.Unmarshal([]byte(answersJSON), &answers); err != nil {
 		return Attempt{}, fmt.Errorf("ost: stored answers: %w", err)
 	}
@@ -396,7 +401,7 @@ func Grade(items []Item, answers map[string]Answer) Report {
 		}
 		rep.Items = append(rep.Items, ItemResult{
 			ID: it.ID, Category: it.Category, Standard: it.Standard, DOK: it.DOK, Type: it.Type, Prompt: it.Prompt,
-			Choices: it.Choices, Answer: it.Answer, Numeric: it.Numeric, Given: given, Answered: answered, Right: right,
+			Choices: it.Choices, Answer: it.Answer, Numeric: it.Numeric, Figure: it.Figure, Given: given, Answered: answered, Right: right,
 			Explanation: it.Explanation,
 		})
 		if cats[it.Category] == nil {

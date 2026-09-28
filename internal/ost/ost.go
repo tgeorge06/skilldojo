@@ -39,6 +39,117 @@ type Item struct {
 	Answer      []int    `json:"answer,omitempty"`  // choice indexes (one for choice, several for multi)
 	Numeric     string   `json:"numeric,omitempty"` // canonical numeric answer for TypeNumber
 	Explanation string   `json:"explanation"`
+	Figure      *Figure  `json:"figure,omitempty"` // a picture, where the real test would show one
+}
+
+// Figure is a small diagram the client draws next to the prompt. Kinds:
+// "rect" (A by B with labels; a label may be "?"), "grid" (A columns by
+// B rows of unit squares), "parts" (a bar cut into A equal parts with B
+// shaded), "numberline" (0 to 1 cut into A parts with a dot at part B).
+type Figure struct {
+	Kind   string `json:"kind"`
+	A      int    `json:"a"`
+	B      int    `json:"b"`
+	LabelA string `json:"label_a,omitempty"`
+	LabelB string `json:"label_b,omitempty"`
+	// Alt says what the picture shows, for read-aloud and screen readers.
+	Alt string `json:"alt"`
+}
+
+// Describe writes the picture in words, so nothing the child needs is
+// only visible.
+func (f Figure) Describe() string {
+	switch f.Kind {
+	case "rect":
+		a, b := f.LabelA, f.LabelB
+		if a == "" {
+			a = itoa(f.A)
+		}
+		if b == "" {
+			b = itoa(f.B)
+		}
+		return fmt.Sprintf("A picture of a rectangle. The long side is labeled %s and the short side is labeled %s.", a, b)
+	case "grid":
+		return fmt.Sprintf("A picture of a rectangle made of small squares: %d squares across and %d squares down.", f.A, f.B)
+	case "parts":
+		return fmt.Sprintf("A picture of a bar cut into %d equal parts. %d of the parts are colored in.", f.A, f.B)
+	case "numberline":
+		return fmt.Sprintf("A picture of a number line from 0 to 1, cut into %d equal parts. The dot is %d parts from 0.", f.A, f.B)
+	}
+	return ""
+}
+
+// Terms is the kid glossary: a test word and how to say it in plain words.
+// The client makes these words tappable in prompts and choices. Keys are
+// lowercase; matching is whole-word and case-insensitive.
+var Terms = map[string]string{
+	"perimeter":      "how far it is all the way around the outside of a shape",
+	"area":           "how much space is inside a shape, counted in squares",
+	"rectangle":      "a shape with 4 straight sides and 4 square corners, like a door",
+	"rectangular":    "shaped like a rectangle: 4 straight sides and 4 square corners",
+	"square":         "a rectangle whose 4 sides are all the same length",
+	"quadrilateral":  "any shape with exactly 4 straight sides",
+	"quadrilaterals": "shapes with exactly 4 straight sides",
+	"triangle":       "a shape with 3 straight sides",
+	"pentagon":       "a shape with 5 straight sides",
+	"hexagon":        "a shape with 6 straight sides",
+	"rhombus":        "a shape with 4 sides that are all the same length (a square is one kind of rhombus)",
+	"trapezoid":      "a 4-sided shape with just one pair of sides that run the same way",
+	"parallelogram":  "a 4-sided shape where both pairs of opposite sides run the same way",
+	"parallel":       "running the same way and never meeting, like train tracks",
+	"perpendicular":  "meeting at a square corner, like the letter L",
+	"equivalent":     "worth the same amount, even if it looks different",
+	"expression":     "a math sentence with no equals sign, like 3 × 4",
+	"equation":       "a math sentence with an equals sign, like 3 × 4 = 12",
+	"fraction":       "a part of a whole, written like 3/4",
+	"numerator":      "the top number of a fraction: how many parts you have",
+	"denominator":    "the bottom number of a fraction: how many equal parts in all",
+	"unit":           "one step of measuring, like one centimeter or one square",
+	"units":          "steps of measuring, like centimeters or squares",
+	"decimal":        "a number with a dot in it, like 2.5",
+	"tenths":         "the first place after the decimal point",
+	"hundredths":     "the second place after the decimal point",
+	"thousandths":    "the third place after the decimal point",
+	"factor":         "a number that multiplies to make another: 3 is a factor of 12",
+	"factors":        "numbers that multiply to make another: 3 and 4 are factors of 12",
+	"multiple":       "what you get by multiplying: 12 is a multiple of 3",
+	"prime":          "a number only 1 and itself can divide evenly, like 7",
+	"remainder":      "what is left over after sharing equally",
+	"angle":          "the corner where two lines meet",
+	"degrees":        "the way we measure how open an angle is",
+	"acute":          "an angle smaller than a square corner",
+	"obtuse":         "an angle bigger than a square corner",
+	"symmetry":       "one half is a mirror of the other half",
+	"volume":         "how much space is inside a box, counted in cubes",
+	"prism":          "a box shape with flat sides",
+	"prisms":         "box shapes with flat sides",
+	"coordinates":    "two numbers that tell where a point is: across, then up",
+	"product":        "the answer when you multiply",
+	"sum":            "the answer when you add",
+	"difference":     "the answer when you subtract",
+	"quotient":       "the answer when you divide",
+	"estimate":       "a good guess that is close, not exact",
+	"round":          "change a number to the nearest easy number, like 48 to 50",
+	"line plot":      "a number line with an X for each thing measured",
+	"mixed number":   "a whole number and a fraction together, like 1 1/2",
+	"expanded form":  "a number written as its pieces, like 300 + 40 + 2",
+}
+
+// fillAlts backfills descriptions on items stored before pictures could
+// speak, so a resumed attempt reads aloud like a new one.
+func fillAlts(items []Item) {
+	for i := range items {
+		if items[i].Figure != nil && items[i].Figure.Alt == "" {
+			items[i].Figure.Alt = items[i].Figure.Describe()
+		}
+	}
+}
+
+// figure attaches a picture to an item, with its description filled in.
+func figure(it Item, f Figure) Item {
+	f.Alt = f.Describe()
+	it.Figure = &f
+	return it
 }
 
 // PublicItem is what the child sees.
@@ -48,11 +159,31 @@ type PublicItem struct {
 	Type     string   `json:"type"`
 	Prompt   string   `json:"prompt"`
 	Choices  []string `json:"choices,omitempty"`
+	Figure   *Figure  `json:"figure,omitempty"`
 }
 
-// Public strips the answer.
+// Public strips the answer, including any dimension a picture would give away.
 func (it Item) Public() PublicItem {
-	return PublicItem{ID: it.ID, Category: it.Category, Type: it.Type, Prompt: it.Prompt, Choices: it.Choices}
+	var f *Figure
+	if it.Figure != nil {
+		pf := it.Figure.Public()
+		f = &pf
+	}
+	return PublicItem{ID: it.ID, Category: it.Category, Type: it.Type, Prompt: it.Prompt, Choices: it.Choices, Figure: f}
+}
+
+// Public hides a rectangle side that is labeled "?": the drawing keeps a
+// plausible shape, but the keyed number never reaches the client.
+func (f Figure) Public() Figure {
+	if f.Kind == "rect" {
+		if f.LabelB == "?" {
+			f.B = max(2, f.A*3/5)
+		}
+		if f.LabelA == "?" {
+			f.A = max(3, f.B*5/3)
+		}
+	}
+	return f
 }
 
 // Template makes items for one standard.

@@ -24,7 +24,7 @@ func init() {
 			return numeric(fmt.Sprintf("%s − %s = ?  (Give your answer as a fraction.)", frac(1, d1), frac(n2, d2)), simplify(d2-2*n2, 2*d2), "Use a common denominator, then subtract the numerators.")
 		}},
 		Template{fr, "5.NF.2", 3, func(r *rand.Rand) Item {
-			return numeric(fmt.Sprintf("%s used 3/4 cup of flour for muffins and 2/3 cup for bread. How many cups of flour did %s use in all? Give a mixed number.", "Jonah", "he"), "1 5/12", "3/4 = 9/12 and 2/3 = 8/12; 9/12 + 8/12 = 17/12 = 1 5/12.")
+			return numeric(fmt.Sprintf("%s used 3/4 cup of flour for muffins and 2/3 cup for bread. How many cups of flour did %s use in all? Give a fraction or mixed number.", "Jonah", "he"), "1 5/12", "3/4 = 9/12 and 2/3 = 8/12; 9/12 + 8/12 = 17/12 = 1 5/12.")
 		}},
 		Template{fr, "5.NF.3", 2, func(r *rand.Rand) Item {
 			n, d := between(r, 2, 9), between(r, 3, 6)

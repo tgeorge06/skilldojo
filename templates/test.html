@@ -7,6 +7,13 @@
   <link rel="stylesheet" href="/static/app.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🥋</text></svg>">
   <script defer src="/static/alpine.min.js"></script>
+  <style>
+    .term { text-decoration: underline dotted #7c3aed 2px; text-underline-offset: 4px; font: inherit; color: inherit; background: none; border: 0; padding: 0; border-radius: 4px; }
+    .term[aria-expanded="true"] { background: #ede4ff; color: #4c1d95; }
+    .term-chip { min-width: 2.75rem; min-height: 2.75rem; border-radius: 9999px; border: 2px dotted #7c3aed; background: #fff; color: #4c1d95; font-weight: 800; font-size: 1.1rem; }
+    .term-chip[aria-expanded="true"] { background: #ede4ff; }
+    @media (prefers-color-scheme: dark) { .term-chip { background: #171c26; color: #ddd6fe; } .term-chip[aria-expanded="true"] { background: #33245a; } }
+  </style>
 </head>
 <body class="min-h-full bg-slate-100 dark:bg-slate-950 text-slate-900 dark:text-slate-100 antialiased">
 <a href="#main-content" class="skip-link">Skip to test</a>
@@ -40,16 +47,24 @@
         </div>
         <template x-if="current()">
           <div class="space-y-4">
-            <p id="test-prompt" class="text-lg font-semibold leading-relaxed" x-text="current().prompt"></p>
+            <div class="flex justify-end">
+              <button type="button" @click="readAloud" :disabled="!canSpeak" class="kid-back inline-flex items-center gap-2 bg-violet-50 border-violet-200 text-violet-900 dark:bg-violet-950 dark:border-violet-800 dark:text-violet-100" aria-label="Read this question to me"><span class="text-xl" aria-hidden="true">🔊</span>Read it to me</button>
+            </div>
+            <p id="test-prompt" class="text-xl font-semibold leading-relaxed"><template x-for="(part, i) in promptParts(current().prompt)" :key="i"><span><template x-if="part.term"><button type="button" @click="explain(part.term)" class="term" :aria-expanded="explained === part.term" x-text="part.text"></button></template><template x-if="!part.term"><span x-text="part.text"></span></template></span></template></p>
+            <p x-show="explained" x-cloak class="kid-row text-base" role="status"><strong x-text="explained"></strong>: <span x-text="explained ? (terms[explained] || '') : ''"></span></p>
+            <div x-show="current().figure" x-cloak class="flex justify-center text-slate-900 dark:text-slate-100" role="img" :aria-label="current().figure ? current().figure.alt : ''" x-html="current().figure ? figureSVG(current().figure) : ''"></div>
 
             <template x-if="current().type === 'choice'">
               <div class="space-y-2" role="radiogroup" aria-labelledby="test-prompt">
                 <template x-for="(c, i) in current().choices" :key="i">
-                  <label class="flex cursor-pointer items-center gap-3 rounded-xl border-2 p-3 transition"
-                         :class="isChosen(i) ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-950 dark:border-emerald-400' : 'border-slate-200 dark:border-slate-800'">
-                    <input type="radio" :name="'q-' + current().id" :value="i" :checked="isChosen(i)" @change="choose([i])" class="accent-emerald-600">
-                    <span x-text="c"></span>
-                  </label>
+                  <div class="flex items-center gap-2">
+                    <label class="flex flex-1 cursor-pointer items-center gap-3 rounded-2xl border-2 p-4 text-lg font-semibold transition"
+                           :class="isChosen(i) ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-950 dark:border-emerald-400' : 'border-slate-200 dark:border-slate-800'">
+                      <input type="radio" :name="'q-' + current().id" :value="i" :checked="isChosen(i)" @change="choose([i])" class="h-5 w-5 accent-emerald-600">
+                      <span x-text="c"></span>
+                    </label>
+                    <template x-for="term in choiceTerms(c)" :key="term"><button type="button" @click="explain(term)" class="term-chip" :aria-expanded="explained === term" :aria-label="'What does ' + term + ' mean?'">?</button></template>
+                  </div>
                 </template>
               </div>
             </template>
@@ -57,27 +72,33 @@
             <template x-if="current().type === 'multi'">
               <div class="space-y-2" role="group" aria-labelledby="test-prompt">
                 <template x-for="(c, i) in current().choices" :key="i">
-                  <label class="flex cursor-pointer items-center gap-3 rounded-xl border-2 p-3 transition"
-                         :class="isChosen(i) ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-950 dark:border-emerald-400' : 'border-slate-200 dark:border-slate-800'">
-                    <input type="checkbox" :value="i" :checked="isChosen(i)" @change="toggleChoice(i)" class="accent-emerald-600">
-                    <span x-text="c"></span>
-                  </label>
+                  <div class="flex items-center gap-2">
+                    <label class="flex flex-1 cursor-pointer items-center gap-3 rounded-2xl border-2 p-4 text-lg font-semibold transition"
+                           :class="isChosen(i) ? 'border-emerald-600 bg-emerald-50 dark:bg-emerald-950 dark:border-emerald-400' : 'border-slate-200 dark:border-slate-800'">
+                      <input type="checkbox" :value="i" :checked="isChosen(i)" @change="toggleChoice(i)" class="h-5 w-5 accent-emerald-600">
+                      <span x-text="c"></span>
+                    </label>
+                    <template x-for="term in choiceTerms(c)" :key="term"><button type="button" @click="explain(term)" class="term-chip" :aria-expanded="explained === term" :aria-label="'What does ' + term + ' mean?'">?</button></template>
+                  </div>
                 </template>
               </div>
             </template>
 
             <template x-if="current().type === 'number'">
-              <div>
-                <label class="block text-sm font-medium" for="test-number">Your answer</label>
-                <input id="test-number" type="text" inputmode="decimal" autocomplete="off" maxlength="20"
-                       :value="numberText()" @input="typeNumber($event.target.value)"
-                       class="mt-1 w-48 rounded-lg border border-slate-300 bg-white px-3 py-2 text-lg dark:border-slate-700 dark:bg-slate-950">
-                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Numbers, decimals like 2.5, or fractions like 3/4 and 1 1/2.</p>
+              <div class="space-y-3" @keydown.window="padKey($event)">
+                <p class="kid-answer tabular-nums text-center" :class="numberText() ? '' : 'kid-answer-empty'" aria-live="polite" :aria-label="'Your answer: ' + (numberText() || 'nothing yet')" x-text="numberText() || '?'"></p>
+                <div class="kid-pad" role="group" aria-label="Number pad">
+                  <template x-for="k in ['1','2','3','4','5','6','7','8','9']" :key="k"><button type="button" @click="padPress(k)" class="kid-key" x-text="k"></button></template>
+                  <button type="button" @click="padDelete" class="kid-key kid-key-del" aria-label="Delete">⌫</button>
+                  <button type="button" @click="padPress('0')" class="kid-key">0</button>
+                  <button type="button" @click="padPress('.')" class="kid-key" aria-label="Decimal point">.</button>
+                  <button type="button" @click="padPress('/')" class="kid-key kid-key-wide" aria-label="Fraction bar">/ &nbsp;fraction</button>
+                </div>
+                <p class="text-center text-xs text-slate-500 dark:text-slate-400">Whole numbers, decimals like 2.5, or fractions like 3/4 (for 1 and a half, type 3/2 or 1.5).</p>
               </div>
             </template>
           </div>
         </template>
-
         <div class="flex flex-wrap items-center justify-between gap-2 pt-2">
           <button type="button" @click="prev()" :disabled="index === 0" class="rounded-xl border border-slate-300 px-4 py-2 font-semibold disabled:opacity-40 dark:border-slate-700">← Back</button>
           <span class="text-xs text-slate-500 dark:text-slate-400" x-text="saveState"></span>
