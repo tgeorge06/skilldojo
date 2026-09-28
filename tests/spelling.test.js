@@ -476,3 +476,80 @@ test("home resets grade and round length to the profile after training another g
   assert.equal(game.count, 10);
   assert.equal(game.view, "home");
 });
+
+test("the number pad builds one answer at a time and finishes on the first blank", async () => {
+  const { game } = loadGame();
+  game.questions = [{ prompt: "1 + 1", op: "addsub" }, { prompt: "1/2 + 1/4", op: "frac" }, { prompt: "2 + 2", op: "addsub" }];
+  game.answers = ["", "", ""];
+  game.qIndex = 0;
+  game.view = "math-play";
+  let graded = 0;
+  game.submitSheet = async () => { graded += 1; };
+  game.padPress("1"); game.padPress("2");
+  assert.equal(game.answers[0], "12");
+  game.padDelete();
+  assert.equal(game.answers[0], "1");
+  await game.padGo();
+  assert.equal(game.qIndex, 1, "a typed answer advances");
+  game.padPress("/");
+  assert.equal(game.answers[1], "", "a fraction bar cannot start an answer");
+  game.padPress("3"); game.padPress("/"); game.padPress("/"); game.padPress("4");
+  assert.equal(game.answers[1], "3/4", "only one fraction bar");
+  await game.skipQuestion();
+  assert.equal(game.qIndex, 2);
+  await game.padGo();
+  assert.equal(graded, 0, "an empty answer does not finish");
+  game.padPress("4");
+  await game.padGo();
+  assert.equal(graded, 1, "the last answered question grades the round");
+  game.answers = ["", "3/4", "4"]; game.qIndex = 2; game.revisited = false;
+  await game.padGo();
+  assert.equal(game.qIndex, 0, "finishing with a blank returns to the first blank instead of grading");
+  assert.equal(graded, 1);
+  await game.skipQuestion(); await game.skipQuestion();
+  assert.equal(game.qIndex, 2);
+  await game.padGo();
+  assert.equal(graded, 2, "a second Finish grades even with a blank, so nobody is trapped");
+  for (let i = 0; i < 12; i += 1) game.padPress("9");
+  assert.equal(game.answers[game.qIndex].length, 7, "answers are capped");
+});
+
+test("a round that finishes loading after Home is dropped, and Enter on a button is not a pad key", async () => {
+  const { game, context } = loadGame();
+  game.child = null;
+  let resolve;
+  game.post = () => new Promise((r) => { resolve = r; });
+  const started = game.startSheet();
+  game.reset();
+  resolve({ id: "s1", questions: [{ prompt: "1 + 1", op: "addsub" }] });
+  await started;
+  assert.equal(game.view, "home", "a late start must not reopen play");
+  assert.equal(game.questions.length, 0);
+  assert.equal(game.busy, false);
+
+  game.questions = [{ prompt: "1 + 1", op: "addsub" }]; game.answers = [""]; game.qIndex = 0; game.view = "math-play";
+  const events = [];
+  const key = (k, tag) => { context.document.activeElement = { tagName: tag }; const e = { key: k, preventDefault() { events.push(k); } }; game.mathKey(e); };
+  key("5", "BODY");
+  assert.equal(game.answers[0], "5");
+  key("Enter", "BUTTON");
+  assert.deepEqual(events.map(String), ["5"], "Enter on a focused button is left to the button");
+  key("7", "INPUT");
+  assert.equal(game.answers[0], "5", "typing in a text field is not the pad");
+  key("7", "BUTTON");
+  assert.equal(game.answers[0], "57", "digits still type while a pad button holds focus");
+});
+
+test("a spelling round that finishes loading after Home is dropped", async () => {
+  const { game } = loadGame();
+  game.child = { id: 1, nickname: "Nova", grade: 2, round: 10 };
+  let resolve;
+  game.post = () => new Promise((r) => { resolve = r; });
+  const started = game.startSpelling();
+  game.reset();
+  resolve({ words: [{ word: "cat", clue: "pet", sentence: "The ___ sat." }] });
+  await started;
+  assert.equal(game.view, "home");
+  assert.equal(game.roundId, "", "the stale round id is never adopted");
+  assert.equal(game.busy, false);
+});

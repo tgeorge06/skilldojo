@@ -29,6 +29,9 @@ function dojo() {
     sheetId: "",
     questions: [],
     answers: [],
+    qIndex: 0,
+    revisited: false, // Finish already sent the child back to a blank once
+    roundSeq: 0, // bumped on every start and on Home, so a late response is ignored
     report: { results: [], score: 0, total: 0, percent: 0 },
     opChoices: [
       { id: "addsub", label: "Add & Subtract", emoji: "➕", hint: "big numbers!" },
@@ -243,9 +246,9 @@ function dojo() {
     gradeMessage() {
       const p = this.report.percent;
       if (p === 100) return "PERFECT! A true SkillDojo master!";
-      if (p >= 90) return "Amazing work — almost perfect!";
+      if (p >= 90) return "Amazing! Almost perfect!";
       if (p >= 80) return "Great job! Keep training!";
-      if (p >= 60) return "Good effort — practice makes perfect!";
+      if (p >= 60) return "Good effort! Practice makes perfect!";
       return "Every ninja starts somewhere. Try again!";
     },
     async post(url, body) {
@@ -267,6 +270,7 @@ function dojo() {
       this.busy = true;
       this.error = "";
       this.reward = null;
+      const seq = ++this.roundSeq;
       try {
         let data;
         if (this.child) {
@@ -277,40 +281,98 @@ function dojo() {
           this.roundId = "";
           data = await this.post("/api/sheet", this.sheetRequest());
         }
+        if (seq !== this.roundSeq) return; // the child went Home while this loaded
         this.sheetId = data.id;
         this.questions = data.questions;
         this.answers = data.questions.map(() => "");
-        this.view = "math-sheet";
+        this.qIndex = 0;
+        this.revisited = false;
+        this.view = "math-play";
         this.moveToTop();
       } catch (e) {
-        this.error = e.message;
+        if (seq === this.roundSeq) this.error = e.message;
       } finally {
-        this.busy = false;
+        if (seq === this.roundSeq) this.busy = false; // a stale request must not unlock a newer one
       }
     },
-    async submitSheet() {
-      if (this.answeredCount() < this.questions.length &&
-          !window.confirm("Some questions are blank — grade anyway?")) {
+    // Number pad. Answers are strings, as the sheet API expects; a fraction
+    // question gets a "/" key. Up to 7 characters keeps 5-digit sums and
+    // fractions like 12/100 typeable without runaway input.
+    padPress(k) {
+      const cur = this.answers[this.qIndex] || "";
+      if (cur.length >= 7) return;
+      if (k === "/" && (cur === "" || cur.includes("/"))) return;
+      this.answers[this.qIndex] = cur + k;
+    },
+    padDelete() {
+      const cur = this.answers[this.qIndex] || "";
+      this.answers[this.qIndex] = cur.slice(0, -1);
+    },
+    async padGo() {
+      if (!this.answers[this.qIndex]) return; // nothing typed: Skip is the way past
+      await this.advance();
+    },
+    async skipQuestion() {
+      await this.advance();
+    },
+    prevQuestion() {
+      if (this.qIndex > 0) this.qIndex -= 1;
+    },
+    async advance() {
+      if (this.qIndex + 1 < this.questions.length) {
+        this.qIndex += 1;
         return;
       }
+      // Last one: the first Finish with blanks goes back to the first
+      // blank; a second Finish grades anyway so a child who wants to skip
+      // a question is never trapped.
+      const blank = this.answers.findIndex((a) => !a);
+      if (blank >= 0 && blank !== this.qIndex && !this.revisited) {
+        this.revisited = true;
+        this.qIndex = blank;
+        return;
+      }
+      await this.submitSheet();
+    },
+    // Physical keyboard on a laptop: digits, slash, backspace, enter.
+    mathKey(event) {
+      if (this.view !== "math-play" || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
+      const tag = document.activeElement ? document.activeElement.tagName : "";
+      // Text fields and links keep every key. A focused button (the one
+      // just tapped) keeps Enter and Space, but digits still type.
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "A") return;
+      if (tag === "BUTTON" && (event.key === "Enter" || event.key === " ")) return;
+      if (/^[0-9]$/.test(event.key)) this.padPress(event.key);
+      else if (event.key === "/") this.padPress("/");
+      else if (event.key === "Backspace") this.padDelete();
+      else if (event.key === "Enter") this.padGo();
+      else return;
+      event.preventDefault();
+    },
+    async submitSheet() {
+      if (this.busy) return;
       this.busy = true;
       this.error = "";
+      const seq = this.roundSeq;
       try {
         if (this.roundId) {
           const data = await this.post("/api/round/finish", { round_id: this.roundId, answers: this.answers });
+          if (seq !== this.roundSeq) return; // quit while grading: stay Home
           this.report = { results: data.results, score: data.score, total: data.total, percent: data.percent };
           this.reward = data.reward;
           if (typeof this.loadBattleCredits === "function") this.loadBattleCredits();
         } else {
-          this.report = await this.post("/api/grade", { id: this.sheetId, answers: this.answers });
+          const report = await this.post("/api/grade", { id: this.sheetId, answers: this.answers });
+          if (seq !== this.roundSeq) return;
+          this.report = report;
         }
         this.view = "math-results";
-        this.moveToTop();
+        this.moveToTop("#math-results-heading");
         if (this.report.percent === 100) confettiBurst();
       } catch (e) {
-        this.error = e.message;
+        if (seq === this.roundSeq) this.error = e.message;
       } finally {
-        this.busy = false;
+        if (seq === this.roundSeq) this.busy = false;
       }
     },
 
@@ -373,21 +435,25 @@ function dojo() {
       this.subject = "spelling";
       this.error = "";
       this.reward = null;
+      const seq = ++this.roundSeq;
       if (this.child) {
         this.busy = true;
         try {
-          this.roundId = newRoundId();
+          const roundId = newRoundId();
           const data = await this.post("/api/round/start", {
-            round_id: this.roundId, kind: "spelling", focus: this.spellingFocus,
+            round_id: roundId, kind: "spelling", focus: this.spellingFocus,
             grade: this.spellingGrade, count: this.spellingCount,
           });
+          if (seq !== this.roundSeq) return; // the child went Home while this loaded
+          this.roundId = roundId;
           this.spellingWords = data.words;
         } catch (e) {
+          if (seq !== this.roundSeq) return;
           this.error = e.message;
           this.roundId = "";
           return;
         } finally {
-          this.busy = false;
+          if (seq === this.roundSeq) this.busy = false;
         }
       } else {
         this.roundId = "";
@@ -516,19 +582,22 @@ function dojo() {
     async finishSpellingRound_() {
       this.busy = true;
       this.error = "";
+      const seq = this.roundSeq;
       try {
         const data = await this.post("/api/round/finish", { round_id: this.roundId, guesses: this.guessLog });
+        if (seq !== this.roundSeq) return false; // quit while saving: stay Home
         this.reward = data.reward;
         if (typeof this.loadBattleCredits === "function") this.loadBattleCredits();
         this.spellingScore = data.score;
         this.spellingResults = data.word_results.map(({ word, won }) => ({ word, won }));
         return true;
       } catch (e) {
+        if (seq !== this.roundSeq) return false;
         this.error = e.message;
         this.statusMessage = "Could not save this round. Tap again to retry.";
         return false;
       } finally {
-        this.busy = false;
+        if (seq === this.roundSeq) this.busy = false;
       }
     },
     rewardSummary() {
@@ -632,6 +701,8 @@ function dojo() {
       window.speechSynthesis?.cancel();
       this.view = "home";
       this.error = "";
+      this.roundSeq += 1; // anything still loading belongs to the old round
+      this.busy = false;
       this.questions = [];
       this.answers = [];
       // Training a kata from another grade must not change the child's

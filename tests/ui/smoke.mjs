@@ -63,23 +63,28 @@ try {
   await page.getByRole("group", { name: "Grade" }).getByRole("button", { name: "2" }).click();
   await page.getByRole("button", { name: /^Math/ }).click();
   await page.getByRole("button", { name: /Add & take away/ }).click();
-  const answers = page.locator("input[inputmode=numeric]:visible");
-  await answers.first().waitFor({ timeout: 5000 });
-  const answerCount = await answers.count();
-  await expect(answerCount === 10, `math sheet should show 10 inputs, saw ${answerCount}`);
-  for (let i = 0; i < answerCount; i += 1) await answers.nth(i).fill("1");
-  await page.getByRole("button", { name: /Grade my sheet/ }).click();
-  await page.locator("text=/out of/").first().waitFor({ timeout: 5000 });
-  await page.getByRole("button", { name: /Home 🏠/ }).click();
+  // One question at a time on the number pad: ten answers, then the celebrate screen.
+  await page.locator("#math-prompt").waitFor({ timeout: 5000 });
+  await expect(await page.locator("input:visible").count() === 0, "math play must not open a text input");
+  await expect((await page.locator(".kid-pill:visible").innerText()) === "1/10", "progress should start at 1/10");
+  for (let i = 0; i < 10; i += 1) {
+    await page.getByRole("button", { name: "1", exact: true }).click();
+    await page.getByRole("button", { name: i === 9 ? "Finish" : "Next" }).click();
+  }
+  await page.locator("#math-results-heading").waitFor({ timeout: 5000 });
+  await expect(/out of 10!/.test(await page.locator("#math-results-heading").innerText()), "celebrate should show the score in words");
+  await page.getByRole("button", { name: /^Home$/ }).first().click();
 
   // Times tables: Math → Times tables → 7 → ordered sheet of 12.
   await page.getByRole("button", { name: /^Math/ }).click();
   await page.getByRole("button", { name: /Times tables/ }).click();
   await page.getByRole("button", { name: "7 times table" }).click();
-  await page.locator("input[inputmode=numeric]:visible").first().waitFor({ timeout: 5000 });
-  const tableInputs = await page.locator("input[inputmode=numeric]:visible").count();
-  await expect(tableInputs === 12, `times-table sheet should show 12 inputs, saw ${tableInputs}`);
-  await expect((await page.locator("form:visible").innerText()).includes("1 × 7"), "ordered 7s should start at 1 × 7");
+  await page.locator("#math-prompt").waitFor({ timeout: 5000 });
+  await expect((await page.locator(".kid-pill:visible").innerText()) === "1/12", "a table round is 12 questions");
+  await expect((await page.locator("#math-prompt").innerText()).startsWith("1 × 7"), "ordered 7s should start at 1 × 7");
+  // Skip leaves a blank and moves on.
+  await page.getByRole("button", { name: /Skip/ }).click();
+  await expect((await page.locator(".kid-pill:visible").innerText()) === "2/12", "skip should advance");
   await page.getByRole("button", { name: "Home", exact: true }).click();
 
   await page.getByRole("button", { name: /^Spelling/ }).click();
@@ -157,7 +162,7 @@ try {
   await expect(cards === 10 || cards === 11, `grade tab should list its creatures, saw ${cards}`);
   await expect(await parent.locator("[aria-label^='This week']").count() === 1, "the sticker book should keep this week's mosaic");
   await parent.locator("ul[aria-label=Kata] li").first().getByRole("button", { name: /Train here/ }).click();
-  await parent.locator("#spelling-word-heading, input[inputmode=numeric]").first().waitFor({ timeout: 5000 });
+  await parent.locator("#spelling-word-heading, #math-prompt").first().waitFor({ timeout: 5000 });
 
   // Home shows the child's most-loved creature once one is found.
   await parent.goto(base + "/");
