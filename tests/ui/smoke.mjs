@@ -124,6 +124,11 @@ try {
   await expect(await parent.locator("text=Hi Nova!").count() === 1, "home should greet the active child");
   await expect(await parent.getByRole("group", { name: "Grade" }).count() === 0, "a signed-in child never sees a grade picker");
 
+  // Today's quests are on Home; the first one is glowing and playable.
+  await parent.locator("#quests-heading").waitFor({ timeout: 5000 });
+  await expect(await parent.locator("ol[aria-label=Quests] li").count() === 3, "home should list three quests");
+  await expect(await parent.locator(".kid-node-now").count() === 1, "exactly one quest is next");
+
   // Signed in, a Word Rescue round goes through the server and earns a reward.
   await parent.getByRole("button", { name: /^Spelling/ }).click();
   await parent.getByRole("button", { name: /Smart mix/ }).click();
@@ -165,12 +170,20 @@ try {
   await parent.locator("ul[aria-label=Kata] li").first().getByRole("button", { name: /Train here/ }).click();
   await parent.locator("#spelling-word-heading, #math-prompt").first().waitFor({ timeout: 5000 });
 
-  // Home shows the child's most-loved creature once one is found.
+  // Home shows the child's most-loved creature once one is found, and it talks.
   await parent.goto(base + "/");
   await parent.locator(".kid-hero svg").first().waitFor({ timeout: 5000 });
+  await expect((await parent.locator(".kid-bubble").first().innerText()).length > 0, "the buddy should say something");
+  // The mixed spelling round above completed the spelling quest.
+  await parent.locator("#quests-heading").waitFor({ timeout: 5000 });
+  await expect(await parent.locator(".kid-node-done").count() >= 1, "a finished matching round should complete a quest");
+  // Play quest starts a round straight from Home.
+  await parent.getByRole("button", { name: /Play quest/ }).click();
+  await parent.locator("#spelling-word-heading, #math-prompt").first().waitFor({ timeout: 5000 });
+  await parent.getByRole("button", { name: "Home", exact: true }).click();
 
   // Color by number: Play → open a page, pick a region, answer wrong, see it wait.
-  await parent.getByRole("button", { name: /^Play/ }).click();
+  await parent.getByRole("button", { name: /^Play Color by number/ }).click();
   await parent.getByRole("button", { name: /^Color by number/ }).click();
   await parent.locator("#paint-heading").waitFor({ timeout: 5000 });
   const regions = await parent.locator("svg[aria-label='Color by number page'] g[role=button]").count();

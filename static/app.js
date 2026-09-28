@@ -4,6 +4,8 @@ function dojo() {
     view: "home",
     subject: "math",
     showPatterns: false,
+    quests: null, // today's three, for a signed-in child
+    questsError: "",
     holdPct: 0,
     holdTimer: null,
     hashStart: false,
@@ -84,6 +86,7 @@ function dojo() {
     // so the home screen can show their creature.
     init() {
       if (this.child && typeof this.loadKata === "function") this.loadKata();
+      if (this.child) this.loadQuests();
       window.addEventListener("blur", () => this.holdEnd());
       if (this.hashStart) {
         this.hashStart = false;
@@ -100,6 +103,77 @@ function dojo() {
     },
     goHome() {
       this.reset();
+      if (this.child) this.loadQuests();
+    },
+    // Daily quests: three picked by the server for today. A finished round
+    // completes a quest on the server; Home reloads them.
+    async loadQuests() {
+      try {
+        const res = await fetch("/api/quests/today", { headers: { Accept: "application/json" } });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Could not load today's quests.");
+        this.quests = data;
+        this.questsError = "";
+      } catch (e) {
+        this.questsError = e.message;
+      }
+    },
+    nextQuest() {
+      if (!this.quests) return null;
+      return this.quests.quests.find((q) => !q.done) || null;
+    },
+    questState(q) {
+      if (q.done) return "done";
+      const next = this.nextQuest();
+      return next && next.id === q.id ? "now" : "locked";
+    },
+    async startQuest(q) {
+      // Quests go in order: only the glowing one starts.
+      if (!q || this.busy || this.questState(q) !== "now") return;
+      this.error = "";
+      // The quest was picked at a grade; play it there even if the profile
+      // grade changed today, since only a round at that grade completes it.
+      const grade = q.grade || (this.child ? this.child.grade : this.grade);
+      this.grade = grade;
+      this.spellingGrade = grade;
+      if (q.kind === "math" && q.focus === "tables") {
+        this.tableOrdered = true;
+        await this.pickTable(q.table);
+      } else if (q.kind === "math") {
+        await this.pickMath(q.focus);
+      } else {
+        await this.pickSpelling(q.focus);
+      }
+    },
+    // Buddy voice: the home creature speaks for itself. Cute designs are
+    // bubbly; cool designs are short. Everything else stays factual.
+    // The buddy is the home creature, or the round's first creature on a
+    // results screen (the home list may not know about it yet).
+    buddy() {
+      const hero = this.heroKata();
+      if (hero) return hero;
+      const touched = typeof this.rewardCreatures === "function" ? this.rewardCreatures() : [];
+      return touched.length ? touched[0] : null;
+    },
+    buddyVibe() {
+      const k = this.buddy();
+      const d = k && typeof kataDesign === "function" ? kataDesign(k.id) : null;
+      return d && d.vibe === "cool" ? "cool" : "cute";
+    },
+    buddySays() {
+      const cool = this.buddyVibe() === "cool";
+      if (this.quests && this.quests.all_done) return cool ? "All three done. Respect." : "We did all three quests! 🎉";
+      const q = this.nextQuest();
+      if (q) return cool ? `${q.label}. Let's go.` : `Let's do ${q.label.toLowerCase()} today!`;
+      if (this.kata && this.kata.review_due > 0) return cool ? "Some words got away. Rescue them." : "Some words are waiting for you!";
+      return cool ? "Pick something. I'm ready." : "What should we train today?";
+    },
+    buddyReacts(percent) {
+      const cool = this.buddyVibe() === "cool";
+      if (percent === 100) return cool ? "Flawless." : "PERFECT! I feel amazing!";
+      if (percent >= 80) return cool ? "Strong work." : "Wow! I feel stronger!";
+      if (percent >= 60) return cool ? "Good. Again?" : "Nice! Let's go again!";
+      return cool ? "Tough one. We'll get it." : "That was hard. I'm still with you!";
     },
     // Anonymous grade picker on the home screen; one grade for both dojos.
     setGrade(g) {
@@ -358,6 +432,7 @@ function dojo() {
       try {
         if (this.roundId) {
           const data = await this.post("/api/round/finish", { round_id: this.roundId, answers: this.answers });
+          if (this.child) this.loadQuests(); // the finish may have completed a quest, even if the child already went Home
           if (seq !== this.roundSeq) return; // quit while grading: stay Home
           this.report = { results: data.results, score: data.score, total: data.total, percent: data.percent };
           this.reward = data.reward;
@@ -369,6 +444,7 @@ function dojo() {
         }
         this.view = "math-results";
         this.moveToTop("#math-results-heading");
+        if (this.child && typeof this.loadKata === "function") this.loadKata();
         if (this.report.percent === 100) confettiBurst();
       } catch (e) {
         if (seq === this.roundSeq) this.error = e.message;
@@ -592,9 +668,11 @@ function dojo() {
       const seq = this.roundSeq;
       try {
         const data = await this.post("/api/round/finish", { round_id: this.roundId, guesses: this.guessLog });
+        if (this.child) this.loadQuests();
         if (seq !== this.roundSeq) return false; // quit while saving: stay Home
         this.reward = data.reward;
         if (typeof this.loadBattleCredits === "function") this.loadBattleCredits();
+        if (typeof this.loadKata === "function") this.loadKata();
         this.spellingScore = data.score;
         this.spellingResults = data.word_results.map(({ word, won }) => ({ word, won }));
         return true;

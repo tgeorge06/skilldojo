@@ -29,6 +29,7 @@ import (
 	"github.com/tgeorge06/skilldojo/internal/ost"
 	"github.com/tgeorge06/skilldojo/internal/paint"
 	"github.com/tgeorge06/skilldojo/internal/progress"
+	"github.com/tgeorge06/skilldojo/internal/quest"
 	"github.com/tgeorge06/skilldojo/internal/sheet"
 )
 
@@ -81,6 +82,7 @@ type server struct {
 	paint    *paint.Store
 	battles  *battle.Store
 	tests    *ost.Store
+	quests   *quest.Store
 	cur      *curriculum.Curriculum
 	mailer   mail.Mailer
 	tmpl     *template.Template
@@ -189,6 +191,11 @@ func newServer(cfg config, database *sql.DB, mailer mail.Mailer) (*server, error
 	prog.AddSink(painter)
 	battles := battle.New(database, cur, roster)
 	prog.AddSink(battles)
+	tests := ost.New(database)
+	// Quests run last so the day's reveal joins the creatures the kata
+	// sink already reported.
+	quests := quest.New(database, roster, questSources{prog: prog, tests: tests})
+	prog.AddSink(quests)
 	return &server{
 		cfg:      cfg,
 		store:    sheets,
@@ -197,7 +204,8 @@ func newServer(cfg config, database *sql.DB, mailer mail.Mailer) (*server, error
 		kata:     creatures,
 		paint:    painter,
 		battles:  battles,
-		tests:    ost.New(database),
+		tests:    tests,
+		quests:   quests,
 		cur:      cur,
 		mailer:   mailer,
 		tmpl:     tmpl,
@@ -250,6 +258,7 @@ func (s *server) handler() http.Handler {
 	mux.HandleFunc("POST /api/ost/start", s.handleOSTStart)
 	mux.HandleFunc("POST /api/ost/answer", s.handleOSTAnswer)
 	mux.HandleFunc("POST /api/ost/submit", s.handleOSTSubmit)
+	mux.HandleFunc("GET /api/quests/today", s.handleQuestsToday)
 
 	// Reject cross-origin form posts (Sec-Fetch-Site / Origin based), which
 	// with SameSite=Lax cookies is the CSRF defence for every POST above.

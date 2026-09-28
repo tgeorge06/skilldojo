@@ -573,3 +573,44 @@ test("the typing step owns the keyboard and closes on the next word", () => {
   game.loadSpellingWord();
   assert.equal(game.showWholeWord, false, "each word starts on the tiles");
 });
+
+test("the buddy suggests the next quest and speaks in its design's vibe", async () => {
+  const { game } = loadGame();
+  game.child = { id: 1, nickname: "Nova", grade: 3, round: 10 };
+  game.kata = { entries: [{ id: "math-mul-g3", state: "seen", fills: 3, regions: 17, kind: "math" }], review_due: 0 };
+  game.quests = { quests: [{ id: 1, idx: 0, kind: "math", focus: "frac", grade: 2, label: "Fractions", done: true }, { id: 2, idx: 1, kind: "spelling", focus: "review", grade: 2, label: "Words I keep missing", done: false }, { id: 3, idx: 2, kind: "math", focus: "tables", table: 7, grade: 2, label: "Times tables: 7s", done: false }], all_done: false };
+  assert.equal(game.nextQuest().id, 2);
+  assert.equal(game.questState(game.quests.quests[0]), "done");
+  assert.equal(game.questState(game.quests.quests[1]), "now");
+  assert.equal(game.questState(game.quests.quests[2]), "locked");
+  assert.ok(game.buddySays().toLowerCase().includes("words i keep missing"), game.buddySays());
+  game.quests.all_done = true;
+  assert.ok(/all three/i.test(game.buddySays()));
+  assert.ok(game.buddyReacts(100).length > 0 && game.buddyReacts(10) !== game.buddyReacts(100));
+  // Only the glowing quest starts; a locked one is refused.
+  game.quests.all_done = false;
+  let started = null;
+  game.pickTable = async (n) => { started = { table: n, grade: game.grade }; };
+  await game.startQuest(game.quests.quests[2]);
+  assert.equal(started, null, "a locked quest must not start");
+  let spelled = null;
+  game.pickSpelling = async (f) => { spelled = f; game.quests.quests[1].done = true; };
+  game.grade = 5;
+  await game.startQuest(game.quests.quests[1]);
+  assert.equal(spelled, "review");
+  assert.equal(game.grade, 2, "a quest runs at the grade it was picked at, even after a regrade");
+  await game.startQuest(game.quests.quests[2]);
+  assert.equal(started.table, 7, "the next quest unlocks once the one before is done");
+  // A finish that lands after Home still refreshes the quests.
+  let reloads = 0;
+  game.loadQuests = async () => { reloads += 1; };
+  game.roundId = "r1"; game.answers = ["1"]; game.questions = [{ prompt: "1 + 0" }]; game.busy = false;
+  let resolve;
+  game.post = () => new Promise((r) => { resolve = r; });
+  const finishing = game.submitSheet();
+  game.reset();
+  resolve({ results: [], score: 1, total: 1, percent: 100, reward: {} });
+  await finishing;
+  assert.equal(reloads, 1, "quests reload after a late finish");
+  assert.equal(game.view, "home");
+});

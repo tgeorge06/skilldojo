@@ -224,6 +224,37 @@
   .kid-dots i.kid-dot-now { background: #fbbf24; }
   .kid-link { min-height: 2.75rem; padding: 0 0.5rem; font-weight: 800; color: #667187; }
   .kid-link:disabled { opacity: 0.35; }
+  .kid-bubble {
+    display: inline-block;
+    max-width: 100%;
+    border-radius: 1rem;
+    background: #ede4ff;
+    color: #4c1d95;
+    padding: 0.35rem 0.75rem;
+    font-weight: 800;
+    font-size: 0.95rem;
+    margin-bottom: 0.35rem;
+  }
+  .kid-trail { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.5rem; position: relative; }
+  .kid-node { display: flex; align-items: center; gap: 0.75rem; }
+  .kid-ball {
+    width: 3.5rem;
+    height: 3.5rem;
+    flex: none;
+    border-radius: 9999px;
+    border: 4px solid #dde2ea;
+    background: white;
+    font-size: 1.5rem;
+    display: grid;
+    place-items: center;
+  }
+  .kid-node-done .kid-ball { background: #218a68; border-color: #218a68; color: white; font-weight: 800; }
+  .kid-node-now .kid-ball { border-color: #fbbf24; background: #fff3c4; box-shadow: 0 0 0 6px rgb(251 191 36 / 0.25); }
+  .kid-node-locked .kid-ball { opacity: 0.55; }
+  .kid-node-label { font-weight: 800; line-height: 1.15; }
+  .kid-node-label small { display: block; font-weight: 700; font-size: 0.8rem; color: #4d566b; }
+  .kid-node-done .kid-node-label { color: #667187; }
+  .stars { color: #fbbf24; letter-spacing: 2px; font-size: 1.1rem; }
   .kid-nav {
     position: fixed;
     inset-inline: 0;
