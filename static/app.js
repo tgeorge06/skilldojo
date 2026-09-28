@@ -290,9 +290,9 @@ function dojo() {
         this.view = "math-play";
         this.moveToTop();
       } catch (e) {
-        this.error = e.message;
+        if (seq === this.roundSeq) this.error = e.message;
       } finally {
-        this.busy = false;
+        if (seq === this.roundSeq) this.busy = false; // a stale request must not unlock a newer one
       }
     },
     // Number pad. Answers are strings, as the sheet API expects; a fraction
@@ -369,9 +369,9 @@ function dojo() {
         this.moveToTop("#math-results-heading");
         if (this.report.percent === 100) confettiBurst();
       } catch (e) {
-        this.error = e.message;
+        if (seq === this.roundSeq) this.error = e.message;
       } finally {
-        this.busy = false;
+        if (seq === this.roundSeq) this.busy = false;
       }
     },
 
