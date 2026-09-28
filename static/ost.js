@@ -158,6 +158,30 @@ function ostTest() {
         for (let i = 0; i < f.a; i += 1) bars += `<rect x="${i * pw}" y="0" width="${pw}" height="48" fill="${i < f.b ? "#7c3aed" : "#ffffff"}" stroke="#4c1d95" stroke-width="2"/>`;
         return `<svg width="${w + 4}" height="52" viewBox="-2 -2 ${w + 4} 52">${bars}</svg>`;
       }
+      if (f.kind === "bars") {
+        const names = f.names || [], vals = f.values || [], scale = f.a || 1;
+        const maxV = Math.max(scale, ...vals), rows = Math.ceil(maxV / scale), h = rows * 22, w = names.length * 60 + 40;
+        let out = "";
+        for (let g = 0; g <= rows; g += 1) {
+          const y = 10 + h - g * 22;
+          out += `<line x1="36" y1="${y}" x2="${w}" y2="${y}" stroke="currentColor" stroke-opacity="0.25"/><text x="30" y="${y + 5}" text-anchor="end" font-size="12" fill="currentColor">${g * scale}</text>`;
+        }
+        names.forEach((n, i) => {
+          const bh = (vals[i] / scale) * 22, x = 46 + i * 60;
+          out += `<rect x="${x}" y="${10 + h - bh}" width="40" height="${bh}" fill="#7c3aed"/><text x="${x + 20}" y="${h + 26}" text-anchor="middle" font-size="12" font-weight="700" fill="currentColor">${esc(n)}</text>`;
+        });
+        return `<svg width="${w + 6}" height="${h + 34}" viewBox="0 0 ${w + 6} ${h + 34}">${out}</svg>`;
+      }
+      if (f.kind === "lineplot") {
+        const vals = f.values || [], n = f.a || 8, step = 260 / n, labels = ["0", "¼", "½", "¾", "1", "1¼", "1½", "1¾", "2"];
+        let out = `<line x1="20" y1="70" x2="${20 + 260}" y2="70" stroke="currentColor" stroke-width="3"/>`;
+        for (let i = 0; i <= n; i += 1) {
+          const x = 20 + i * step;
+          out += `<line x1="${x}" y1="62" x2="${x}" y2="78" stroke="currentColor" stroke-width="2"/><text x="${x}" y="94" text-anchor="middle" font-size="12" font-weight="700" fill="currentColor">${labels[i] || ""}</text>`;
+          for (let k = 0; k < (vals[i] || 0); k += 1) out += `<text x="${x}" y="${56 - k * 16}" text-anchor="middle" font-size="16" font-weight="800" fill="#ef476f">X</text>`;
+        }
+        return `<svg width="300" height="100" viewBox="0 0 300 100">${out}<text x="150" y="99" font-size="1" fill="none">inches</text></svg>`;
+      }
       if (f.kind === "numberline") {
         const w = 240, step = w / f.a;
         let ticks = "";

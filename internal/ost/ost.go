@@ -45,13 +45,18 @@ type Item struct {
 // Figure is a small diagram the client draws next to the prompt. Kinds:
 // "rect" (A by B with labels; a label may be "?"), "grid" (A columns by
 // B rows of unit squares), "parts" (a bar cut into A equal parts with B
-// shaded), "numberline" (0 to 1 cut into A parts with a dot at part B).
+// shaded), "numberline" (0 to 1 cut into A parts with a dot at part B),
+// "bars" (a scaled bar graph: Names with Values, each grid line worth A),
+// "lineplot" (X marks above a ruler: Values are counts at each quarter
+// from 0, so index 2 is 1/2 inch; A is the number of quarters shown).
 type Figure struct {
-	Kind   string `json:"kind"`
-	A      int    `json:"a"`
-	B      int    `json:"b"`
-	LabelA string `json:"label_a,omitempty"`
-	LabelB string `json:"label_b,omitempty"`
+	Kind   string   `json:"kind"`
+	A      int      `json:"a"`
+	B      int      `json:"b"`
+	LabelA string   `json:"label_a,omitempty"`
+	LabelB string   `json:"label_b,omitempty"`
+	Names  []string `json:"names,omitempty"`
+	Values []int    `json:"values,omitempty"`
 	// Alt says what the picture shows, for read-aloud and screen readers.
 	Alt string `json:"alt"`
 }
@@ -75,6 +80,23 @@ func (f Figure) Describe() string {
 		return fmt.Sprintf("A picture of a bar cut into %d equal parts. %d of the parts are colored in.", f.A, f.B)
 	case "numberline":
 		return fmt.Sprintf("A picture of a number line from 0 to 1, cut into %d equal parts. The dot is %d parts from 0.", f.A, f.B)
+	case "bars":
+		var parts []string
+		for i, n := range f.Names {
+			if i < len(f.Values) {
+				parts = append(parts, fmt.Sprintf("%s %d", n, f.Values[i]))
+			}
+		}
+		return fmt.Sprintf("A picture of a bar graph. Each line on the graph counts %d. The bars show: %s.", f.A, strings.Join(parts, ", "))
+	case "lineplot":
+		var parts []string
+		labels := []string{"0", "1/4", "1/2", "3/4", "1", "1 1/4", "1 1/2", "1 3/4", "2"}
+		for i, n := range f.Values {
+			if n > 0 && i < len(labels) {
+				parts = append(parts, fmt.Sprintf("%d at %s", n, labels[i]))
+			}
+		}
+		return fmt.Sprintf("A picture of a line plot. Each X is one thing measured in inches. The X marks are: %s.", strings.Join(parts, ", "))
 	}
 	return ""
 }
@@ -271,6 +293,11 @@ func Build(grade int, seed uint64) ([]Item, error) {
 		for k := 0; k < counts[i]; k++ {
 			t := ts[order[k%len(order)]]
 			it := t.Gen(r)
+			// A test must not ask the same question twice; try a few more
+			// draws before accepting a repeat.
+			for tries := 0; tries < 8 && sameItem(items, it); tries++ {
+				it = t.Gen(r)
+			}
 			it.Category, it.Standard, it.DOK = w.Name, t.Standard, t.DOK
 			it.ID = fmt.Sprintf("%d-%s-%d", grade, strings.ReplaceAll(strings.ToLower(t.Standard), ".", ""), len(items)+1)
 			items = append(items, it)
@@ -282,6 +309,27 @@ func Build(grade int, seed uint64) ([]Item, error) {
 	}
 	return items, nil
 }
+
+// sameItem reports whether an equal question (prompt and choices) is
+// already on the test.
+func sameItem(items []Item, it Item) bool {
+	for _, o := range items {
+		if o.Prompt == it.Prompt && strings.Join(o.Choices, "|") == strings.Join(it.Choices, "|") && figureKey(o.Figure) == figureKey(it.Figure) {
+			return true
+		}
+	}
+	return false
+}
+
+func figureKey(f *Figure) string {
+	if f == nil {
+		return ""
+	}
+	return fmt.Sprintf("%s:%d:%d:%v", f.Kind, f.A, f.B, f.Values)
+}
+
+// Grade 3 fractions use only these denominators (Ohio content limits).
+var grade3Denominators = []int{2, 3, 4, 6, 8}
 
 // Answer is what the child submitted for one item.
 type Answer struct {

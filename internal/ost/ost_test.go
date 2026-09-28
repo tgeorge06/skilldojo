@@ -1,6 +1,7 @@
 package ost
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -135,7 +136,7 @@ func TestCheckAndNumbers(t *testing.T) {
 }
 
 func TestFiguresAndGlossary(t *testing.T) {
-	kinds := map[string]bool{"rect": true, "grid": true, "parts": true, "numberline": true}
+	kinds := map[string]bool{"rect": true, "grid": true, "parts": true, "numberline": true, "bars": true, "lineplot": true}
 	figures := 0
 	for grade := 3; grade <= 5; grade++ {
 		for seed := uint64(1); seed <= 40; seed++ {
@@ -146,7 +147,7 @@ func TestFiguresAndGlossary(t *testing.T) {
 				}
 				figures++
 				f := it.Figure
-				if !kinds[f.Kind] || f.A < 1 || f.B < 0 || f.A > 60 || f.B > 60 {
+				if !kinds[f.Kind] || f.A < 1 || f.B < 0 || f.A > 60 || f.B > 60 || (f.Kind == "bars" && len(f.Names) != len(f.Values)) {
 					t.Fatalf("bad figure on %s: %+v", it.Standard, f)
 				}
 				if (f.Kind == "parts" || f.Kind == "numberline") && f.B > f.A {
@@ -184,6 +185,62 @@ func TestFiguresAndGlossary(t *testing.T) {
 	for _, w := range []string{"perimeter", "rectangle", "area", "equivalent", "quadrilateral"} {
 		if _, ok := Terms[w]; !ok {
 			t.Fatalf("glossary is missing %q", w)
+		}
+	}
+}
+
+// Ohio's grade 3 blueprint and content limits: every listed standard has a
+// template, fractions stay on the allowed denominators, and a test never
+// repeats a question.
+func TestGrade3FollowsOhioBlueprint(t *testing.T) {
+	want := map[string]string{
+		"3.OA.1": "Multiplication and Division", "3.OA.2": "Multiplication and Division", "3.OA.3": "Multiplication and Division",
+		"3.OA.4": "Multiplication and Division", "3.OA.5": "Multiplication and Division", "3.OA.6": "Multiplication and Division",
+		"3.OA.7": "Multiplication and Division", "3.OA.8": "Multiplication and Division", "3.OA.9": "Multiplication and Division",
+		"3.NBT.3": "Multiplication and Division",
+		"3.NBT.1": "Number and Operations", "3.NBT.2": "Number and Operations", "3.MD.1": "Number and Operations",
+		"3.MD.2": "Number and Operations", "3.MD.3": "Number and Operations",
+		"3.MD.5": "Geometry", "3.MD.6": "Geometry", "3.MD.7": "Geometry", "3.MD.8": "Geometry", "3.G.1": "Geometry", "3.G.2": "Geometry",
+		"3.NF.1": "Fractions", "3.NF.2": "Fractions", "3.NF.3": "Fractions", "3.MD.4": "Fractions",
+	}
+	have := map[string]string{}
+	for _, tp := range templates[3] {
+		if c, ok := want[tp.Standard]; !ok {
+			t.Errorf("template for %s is not on the grade 3 blueprint", tp.Standard)
+		} else if c != tp.Category {
+			t.Errorf("%s is filed under %q; the blueprint puts it in %q", tp.Standard, tp.Category, c)
+		}
+		have[tp.Standard] = tp.Category
+	}
+	for std := range want {
+		if _, ok := have[std]; !ok {
+			t.Errorf("no template covers %s", std)
+		}
+	}
+	allowed := map[string]bool{"2": true, "3": true, "4": true, "6": true, "8": true, "1": true}
+	fracRE := regexp.MustCompile(`\b\d+/(\d+)\b`)
+	for seed := uint64(1); seed <= 200; seed++ {
+		items, _ := Build(3, seed)
+		seen := map[string]bool{}
+		for _, it := range items {
+			key := it.Prompt + "|" + strings.Join(it.Choices, "|") + "|" + figureKey(it.Figure)
+			if seen[key] {
+				t.Fatalf("seed %d repeats a question: %s", seed, it.Prompt)
+			}
+			seen[key] = true
+			if it.Category != "Fractions" && it.Standard != "3.G.2" {
+				continue
+			}
+			for _, text := range append([]string{it.Prompt, it.Numeric}, it.Choices...) {
+				for _, m := range fracRE.FindAllStringSubmatch(text, -1) {
+					if !allowed[m[1]] {
+						t.Fatalf("seed %d %s uses denominator %s (%s)", seed, it.Standard, m[1], text)
+					}
+				}
+			}
+			if strings.Contains(it.Prompt, "milliliter") {
+				t.Fatalf("milliliters are not a grade 3 unit: %s", it.Prompt)
+			}
 		}
 	}
 }
