@@ -4,6 +4,8 @@ function dojo() {
     view: "home",
     subject: "math",
     showPatterns: false,
+    quests: null, // today's three, for a signed-in child
+    questsError: "",
     holdPct: 0,
     holdTimer: null,
     hashStart: false,
@@ -84,6 +86,7 @@ function dojo() {
     // so the home screen can show their creature.
     init() {
       if (this.child && typeof this.loadKata === "function") this.loadKata();
+      if (this.child) this.loadQuests();
       window.addEventListener("blur", () => this.holdEnd());
       if (this.hashStart) {
         this.hashStart = false;
@@ -100,6 +103,67 @@ function dojo() {
     },
     goHome() {
       this.reset();
+      if (this.child) this.loadQuests();
+    },
+    // Daily quests: three picked by the server for today. A finished round
+    // completes a quest on the server; Home reloads them.
+    async loadQuests() {
+      try {
+        const res = await fetch("/api/quests/today", { headers: { Accept: "application/json" } });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Could not load today's quests.");
+        this.quests = data;
+        this.questsError = "";
+      } catch (e) {
+        this.questsError = e.message;
+      }
+    },
+    nextQuest() {
+      if (!this.quests) return null;
+      return this.quests.quests.find((q) => !q.done) || null;
+    },
+    questState(q) {
+      if (q.done) return "done";
+      const next = this.nextQuest();
+      return next && next.id === q.id ? "now" : "locked";
+    },
+    async startQuest(q) {
+      if (!q || this.busy) return;
+      this.error = "";
+      if (this.child) {
+        this.grade = this.child.grade;
+        this.spellingGrade = this.child.grade;
+      }
+      if (q.kind === "math" && q.focus === "tables") {
+        this.tableOrdered = true;
+        await this.pickTable(q.table);
+      } else if (q.kind === "math") {
+        await this.pickMath(q.focus);
+      } else {
+        await this.pickSpelling(q.focus);
+      }
+    },
+    // Buddy voice: the home creature speaks for itself. Cute designs are
+    // bubbly; cool designs are short. Everything else stays factual.
+    buddyVibe() {
+      const k = this.heroKata();
+      const d = k && typeof kataDesign === "function" ? kataDesign(k.id) : null;
+      return d && d.vibe === "cool" ? "cool" : "cute";
+    },
+    buddySays() {
+      const cool = this.buddyVibe() === "cool";
+      if (this.quests && this.quests.all_done) return cool ? "All three done. Respect." : "We did all three quests! 🎉";
+      const q = this.nextQuest();
+      if (q) return cool ? `${q.label}. Let's go.` : `Let's do ${q.label.toLowerCase()} today!`;
+      if (this.kata && this.kata.review_due > 0) return cool ? "Some words got away. Rescue them." : "Some words are waiting for you!";
+      return cool ? "Pick something. I'm ready." : "What should we train today?";
+    },
+    buddyReacts(percent) {
+      const cool = this.buddyVibe() === "cool";
+      if (percent === 100) return cool ? "Flawless." : "PERFECT! I feel amazing!";
+      if (percent >= 80) return cool ? "Strong work." : "Wow! I feel stronger!";
+      if (percent >= 60) return cool ? "Good. Again?" : "Nice! Let's go again!";
+      return cool ? "Tough one. We'll get it." : "That was hard. I'm still with you!";
     },
     // Anonymous grade picker on the home screen; one grade for both dojos.
     setGrade(g) {

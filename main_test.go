@@ -892,3 +892,51 @@ func TestPracticeTestEndpoints(t *testing.T) {
 		t.Fatalf("cross-account review: %d", res.StatusCode)
 	}
 }
+
+func TestQuestsEndpoint(t *testing.T) {
+	e := newTestEnv(t)
+	anon := e.client(t)
+	res, _ := anon.Get(e.srv.URL + "/api/quests/today")
+	if body(t, res); res.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("anonymous quests: %d", res.StatusCode)
+	}
+	c := e.signIn(t, "p@example.com")
+	e.postForm(t, c, "/family/children", url.Values{"nickname": {"Nova"}, "grade": {"2"}}).Body.Close()
+	res, _ = c.Get(e.srv.URL + "/api/quests/today")
+	page := body(t, res)
+	var day struct {
+		Quests []struct {
+			Kind  string `json:"kind"`
+			Focus string `json:"focus"`
+			Count int    `json:"count"`
+			Done  bool   `json:"done"`
+		} `json:"quests"`
+		AllDone bool `json:"all_done"`
+	}
+	if err := json.Unmarshal([]byte(page), &day); err != nil || res.StatusCode != http.StatusOK || len(day.Quests) != 3 {
+		t.Fatalf("quests: %d %s", res.StatusCode, snippet(page))
+	}
+	if day.Quests[1].Kind != "spelling" || day.Quests[1].Focus != "mixed" || day.Quests[1].Count != 5 {
+		t.Fatalf("spelling quest for a fresh grade 2 child: %+v", day.Quests[1])
+	}
+	// A matching spelling round completes the quest.
+	res, page = e.postJSON(t, c, "/api/round/start", `{"round_id":"quest-round-1","kind":"spelling","focus":"mixed","grade":2,"count":5}`)
+	var start struct {
+		Words []struct{ Word string } `json:"words"`
+	}
+	json.Unmarshal([]byte(page), &start)
+	var guesses []string
+	for range start.Words {
+		guesses = append(guesses, "[]")
+	}
+	res, page = e.postJSON(t, c, "/api/round/finish", `{"round_id":"quest-round-1","guesses":[`+strings.Join(guesses, ",")+`]}`)
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("finish: %d %s", res.StatusCode, page)
+	}
+	res, _ = c.Get(e.srv.URL + "/api/quests/today")
+	page = body(t, res)
+	json.Unmarshal([]byte(page), &day)
+	if !day.Quests[1].Done || day.Quests[0].Done || day.AllDone {
+		t.Fatalf("spelling quest should be done: %s", snippet(page))
+	}
+}

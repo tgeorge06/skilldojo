@@ -28,6 +28,7 @@
           <div class="flex items-center gap-3">
             <div class="shrink-0" x-html="kataSVG(heroKata(), 92)"></div>
             <div>
+              <p class="kid-bubble" x-text="buddySays()"></p>
               <p class="kid-hero-title" x-text="kataName(heroKata())"></p>
               <p class="kid-hero-hint" x-text="heroHint()"></p>
             </div>
@@ -54,6 +55,36 @@
         </template>
       </div>
       <p x-show="error" x-cloak role="alert" class="rounded-lg bg-rose-50 dark:bg-rose-950 px-4 py-3 text-sm font-medium text-rose-700 dark:text-rose-300" x-text="error"></p>
+
+      <!-- Today's quests: three picked by the server; the glowing one is next. -->
+      <template x-if="child && quests">
+        <section class="kid-hero space-y-3" aria-labelledby="quests-heading">
+          <div class="flex items-center justify-between">
+            <h2 id="quests-heading" class="kid-hero-title">Today's quests</h2>
+            <span class="stars" aria-label="quests done"><template x-for="q in quests.quests" :key="q.id"><span x-text="q.done ? '★' : '☆'"></span></template></span>
+          </div>
+          <ol class="kid-trail" aria-label="Quests">
+            <template x-for="(q, i) in quests.quests" :key="q.id">
+              <li class="kid-node" :class="'kid-node-' + questState(q)">
+                <button type="button" @click="startQuest(q)" :disabled="q.done || busy" class="kid-ball" :aria-label="`Quest ${i + 1}: ${q.label}${q.done ? ', done' : ''}`" x-text="q.done ? '✓' : (q.kind === 'math' ? (q.focus === 'tables' ? '✖️' : '🧮') : '🔤')"></button>
+                <div class="kid-node-label"><span x-text="q.label"></span><small x-text="q.done ? 'Done!' : q.reason"></small></div>
+              </li>
+            </template>
+          </ol>
+          <template x-if="quests.all_done && quests.reveal">
+            <div class="flex items-center gap-3 rounded-2xl bg-amber-50 p-3 dark:bg-amber-950">
+              <div class="shrink-0" x-html="revealSVG(JSON.parse(JSON.stringify(quests.reveal)))"></div>
+              <p class="font-bold">All done! You found <span x-text="quests.reveal.name"></span>. Come back tomorrow for three new quests.</p>
+            </div>
+          </template>
+          <template x-if="quests.all_done && !quests.reveal">
+            <p class="font-bold">All done for today! Come back tomorrow for three new quests.</p>
+          </template>
+          <button x-show="nextQuest()" x-cloak type="button" @click="startQuest(nextQuest())" :disabled="busy" class="kid-tile kid-tile-play justify-center"><span class="kid-tile-emoji" aria-hidden="true">▶️</span><span x-text="nextQuest() ? 'Play quest ' + (nextQuest().idx + 1) : ''"></span></button>
+        </section>
+      </template>
+      <p x-show="questsError" x-cloak role="alert" class="text-sm text-rose-700" x-text="questsError"></p>
+
       <button type="button" @click="openMath" class="kid-tile kid-tile-math"><span class="kid-tile-emoji" aria-hidden="true">🧮</span><span>Math<small>Add, times, divide, fractions</small></span></button>
       <button type="button" @click="openSpelling" class="kid-tile kid-tile-spell"><span class="kid-tile-emoji" aria-hidden="true">🔤</span><span>Spelling<small>Rescue words</small></span></button>
       <button x-show="child" x-cloak type="button" @click="openPlay" class="kid-tile kid-tile-play"><span class="kid-tile-emoji" aria-hidden="true">🎨</span><span>Play<small>Color by number · Battle</small></span></button>
@@ -167,6 +198,7 @@
     <section x-show="view === 'math-results'" x-cloak class="space-y-4">
       <div class="kid-hero text-center space-y-2">
         <div class="text-6xl" aria-hidden="true" x-text="report.percent === 100 ? '🏆' : report.percent >= 80 ? '🎉' : report.percent >= 60 ? '💪' : '🥋'"></div>
+        <p x-show="child && heroKata()" x-cloak class="kid-bubble mx-auto" x-text="buddyReacts(report.percent)"></p>
         <h2 id="math-results-heading" tabindex="-1" class="text-3xl font-black" x-text="`${report.score} out of ${report.total}!`"></h2>
         <p class="text-slate-600 dark:text-slate-300 font-semibold" x-text="gradeMessage()"></p>
         <p x-show="rewardSummary()" x-cloak class="inline-block rounded-full bg-emerald-100 px-4 py-1 text-sm font-bold text-emerald-800 dark:bg-emerald-900 dark:text-emerald-100" x-text="rewardSummary()"></p>
@@ -248,6 +280,7 @@
     <section x-show="view === 'spelling-results'" x-cloak class="space-y-4">
       <div class="kid-hero text-center space-y-2">
         <div class="text-6xl" aria-hidden="true" x-text="spellingScore === spellingWords.length ? '🏆' : spellingScore >= Math.ceil(spellingWords.length * .6) ? '🌟' : '💪'"></div>
+        <p x-show="child && heroKata()" x-cloak class="kid-bubble mx-auto" x-text="buddyReacts(spellingWords.length ? Math.round(spellingScore * 100 / spellingWords.length) : 0)"></p>
         <h2 id="spelling-results-heading" tabindex="-1" class="text-3xl font-black" x-text="`You rescued ${spellingScore} of ${spellingWords.length}!`"></h2>
         <p class="text-slate-600 dark:text-slate-300 font-semibold" x-text="spellingResultMessage()"></p>
         <p x-show="rewardSummary()" x-cloak class="inline-block rounded-full bg-violet-100 px-4 py-1 text-sm font-bold text-violet-800 dark:bg-violet-900 dark:text-violet-100" x-text="rewardSummary()"></p>

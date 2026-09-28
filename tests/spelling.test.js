@@ -573,3 +573,29 @@ test("the typing step owns the keyboard and closes on the next word", () => {
   game.loadSpellingWord();
   assert.equal(game.showWholeWord, false, "each word starts on the tiles");
 });
+
+test("the buddy suggests the next quest and speaks in its design's vibe", async () => {
+  const { game } = loadGame();
+  game.child = { id: 1, nickname: "Nova", grade: 3, round: 10 };
+  game.kata = { entries: [{ id: "math-mul-g3", state: "seen", fills: 3, regions: 17, kind: "math" }], review_due: 0 };
+  game.quests = { quests: [{ id: 1, idx: 0, kind: "math", focus: "frac", label: "Fractions", done: true }, { id: 2, idx: 1, kind: "spelling", focus: "review", label: "Words I keep missing", done: false }, { id: 3, idx: 2, kind: "math", focus: "tables", table: 7, label: "Times tables: 7s", done: false }], all_done: false };
+  assert.equal(game.nextQuest().id, 2);
+  assert.equal(game.questState(game.quests.quests[0]), "done");
+  assert.equal(game.questState(game.quests.quests[1]), "now");
+  assert.equal(game.questState(game.quests.quests[2]), "locked");
+  assert.ok(game.buddySays().toLowerCase().includes("words i keep missing"), game.buddySays());
+  game.quests.all_done = true;
+  assert.ok(/all three/i.test(game.buddySays()));
+  assert.ok(game.buddyReacts(100).length > 0 && game.buddyReacts(10) !== game.buddyReacts(100));
+  // Starting a tables quest sets the table and starts a round at the child's grade.
+  let started = null;
+  game.pickTable = async (n) => { started = { table: n, grade: game.grade }; };
+  game.grade = 5;
+  await game.startQuest(game.quests.quests[2]);
+  assert.equal(started.table, 7);
+  assert.equal(started.grade, 3, "a quest always runs at the profile grade");
+  let spelled = null;
+  game.pickSpelling = async (f) => { spelled = f; };
+  await game.startQuest(game.quests.quests[1]);
+  assert.equal(spelled, "review");
+});
