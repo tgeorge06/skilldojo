@@ -553,3 +553,23 @@ test("a spelling round that finishes loading after Home is dropped", async () =>
   assert.equal(game.roundId, "", "the stale round id is never adopted");
   assert.equal(game.busy, false);
 });
+
+test("the typing step owns the keyboard and closes on the next word", () => {
+  const { game, context } = loadGame();
+  game.spellingWords = [{ word: "cat", clue: "pet", sentence: "The cat sat.", skill: "g1-short-vowels" }, { word: "dog", clue: "pet", sentence: "The dog ran.", skill: "g1-short-vowels" }];
+  game.guessLog = [[], []];
+  game.spellingRound = 0;
+  game.view = "spelling-game";
+  game.loadSpellingWord();
+  context.document.activeElement = { tagName: "BUTTON" };
+  game.showWholeWord = true;
+  game.handleKey({ key: "c" });
+  assert.equal(game.guessedLetters.join(","), "", "typing while the word field is open is not a letter guess");
+  game.showWholeWord = false;
+  game.handleKey({ key: "c" });
+  assert.equal(game.guessedLetters.join(","), "C");
+  game.showWholeWord = true;
+  game.spellingRound = 1;
+  game.loadSpellingWord();
+  assert.equal(game.showWholeWord, false, "each word starts on the tiles");
+});

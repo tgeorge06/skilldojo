@@ -633,7 +633,8 @@ function dojo() {
         : `${letter}, guessed, not in the word`;
     },
     handleKey(event) {
-      if (this.view !== "spelling-game" || this.roundDone || event.metaKey || event.ctrlKey || event.altKey) return;
+      // While the typing step is open, every key belongs to the word field.
+      if (this.view !== "spelling-game" || this.roundDone || this.showWholeWord || event.metaKey || event.ctrlKey || event.altKey) return;
       const tag = document.activeElement ? document.activeElement.tagName : "";
       if (tag === "INPUT" || tag === "TEXTAREA") return;
       const letter = event.key.toUpperCase();

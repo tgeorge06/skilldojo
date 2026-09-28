@@ -210,9 +210,9 @@
       <div class="flex items-center justify-between gap-3">
         <button type="button" @click="reset" class="kid-back" aria-label="Quit this round and go home">‹</button>
         <div class="kid-dots" role="progressbar" :aria-valuenow="spellingRound + (roundDone ? 1 : 0)" aria-valuemin="0" :aria-valuemax="spellingWords.length" aria-label="Word rescue progress">
-          <template x-for="(w, i) in spellingWords" :key="i"><i :class="i === spellingRound ? 'kid-dot-now' : i < spellingRound ? 'kid-dot-done' : ''"></i></template>
+          <template x-for="(w, i) in spellingWords" :key="i"><i :class="i < spellingRound || (i === spellingRound && roundDone) ? 'kid-dot-done' : i === spellingRound ? 'kid-dot-now' : ''"></i></template>
         </div>
-        <div class="flex gap-0.5" role="img" :aria-label="triesLeft() + ' tries left'"><template x-for="n in 6" :key="n"><span class="lantern" :class="n <= triesLeft() ? 'lantern-on' : 'lantern-off'" aria-hidden="true">🏮</span></template></div>
+        <div class="flex gap-0.5" aria-hidden="true"><template x-for="n in 6" :key="n"><span class="lantern" :class="n <= triesLeft() ? 'lantern-on' : 'lantern-off'">🏮</span></template></div>
       </div>
       <p class="sr-only" aria-live="polite" x-text="triesLeft() + ' tries left'"></p>
 
