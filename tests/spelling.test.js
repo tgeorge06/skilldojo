@@ -502,10 +502,38 @@ test("the number pad builds one answer at a time and finishes on the first blank
   game.padPress("4");
   await game.padGo();
   assert.equal(graded, 1, "the last answered question grades the round");
-  game.answers = ["", "3/4", "4"]; game.qIndex = 2;
+  game.answers = ["", "3/4", "4"]; game.qIndex = 2; game.revisited = false;
   await game.padGo();
   assert.equal(game.qIndex, 0, "finishing with a blank returns to the first blank instead of grading");
   assert.equal(graded, 1);
+  await game.skipQuestion(); await game.skipQuestion();
+  assert.equal(game.qIndex, 2);
+  await game.padGo();
+  assert.equal(graded, 2, "a second Finish grades even with a blank, so nobody is trapped");
   for (let i = 0; i < 12; i += 1) game.padPress("9");
-  assert.equal(game.answers[0].length, 7, "answers are capped");
+  assert.equal(game.answers[game.qIndex].length, 7, "answers are capped");
+});
+
+test("a round that finishes loading after Home is dropped, and Enter on a button is not a pad key", async () => {
+  const { game, context } = loadGame();
+  game.child = null;
+  let resolve;
+  game.post = () => new Promise((r) => { resolve = r; });
+  const started = game.startSheet();
+  game.reset();
+  resolve({ id: "s1", questions: [{ prompt: "1 + 1", op: "addsub" }] });
+  await started;
+  assert.equal(game.view, "home", "a late start must not reopen play");
+  assert.equal(game.questions.length, 0);
+  assert.equal(game.busy, false);
+
+  game.questions = [{ prompt: "1 + 1", op: "addsub" }]; game.answers = [""]; game.qIndex = 0; game.view = "math-play";
+  const events = [];
+  const key = (k, tag) => { context.document.activeElement = { tagName: tag }; const e = { key: k, preventDefault() { events.push(k); } }; game.mathKey(e); };
+  key("5", "BODY");
+  assert.equal(game.answers[0], "5");
+  key("Enter", "BUTTON");
+  assert.deepEqual(events.map(String), ["5"], "Enter on a focused button is left to the button");
+  key("7", "INPUT");
+  assert.equal(game.answers[0], "5", "typing in a text field is not the pad");
 });

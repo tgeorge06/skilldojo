@@ -220,8 +220,8 @@
   .kid-key-wide { grid-column: 1 / -1; min-height: 3rem; font-size: 1.5rem; }
   .kid-dots { display: flex; flex: 1; justify-content: center; gap: 4px; flex-wrap: wrap; }
   .kid-dots i { width: 14px; height: 7px; border-radius: 4px; background: #dde2ea; }
-  .kid-dot-done { background: #218a68; }
-  .kid-dot-now { background: #fbbf24; }
+  .kid-dots i.kid-dot-done { background: #218a68; }
+  .kid-dots i.kid-dot-now { background: #fbbf24; }
   .kid-link { min-height: 2.75rem; padding: 0 0.5rem; font-weight: 800; color: #667187; }
   .kid-link:disabled { opacity: 0.35; }
   .kid-nav {
@@ -300,8 +300,8 @@
   .kid-key-wide { grid-column: 1 / -1; min-height: 3rem; font-size: 1.5rem; }
   .kid-dots { display: flex; flex: 1; justify-content: center; gap: 4px; flex-wrap: wrap; }
   .kid-dots i { width: 14px; height: 7px; border-radius: 4px; background: #dde2ea; }
-  .kid-dot-done { background: #218a68; }
-  .kid-dot-now { background: #fbbf24; }
+  .kid-dots i.kid-dot-done { background: #218a68; }
+  .kid-dots i.kid-dot-now { background: #fbbf24; }
   .kid-link { min-height: 2.75rem; padding: 0 0.5rem; font-weight: 800; color: #667187; }
   .kid-link:disabled { opacity: 0.35; }
   .kid-nav { background: rgb(23 28 38 / 0.96); border-color: #232a38; }

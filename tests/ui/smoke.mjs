@@ -82,7 +82,7 @@ try {
   await page.locator("#math-prompt").waitFor({ timeout: 5000 });
   await expect((await page.locator(".kid-pill:visible").innerText()) === "1/12", "a table round is 12 questions");
   await expect((await page.locator("#math-prompt").innerText()).startsWith("1 × 7"), "ordered 7s should start at 1 × 7");
-  // Skip leaves a blank; Finish on the last question returns to the first blank instead of grading.
+  // Skip leaves a blank and moves on.
   await page.getByRole("button", { name: /Skip/ }).click();
   await expect((await page.locator(".kid-pill:visible").innerText()) === "2/12", "skip should advance");
   await page.getByRole("button", { name: "Home", exact: true }).click();

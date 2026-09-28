@@ -138,10 +138,11 @@
       <div class="flex items-center justify-between gap-3">
         <button type="button" @click="reset" class="kid-back" aria-label="Quit this round and go home">‹</button>
         <div class="kid-dots" role="progressbar" :aria-valuenow="qIndex + 1" aria-valuemin="1" :aria-valuemax="questions.length" :aria-label="`Question ${qIndex + 1} of ${questions.length}`">
-          <template x-for="(q, i) in questions" :key="i"><i :class="i < qIndex || (i !== qIndex && answers[i]) ? 'kid-dot-done' : i === qIndex ? 'kid-dot-now' : ''"></i></template>
+          <template x-for="(q, i) in questions" :key="i"><i :class="i === qIndex ? 'kid-dot-now' : answers[i] ? 'kid-dot-done' : ''"></i></template>
         </div>
         <span class="kid-pill" x-text="`${qIndex + 1}/${questions.length}`"></span>
       </div>
+      <p class="sr-only" aria-live="polite" x-text="questions[qIndex] ? `Question ${qIndex + 1} of ${questions.length}: ${questions[qIndex].prompt}` : ''"></p>
       <template x-if="questions[qIndex]">
         <div class="kid-hero text-center">
           <p id="math-prompt" class="kid-prompt tabular-nums" x-text="questions[qIndex].prompt + ' ='"></p>
@@ -186,6 +187,7 @@
           <p x-show="battleError" x-cloak role="alert" class="mt-2 text-sm text-rose-700" x-text="battleError"></p>
         </div>
       </div>
+      <p x-show="error" x-cloak role="alert" class="rounded-lg bg-rose-50 dark:bg-rose-950 px-4 py-3 text-sm font-medium text-rose-700 dark:text-rose-300" x-text="error"></p>
       <button type="button" @click="startSheet" :disabled="busy" class="kid-tile kid-tile-math justify-center"><span class="kid-tile-emoji" aria-hidden="true">🔁</span><span>Again!</span></button>
       <button type="button" @click="reset" class="kid-tile justify-center bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-800"><span class="kid-tile-emoji" aria-hidden="true">🏠</span><span>Home</span></button>
       <details class="kid-row">
